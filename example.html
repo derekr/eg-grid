@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Gridiot Example</title>
+		<style>
+			* {
+				box-sizing: border-box;
+			}
+
+			body {
+				font-family: system-ui, sans-serif;
+				padding: 2rem;
+				background: #f5f5f5;
+			}
+
+			h1 {
+				margin-bottom: 1rem;
+			}
+
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(4, 100px);
+				grid-auto-rows: 100px;
+				gap: 8px;
+				background: #ddd;
+				padding: 8px;
+				border-radius: 8px;
+				width: fit-content;
+			}
+
+			.item {
+				background: white;
+				border-radius: 4px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: bold;
+				font-size: 1.5rem;
+				cursor: grab;
+				user-select: none;
+			}
+
+			.item:focus {
+				outline: 2px solid #0066ff;
+				outline-offset: 2px;
+			}
+
+			.item[data-gridiot-dragging] {
+				cursor: grabbing;
+				transform: scale(1.05);
+				box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), 0 4px 8px rgba(0, 0, 0, 0.1);
+				z-index: 100;
+			}
+
+			/* Keep dropped card on top during FLIP animation */
+			.item[data-gridiot-dropping] {
+				z-index: 100;
+			}
+
+			/* View Transitions */
+			.item {
+				view-transition-name: var(--item-id);
+			}
+
+			::view-transition-group(*) {
+				animation-duration: 200ms;
+				animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+			}
+
+			/* Disable crossfade to prevent ghosting - only animate position */
+			::view-transition-old(*) {
+				animation: none;
+				opacity: 0;
+			}
+
+			::view-transition-new(*) {
+				animation: none;
+			}
+
+			/* Don't animate the dragging item - it follows the cursor */
+			::view-transition-old(dragging),
+			::view-transition-new(dragging) {
+				animation: none;
+			}
+
+			::view-transition-group(dragging) {
+				animation: none;
+			}
+
+			.log {
+				margin-top: 1rem;
+				padding: 1rem;
+				background: #1a1a1a;
+				color: #0f0;
+				font-family: monospace;
+				font-size: 0.875rem;
+				border-radius: 4px;
+				max-height: 200px;
+				overflow-y: auto;
+			}
+
+			.instructions {
+				margin-top: 1rem;
+				padding: 1rem;
+				background: white;
+				border-radius: 4px;
+				font-size: 0.875rem;
+			}
+
+			.instructions h3 {
+				margin-bottom: 0.5rem;
+			}
+
+			.instructions ul {
+				margin: 0;
+				padding-left: 1.5rem;
+			}
+
+			.instructions li {
+				margin-bottom: 0.25rem;
+			}
+
+			.instructions kbd {
+				background: #eee;
+				padding: 2px 6px;
+				border-radius: 3px;
+				font-family: monospace;
+				font-size: 0.8rem;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Gridiot Example</h1>
+		<p>Drag items to reorder. Uses push-down algorithm with View Transitions.</p>
+
+		<div class="grid" id="grid">
+			<div
+				class="item"
+				data-gridiot-item
+				data-gridiot-label="Item A"
+				data-id="a"
+				style="grid-column: 1; grid-row: 1; --item-id: item-a; background: #e8f5e9"
+				tabindex="0"
+			>
+				A
+			</div>
+			<div
+				class="item"
+				data-gridiot-item
+				data-gridiot-label="Item B"
+				data-id="b"
+				style="grid-column: 2; grid-row: 1; --item-id: item-b; background: #e3f2fd"
+				tabindex="0"
+			>
+				B
+			</div>
+			<div
+				class="item"
+				data-gridiot-item
+				data-gridiot-label="Item C"
+				data-id="c"
+				style="grid-column: 3; grid-row: 1; --item-id: item-c; background: #fce4ec"
+				tabindex="0"
+			>
+				C
+			</div>
+			<div
+				class="item"
+				data-gridiot-item
+				data-gridiot-label="Item D"
+				data-id="d"
+				style="grid-column: 4; grid-row: 1; --item-id: item-d; background: #fff3e0"
+				tabindex="0"
+			>
+				D
+			</div>
+			<div
+				class="item"
+				data-gridiot-item
+				data-gridiot-label="Item E"
+				data-id="e"
+				style="grid-column: 1; grid-row: 2; --item-id: item-e; background: #f3e5f5"
+				tabindex="0"
+			>
+				E
+			</div>
+			<div
+				class="item"
+				data-gridiot-item
+				data-gridiot-label="Item F"
+				data-id="f"
+				style="grid-column: 2; grid-row: 2; --item-id: item-f; background: #e0f7fa"
+				tabindex="0"
+			>
+				F
+			</div>
+		</div>
+
+		<div class="instructions">
+			<h3>Controls</h3>
+			<ul>
+				<li><strong>Mouse:</strong> Drag items to reorder</li>
+				<li><strong>Keyboard:</strong> <kbd>Tab</kbd> to focus, <kbd>Enter</kbd>/<kbd>Space</kbd> to grab, arrows to move, <kbd>Escape</kbd> to cancel</li>
+				<li><strong>Accessibility:</strong> Screen reader announcements for all actions</li>
+			</ul>
+		</div>
+
+		<div class="log" id="log"></div>
+
+		<script type="module">
+			// Import core gridiot (includes pointer, keyboard, accessibility)
+			import { init } from './dist/gridiot.js';
+
+			// Import push algorithm (algorithms are separate, pluggable)
+			import { attachPushAlgorithm } from './dist/algorithm-push.js';
+
+			const grid = init(document.getElementById('grid'));
+
+			// Attach the push algorithm to handle layout during drag
+			const detachAlgorithm = attachPushAlgorithm(grid.element);
+			const log = document.getElementById('log');
+
+			function logEvent(msg) {
+				const line = document.createElement('div');
+				line.textContent = `${new Date().toLocaleTimeString()} - ${msg}`;
+				log.prepend(line);
+				if (log.children.length > 20) log.lastChild.remove();
+			}
+
+			// Listen for drag events (just for logging - algorithm handles layout)
+			grid.element.addEventListener('gridiot:drag-start', (e) => {
+				logEvent(`Drag start: ${e.detail.item.dataset.id}`);
+			});
+
+			grid.element.addEventListener('gridiot:drag-move', (e) => {
+				logEvent(`Drag move: ${e.detail.item.dataset.id} over (${e.detail.cell.column}, ${e.detail.cell.row})`);
+			});
+
+			grid.element.addEventListener('gridiot:drag-end', (e) => {
+				logEvent(`Drag end: ${e.detail.item.dataset.id} at (${e.detail.cell.column}, ${e.detail.cell.row})`);
+			});
+
+			grid.element.addEventListener('gridiot:drag-cancel', (e) => {
+				logEvent(`Drag cancelled: ${e.detail.item.dataset.id}`);
+			});
+
+			logEvent('Gridiot initialized with push algorithm');
+		</script>
+	</body>
+</html>

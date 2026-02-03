@@ -1,0 +1,2263 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>CSS Grid Drag & Drop with View Transitions</title>
+		<style>
+			* {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				font-family:
+					system-ui,
+					-apple-system,
+					sans-serif;
+				background: #1a1a2e;
+				min-height: 100vh;
+				padding: 32px;
+			}
+
+			.grid-container {
+				display: grid;
+				/* Columns set by generated CSS based on container queries */
+				grid-auto-rows: 184px;
+				gap: 16px;
+				max-width: 1216px;
+				margin: 0 auto;
+				position: relative;
+			}
+
+			/* Enable container queries */
+			.grid-wrapper {
+				container-type: inline-size;
+			}
+
+			/* Layout CSS is generated and injected into #layout-styles */
+
+			.grid-item {
+				border-radius: 12px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: white;
+				font-weight: 600;
+				font-size: 18px;
+				cursor: grab;
+				user-select: none;
+				-webkit-user-select: none;
+				-webkit-touch-callout: none;
+				position: relative;
+				contain: layout;
+				transition: box-shadow 0.2s ease;
+			}
+
+			.grid-item:active {
+				cursor: grabbing;
+			}
+
+			/* Prevent all selection during drag */
+			body.is-dragging {
+				user-select: none;
+				-webkit-user-select: none;
+				cursor: grabbing;
+			}
+
+			body.is-dragging * {
+				user-select: none;
+				-webkit-user-select: none;
+			}
+
+			.grid-item.dragging {
+				opacity: 1;
+				box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+				z-index: 100;
+				/* During drag, use fixed positioning */
+				position: fixed;
+				pointer-events: none;
+			}
+
+			.grid-item.selected {
+				outline: 3px solid yellow;
+				outline-offset: -3px;
+			}
+
+			/* Keep dropped card on top during FLIP animation */
+			.grid-item.dropping {
+				z-index: 100;
+			}
+
+			/* Color variants for visual distinction */
+			.grid-item[data-color='1'] {
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			}
+			.grid-item[data-color='2'] {
+				background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+			}
+			.grid-item[data-color='3'] {
+				background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+			}
+			.grid-item[data-color='4'] {
+				background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+			}
+			.grid-item[data-color='5'] {
+				background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+			}
+			.grid-item[data-color='6'] {
+				background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+				color: #333;
+			}
+
+			/* Drop placeholder showing where item will land */
+			.drop-placeholder {
+				background: rgba(255, 255, 255, 0.1);
+				border: 2px dashed rgba(255, 255, 255, 0.4);
+				border-radius: 12px;
+				pointer-events: none;
+				/* Exclude from view transitions to prevent flickering */
+				view-transition-name: none;
+			}
+
+			/* View Transition styles */
+			::view-transition-group(*) {
+				animation-duration: 200ms;
+				animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+			}
+
+			/* Don't animate the dragging item - it follows cursor */
+			::view-transition-old(dragging),
+			::view-transition-new(dragging) {
+				animation: none;
+			}
+
+			/* Fix z-index for UI elements during view transitions */
+			::view-transition-group(debug-panel) {
+				z-index: 1000;
+			}
+
+			::view-transition-group(instructions) {
+				z-index: 999;
+			}
+
+			/* Debug panel */
+			.debug-panel {
+				position: fixed;
+				top: 16px;
+				right: 16px;
+				background: rgba(0, 0, 0, 0.9);
+				color: #0f0;
+				padding: 16px;
+				border-radius: 8px;
+				font-family: monospace;
+				font-size: 11px;
+				max-width: 320px;
+				z-index: 1000;
+				max-height: 400px;
+				overflow-y: auto;
+				view-transition-name: debug-panel;
+			}
+
+			.debug-panel h3 {
+				margin-bottom: 8px;
+				color: #fff;
+			}
+
+			.instructions {
+				position: fixed;
+				bottom: 16px;
+				left: 16px;
+				background: rgba(0, 0, 0, 0.9);
+				color: #fff;
+				padding: 16px;
+				border-radius: 8px;
+				font-size: 14px;
+				max-width: 400px;
+				z-index: 999;
+				view-transition-name: instructions;
+			}
+
+			.instructions h3 {
+				margin-bottom: 8px;
+			}
+
+			.instructions ul {
+				margin-left: 20px;
+			}
+
+			.instructions li {
+				margin-bottom: 4px;
+			}
+
+			.instructions kbd {
+				background: #444;
+				padding: 2px 6px;
+				border-radius: 4px;
+				font-family: monospace;
+			}
+		</style>
+		<!-- Generated layout CSS - positions for each column count via container queries -->
+		<style id="layout-styles"></style>
+		<!-- Preview CSS during drag - higher specificity to override layout-styles -->
+		<style id="preview-styles"></style>
+	</head>
+	<body>
+		<div class="grid-wrapper">
+			<div class="grid-container" id="grid">
+				<!-- Items will be rendered by JavaScript -->
+			</div>
+		</div>
+
+		<div class="debug-panel" id="debug">
+			<h3>Debug Info</h3>
+			<div id="debug-content">Ready</div>
+		</div>
+
+		<div class="instructions">
+			<h3>CSS Grid + View Transitions Prototype</h3>
+			<ul>
+				<li>Click and drag any item to reorder</li>
+				<li>Items animate smoothly as they reflow</li>
+				<li>
+					Click to select, then <kbd>H</kbd><kbd>J</kbd><kbd>K</kbd
+					><kbd>L</kbd> or arrows to nudge
+				</li>
+				<li><kbd>Ctrl</kbd>+nav to jump/reorder (leap over cards)</li>
+				<li><kbd>Alt</kbd>+nav to select adjacent card</li>
+				<li><kbd>Esc</kbd> to deselect</li>
+				<li><strong>Resize window</strong> to see fluid column reflow</li>
+				<li>Drag at different widths creates per-column overrides</li>
+			</ul>
+			<div
+				style="
+					margin-top: 12px;
+					padding-top: 12px;
+					border-top: 1px solid rgba(255, 255, 255, 0.2);
+				"
+			>
+				<label style="display: block; margin-bottom: 8px; font-weight: 600"
+					>Layout Algorithms:</label
+				>
+				<div
+					style="
+						display: grid;
+						grid-template-columns: auto 1fr;
+						gap: 6px 8px;
+						align-items: center;
+						font-size: 12px;
+					"
+				>
+					<label for="alg-drag">Drag:</label>
+					<select id="alg-drag" class="alg-select">
+						<option value="push-down" selected>Push-Down</option>
+						<option value="reorder">Reorder</option>
+						<option value="swap">Swap</option>
+						<option value="insert">Insert</option>
+						<option value="snap-to-gap">Snap to Gap</option>
+					</select>
+					<label for="alg-nudge">Nudge:</label>
+					<select id="alg-nudge" class="alg-select">
+						<option value="push-down" selected>Push-Down</option>
+						<option value="reorder">Reorder</option>
+						<option value="swap">Swap</option>
+						<option value="insert">Insert</option>
+						<option value="snap-to-gap">Snap to Gap</option>
+					</select>
+					<label for="alg-jump">Jump:</label>
+					<select id="alg-jump" class="alg-select">
+						<option value="push-down">Push-Down</option>
+						<option value="reorder" selected>Reorder</option>
+						<option value="swap">Swap</option>
+						<option value="insert">Insert</option>
+						<option value="snap-to-gap">Snap to Gap</option>
+					</select>
+				</div>
+				<p style="margin-top: 8px; font-size: 11px; opacity: 0.7">
+					<strong>Push-Down:</strong> Cascade collisions downward<br />
+					<strong>Reorder:</strong> Shift items to fill gaps<br />
+					<strong>Swap:</strong> Exchange positions (2 items move)<br />
+					<strong>Insert:</strong> Shift items by 1 cell<br />
+					<strong>Snap to Gap:</strong> Find nearest empty position
+				</p>
+				<label
+					style="
+						display: block;
+						margin-top: 12px;
+						margin-bottom: 8px;
+						font-weight: 600;
+					"
+					>Layout Options:</label
+				>
+				<div
+					style="
+						display: grid;
+						grid-template-columns: auto 1fr;
+						gap: 6px 8px;
+						align-items: center;
+						font-size: 12px;
+					"
+				>
+					<label for="opt-nudge-amount">Nudge by:</label>
+					<select id="opt-nudge-amount" class="alg-select">
+						<option value="1" selected>1 cell</option>
+						<option value="item-size">Item size</option>
+					</select>
+					<label for="opt-reorder-shift">Reorder shift:</label>
+					<select id="opt-reorder-shift" class="alg-select">
+						<option value="movement">Movement amount</option>
+						<option value="item-size" selected>Item size</option>
+					</select>
+					<label for="opt-compaction">Compaction:</label>
+					<select id="opt-compaction" class="alg-select">
+						<option value="on" selected>On (float up)</option>
+						<option value="off">Off (stay in place)</option>
+					</select>
+					<label></label>
+					<button id="btn-compact" class="alg-select" style="cursor: pointer">
+						Compact Now (C)
+					</button>
+				</div>
+				<p style="margin-top: 8px; font-size: 11px; opacity: 0.7">
+					<strong>Nudge by:</strong> How far item moves per keystroke<br />
+					<strong>Reorder shift:</strong> How far others shift to make room<br />
+					<strong>Compaction:</strong> Whether items float up to fill gaps<br />
+					<strong>Compact Now:</strong> Manually tidy up the layout (C key)
+				</p>
+			</div>
+			<style>
+				.alg-select {
+					padding: 4px 6px;
+					border-radius: 4px;
+					border: 1px solid rgba(255, 255, 255, 0.3);
+					background: rgba(0, 0, 0, 0.3);
+					color: white;
+					font-size: 12px;
+				}
+			</style>
+		</div>
+
+		<script>
+			// Grid configuration
+			const MAX_COLS = 6; // Maximum columns (canonical layout)
+			const GRID_ROWS = 20; // Increased for reflow
+			const CELL_SIZE = 184;
+			const GAP = 16;
+
+			// Hysteresis threshold - distance in grid units before changing target
+			const HYSTERESIS = 0.5;
+			// Minimum time (ms) between target changes to prevent jitter
+			const TARGET_CHANGE_DEBOUNCE = 40;
+
+			// Current detected column count (updated on resize)
+			let currentColCount = MAX_COLS;
+
+			// Layout algorithms per interaction type: 'push-down' or 'reorder'
+			const layoutAlgorithms = {
+				drag: 'push-down',
+				nudge: 'push-down',
+				jump: 'reorder',
+			};
+
+			// Additional layout options
+			const layoutOptions = {
+				// Nudge movement amount: '1' (one cell) or 'item-size' (item dimension)
+				nudgeAmount: '1',
+				// Reorder shift amount: 'movement' (same as movement) or 'item-size' (item dimension)
+				reorderShift: 'item-size',
+				// Compaction: 'on' (float items up to fill gaps) or 'off' (keep items in place)
+				compaction: 'on',
+			};
+
+			// Helper to get algorithm for an interaction
+			function getAlgorithm(interaction) {
+				return layoutAlgorithms[interaction] || 'push-down';
+			}
+
+			// Helper to get layout option
+			function getOption(option) {
+				return layoutOptions[option];
+			}
+
+			// Canonical layout - the "source of truth" at max columns
+			// Items only store intrinsic properties (w, h, label, color)
+			// Positions come from canonicalPositions or are derived
+			const itemDefinitions = [
+				{ id: 'item-1', w: 2, h: 2, label: 'A', color: 1 },
+				{ id: 'item-2', w: 2, h: 1, label: 'B', color: 2 },
+				{ id: 'item-3', w: 2, h: 1, label: 'C', color: 3 },
+				{ id: 'item-4', w: 1, h: 2, label: 'D', color: 4 },
+				{ id: 'item-5', w: 1, h: 1, label: 'E', color: 5 },
+				{ id: 'item-6', w: 2, h: 2, label: 'F', color: 6 },
+				{ id: 'item-7', w: 3, h: 1, label: 'G', color: 1 },
+				{ id: 'item-8', w: 1, h: 1, label: 'H', color: 2 },
+				{ id: 'item-9', w: 2, h: 1, label: 'I', color: 3 },
+			];
+
+			// Canonical positions (max columns layout)
+			let canonicalPositions = {
+				'item-1': { x: 0, y: 0 },
+				'item-2': { x: 2, y: 0 },
+				'item-3': { x: 4, y: 0 },
+				'item-4': { x: 2, y: 1 },
+				'item-5': { x: 3, y: 1 },
+				'item-6': { x: 4, y: 1 },
+				'item-7': { x: 0, y: 3 },
+				'item-8': { x: 3, y: 2 },
+				'item-9': { x: 0, y: 4 },
+			};
+
+			// Per-column-count layout overrides (only stored if user drags at that column count)
+			// Key is column count, value is positions map
+			let layoutOverrides = {};
+
+			// Current working items array (derived from positions)
+			let items = [];
+
+			// State
+			let dragState = null;
+			let selectedItemId = null;
+			let keyboardMode = false; // When true, hjkl/arrows navigate the grid
+			let didDrag = false;
+
+			const grid = document.getElementById('grid');
+			const debugContent = document.getElementById('debug-content');
+
+			function clamp(value, min, max) {
+				return Math.min(Math.max(value, min), max);
+			}
+
+			function debug(msg) {
+				debugContent.innerHTML = msg;
+			}
+
+			// Detect current column count from container width
+			// (Can't use computed gridTemplateColumns because explicit item positions force column creation)
+			function getColumnCount() {
+				const gridRect = grid.getBoundingClientRect();
+				const availableWidth = gridRect.width;
+				// Each column needs CELL_SIZE, plus GAP between columns
+				// Formula: n*CELL_SIZE + (n-1)*GAP <= availableWidth
+				// Solving: n <= (availableWidth + GAP) / (CELL_SIZE + GAP)
+				const colWithGap = CELL_SIZE + GAP; // 184 + 16 = 200
+				const cols = Math.floor((availableWidth + GAP) / colWithGap);
+				return Math.max(1, Math.min(cols, MAX_COLS));
+			}
+
+			// Get items sorted by position (Y then X) for consistent ordering
+			function getItemsInPositionOrder(positions) {
+				return [...itemDefinitions].sort((a, b) => {
+					const posA = positions[a.id] || { x: 0, y: 0 };
+					const posB = positions[b.id] || { x: 0, y: 0 };
+					return posA.y - posB.y || posA.x - posB.x;
+				});
+			}
+
+			// Derive layout for a given column count using compaction algorithm
+			function deriveLayoutForColumns(cols, sourcePositions) {
+				const sorted = getItemsInPositionOrder(sourcePositions);
+				const result = {};
+				const occupied = Array(GRID_ROWS)
+					.fill(null)
+					.map(() => Array(cols).fill(null));
+
+				for (const itemDef of sorted) {
+					// Clamp width to available columns
+					const w = Math.min(itemDef.w, cols);
+					const h = itemDef.h;
+
+					// Find first available position
+					let placed = false;
+					for (let y = 0; y < GRID_ROWS && !placed; y++) {
+						for (let x = 0; x <= cols - w && !placed; x++) {
+							// Check if space is available
+							let canFit = true;
+							for (let dy = 0; dy < h && canFit; dy++) {
+								for (let dx = 0; dx < w && canFit; dx++) {
+									if (occupied[y + dy]?.[x + dx] !== null) {
+										canFit = false;
+									}
+								}
+							}
+
+							if (canFit) {
+								result[itemDef.id] = { x, y };
+								// Mark as occupied
+								for (let dy = 0; dy < h; dy++) {
+									for (let dx = 0; dx < w; dx++) {
+										if (occupied[y + dy]) {
+											occupied[y + dy][x + dx] = itemDef.id;
+										}
+									}
+								}
+								placed = true;
+							}
+						}
+					}
+
+					if (!placed) {
+						// Fallback: place at bottom
+						result[itemDef.id] = { x: 0, y: GRID_ROWS - h };
+					}
+				}
+
+				return result;
+			}
+
+			// Get layout for current column count (override or derived)
+			function getLayoutForColumns(cols) {
+				if (cols === MAX_COLS) {
+					return canonicalPositions;
+				}
+
+				// Check for explicit override
+				if (layoutOverrides[cols]) {
+					return layoutOverrides[cols];
+				}
+
+				// Auto-derive from canonical
+				return deriveLayoutForColumns(cols, canonicalPositions);
+			}
+
+			// Build items array from positions
+			function buildItemsFromPositions(positions, cols) {
+				return itemDefinitions.map((def) => ({
+					...def,
+					// Clamp width to current columns
+					w: Math.min(def.w, cols),
+					x: positions[def.id]?.x ?? 0,
+					y: positions[def.id]?.y ?? 0,
+				}));
+			}
+
+			// Update items for current column count
+			function updateItemsForCurrentColumns() {
+				const positions = getLayoutForColumns(currentColCount);
+				items = buildItemsFromPositions(positions, currentColCount);
+			}
+
+			// Calculate breakpoint widths for each column count
+			// n columns needs: n*CELL_SIZE + (n-1)*GAP pixels
+			function getBreakpointForColumns(cols) {
+				return cols * CELL_SIZE + (cols - 1) * GAP;
+			}
+
+			// Generate CSS for all column counts using container queries
+			function generateLayoutCSS() {
+				const layoutStyleEl = document.getElementById('layout-styles');
+				const cssRules = [];
+
+				// Generate rules for each column count (MAX_COLS down to 1)
+				for (let cols = MAX_COLS; cols >= 1; cols--) {
+					const positions = getLayoutForColumns(cols);
+					const minWidth = getBreakpointForColumns(cols);
+					const hasOverride = layoutOverrides[cols] !== undefined;
+
+					// Container query - use min-width for this column count
+					// Higher column counts have higher min-width, so they take precedence
+					let containerQuery;
+					if (cols === MAX_COLS) {
+						containerQuery = `@container (min-width: ${minWidth}px)`;
+					} else if (cols === 1) {
+						// 1 column is the default/fallback (no query needed, but we'll use max-width)
+						const maxWidth = getBreakpointForColumns(2) - 1;
+						containerQuery = `@container (max-width: ${maxWidth}px)`;
+					} else {
+						const maxWidth = getBreakpointForColumns(cols + 1) - 1;
+						containerQuery = `@container (min-width: ${minWidth}px) and (max-width: ${maxWidth}px)`;
+					}
+
+					// Generate rules for this column count
+					const itemRules = [];
+
+					// Grid column template
+					itemRules.push(
+						`.grid-container { grid-template-columns: repeat(${cols}, 1fr); }`,
+					);
+
+					// Item positions
+					for (const def of itemDefinitions) {
+						const pos = positions[def.id];
+						const w = Math.min(def.w, cols);
+						if (pos) {
+							itemRules.push(
+								`#${def.id} { grid-column: ${pos.x + 1} / span ${w}; grid-row: ${pos.y + 1} / span ${def.h}; }`,
+							);
+						}
+					}
+
+					cssRules.push(
+						`/* ${cols} columns ${hasOverride ? '(override)' : cols === MAX_COLS ? '(canonical)' : '(derived)'} */`,
+					);
+					cssRules.push(`${containerQuery} {`);
+					cssRules.push(itemRules.map((r) => '  ' + r).join('\n'));
+					cssRules.push('}');
+					cssRules.push('');
+				}
+
+				return cssRules.join('\n');
+			}
+
+			// Inject generated layout CSS
+			function injectLayoutCSS() {
+				const layoutStyleEl = document.getElementById('layout-styles');
+				const css = generateLayoutCSS();
+				layoutStyleEl.textContent = css;
+				console.log('[CSS] Injected layout styles for all column counts');
+			}
+
+			// Generate CSS for a specific layout (used for drag preview)
+			function generatePreviewCSS(layout, cols) {
+				const rules = [];
+				for (const item of layout) {
+					const w = Math.min(item.w, cols);
+					rules.push(
+						`#${item.id}:not(.dragging) { grid-column: ${item.x + 1} / span ${w}; grid-row: ${item.y + 1} / span ${item.h}; }`,
+					);
+				}
+				return rules.join('\n');
+			}
+
+			// Inject preview CSS during drag
+			function injectPreviewCSS(layout, cols) {
+				const previewStyleEl = document.getElementById('preview-styles');
+				previewStyleEl.textContent = generatePreviewCSS(layout, cols);
+			}
+
+			// Clear preview CSS (on drop or drag cancel)
+			function clearPreviewCSS() {
+				const previewStyleEl = document.getElementById('preview-styles');
+				previewStyleEl.textContent = '';
+			}
+
+			// Handle column count changes (for debug display only - CSS handles layout)
+			function handleColumnCountChange() {
+				const newColCount = getColumnCount();
+				if (newColCount !== currentColCount) {
+					currentColCount = newColCount;
+					// Update items array for drag calculations at current width
+					updateItemsForCurrentColumns();
+					updateDebug();
+				}
+			}
+
+			// Create a 2D grid occupancy map
+			function createOccupancyGrid(itemsToPlace, excludeId = null) {
+				const occupied = Array(GRID_ROWS)
+					.fill(null)
+					.map(() => Array(currentColCount).fill(null));
+
+				for (const item of itemsToPlace) {
+					if (item.id === excludeId) continue;
+					for (let dy = 0; dy < item.h; dy++) {
+						for (let dx = 0; dx < item.w; dx++) {
+							const ny = item.y + dy;
+							const nx = item.x + dx;
+							if (ny < GRID_ROWS && nx < currentColCount) {
+								occupied[ny][nx] = item.id;
+							}
+						}
+					}
+				}
+				return occupied;
+			}
+
+			// Check if an item can be placed at a position
+			function canPlace(occupied, x, y, w, h, excludeId = null) {
+				if (x < 0 || y < 0 || x + w > currentColCount || y + h > GRID_ROWS) {
+					return false;
+				}
+				for (let dy = 0; dy < h; dy++) {
+					for (let dx = 0; dx < w; dx++) {
+						const cell = occupied[y + dy]?.[x + dx];
+						if (cell !== null && cell !== excludeId) {
+							return false;
+						}
+					}
+				}
+				return true;
+			}
+
+			// Find first available position for an item
+			function findFirstAvailable(occupied, w, h) {
+				for (let y = 0; y < GRID_ROWS; y++) {
+					for (let x = 0; x <= currentColCount - w; x++) {
+						if (canPlace(occupied, x, y, w, h)) {
+							return { x, y };
+						}
+					}
+				}
+				return null;
+			}
+
+			// Check if two items overlap
+			function itemsOverlap(a, b) {
+				return !(
+					a.x + a.w <= b.x ||
+					b.x + b.w <= a.x ||
+					a.y + a.h <= b.y ||
+					b.y + b.h <= a.y
+				);
+			}
+
+			// Find jump target position and obstacle for swap behavior
+			// Returns { target: {x, y}, obstacle: item | null }
+			function findJumpTarget(fromItem, dx, dy) {
+				const fromX = fromItem.x;
+				const fromY = fromItem.y;
+				const w = fromItem.w;
+				const h = fromItem.h;
+
+				// Find all cards that are in the direction of movement and could block
+				const obstacles = items.filter((other) => {
+					if (other.id === fromItem.id) return false;
+
+					if (dx > 0) {
+						// Moving right: obstacle must be to the right and vertically overlapping
+						return (
+							other.x >= fromX + w &&
+							other.y < fromY + h &&
+							other.y + other.h > fromY
+						);
+					} else if (dx < 0) {
+						// Moving left: obstacle must be to the left and vertically overlapping
+						return (
+							other.x + other.w <= fromX &&
+							other.y < fromY + h &&
+							other.y + other.h > fromY
+						);
+					} else if (dy > 0) {
+						// Moving down: obstacle must be below and horizontally overlapping
+						return (
+							other.y >= fromY + h &&
+							other.x < fromX + w &&
+							other.x + other.w > fromX
+						);
+					} else if (dy < 0) {
+						// Moving up: obstacle must be above and horizontally overlapping
+						return (
+							other.y + other.h <= fromY &&
+							other.x < fromX + w &&
+							other.x + other.w > fromX
+						);
+					}
+					return false;
+				});
+
+				if (obstacles.length === 0) {
+					// No obstacles - move to edge
+					if (dx > 0)
+						return {
+							target: { x: currentColCount - w, y: fromY },
+							obstacle: null,
+						};
+					if (dx < 0) return { target: { x: 0, y: fromY }, obstacle: null };
+					if (dy > 0)
+						return { target: { x: fromX, y: GRID_ROWS - h }, obstacle: null };
+					if (dy < 0) return { target: { x: fromX, y: 0 }, obstacle: null };
+				}
+
+				// Find the nearest obstacle
+				let nearest = null;
+				let nearestDist = Infinity;
+
+				for (const obs of obstacles) {
+					let dist;
+					if (dx > 0) dist = obs.x - (fromX + w);
+					else if (dx < 0) dist = fromX - (obs.x + obs.w);
+					else if (dy > 0) dist = obs.y - (fromY + h);
+					else if (dy < 0) dist = fromY - (obs.y + obs.h);
+
+					if (dist < nearestDist) {
+						nearestDist = dist;
+						nearest = obs;
+					}
+				}
+
+				// Return the obstacle's position and the obstacle itself for swap
+				let target;
+				if (dx > 0) target = { x: nearest.x, y: fromY };
+				else if (dx < 0) target = { x: nearest.x, y: fromY };
+				else if (dy > 0) target = { x: fromX, y: nearest.y };
+				else if (dy < 0) target = { x: fromX, y: nearest.y };
+				else target = { x: fromX, y: fromY };
+
+				return { target, obstacle: nearest };
+			}
+
+			// Find nearest item in a direction (for alt+nav selection)
+			function findAdjacentItem(fromItem, dx, dy) {
+				// Get center of current item
+				const fromCenterX = fromItem.x + fromItem.w / 2;
+				const fromCenterY = fromItem.y + fromItem.h / 2;
+
+				let bestCandidate = null;
+				let bestScore = Infinity;
+
+				// Also track best "nearby" candidate if nothing strictly in direction
+				let nearestCandidate = null;
+				let nearestDist = Infinity;
+
+				for (const candidate of items) {
+					if (candidate.id === fromItem.id) continue;
+
+					const candCenterX = candidate.x + candidate.w / 2;
+					const candCenterY = candidate.y + candidate.h / 2;
+
+					// Vector from current to candidate
+					const vecX = candCenterX - fromCenterX;
+					const vecY = candCenterY - fromCenterY;
+
+					// Track nearest overall (fallback)
+					const dist = Math.abs(vecX) + Math.abs(vecY);
+					if (dist < nearestDist) {
+						nearestDist = dist;
+						nearestCandidate = candidate;
+					}
+
+					// Check if candidate is in the right direction
+					const inDirection =
+						(dx > 0 && vecX > 0) ||
+						(dx < 0 && vecX < 0) ||
+						(dy > 0 && vecY > 0) ||
+						(dy < 0 && vecY < 0);
+
+					if (!inDirection) continue;
+
+					// Score: prefer items directly in line, then closest
+					// Primary axis distance (in direction of movement)
+					const primaryDist = Math.abs(dx !== 0 ? vecX : vecY);
+					// Cross axis distance (perpendicular to movement)
+					const crossDist = Math.abs(dx !== 0 ? vecY : vecX);
+
+					// Weighted score: cross distance matters more for selection
+					const score = primaryDist + crossDist * 2;
+
+					if (score < bestScore) {
+						bestScore = score;
+						bestCandidate = candidate;
+					}
+				}
+
+				// Return best in direction only - don't jump to unrelated items
+				return bestCandidate;
+			}
+
+			// Push-down cascade: push target below blocker, keeping x fixed
+			// Recursively resolves any new collisions caused by the push
+			function pushDownCascade(items, target, blocker, movedId) {
+				const fixedX = target.x; // Keep x fixed always when pushing down
+
+				// Move target just below blocker
+				const desiredY = blocker.y + blocker.h;
+				if (target.y < desiredY) {
+					target.y = desiredY;
+				}
+
+				// Resolve any collisions this creates by pushing those items down first
+				let iterations = 0;
+				while (iterations < 50) {
+					// Safety limit
+					const hit = items.find(
+						(it) =>
+							it.id !== target.id &&
+							it.id !== movedId &&
+							itemsOverlap(target, it),
+					);
+					if (!hit) break;
+
+					// Push the hit item down first (cascade)
+					pushDownCascade(items, hit, target, movedId);
+
+					// Ensure target.x stays fixed
+					target.x = fixedX;
+					iterations++;
+				}
+			}
+
+			// Compact all items upward (gravity) - separate pass after collision resolution
+			function compactItems(items, movedId = null) {
+				// Sort by Y position (top-to-bottom) so upper items settle first
+				const sortedItems = [...items].sort((a, b) => a.y - b.y || a.x - b.x);
+
+				for (const item of sortedItems) {
+					if (item.id === movedId) continue; // Don't compact the item being moved
+
+					// Try moving item up row by row until we hit y=0 or a collision
+					while (item.y > 0) {
+						item.y -= 1;
+
+						// Check for collision with any other item
+						const hasCollision = items.some(
+							(other) => other.id !== item.id && itemsOverlap(item, other),
+						);
+
+						if (hasCollision) {
+							// Revert the move
+							item.y += 1;
+							break;
+						}
+						// No collision, keep the new position and try moving up again
+					}
+				}
+			}
+
+			// Manual compact - triggered by user action (button or 'c' key)
+			function triggerManualCompact() {
+				console.log('Manual compact triggered');
+				compactItems(items);
+
+				// Save compacted positions
+				const newPositions = {};
+				for (const item of items) {
+					newPositions[item.id] = { x: item.x, y: item.y };
+				}
+
+				const commitCompact = () => {
+					if (currentColCount === MAX_COLS) {
+						canonicalPositions = newPositions;
+					} else {
+						layoutOverrides[currentColCount] = newPositions;
+					}
+
+					// Regenerate CSS and render
+					injectLayoutCSS();
+					renderItems();
+					updateDebug();
+				};
+
+				// Use View Transition for smooth animation
+				if (document.startViewTransition) {
+					document.startViewTransition(commitCompact);
+				} else {
+					commitCompact();
+				}
+			}
+
+			// Fix collisions using push-down cascade (Blento-style algorithm)
+			function fixCollisions(items, movedItem, originalPositions = null) {
+				// Clamp moved item to grid bounds
+				movedItem.x = clamp(movedItem.x, 0, currentColCount - movedItem.w);
+				movedItem.y = clamp(movedItem.y, 0, GRID_ROWS - movedItem.h);
+
+				// Find all items colliding with movedItem, sorted top-to-bottom
+				// for stable chain reaction
+				const colliders = items
+					.filter((it) => it.id !== movedItem.id && itemsOverlap(movedItem, it))
+					.sort((a, b) => a.y - b.y || a.x - b.x);
+
+				for (const collider of colliders) {
+					// Clamp x but don't change it during push
+					collider.x = clamp(collider.x, 0, currentColCount - collider.w);
+
+					// Push collider down just below movedItem; cascade handles the rest
+					pushDownCascade(items, collider, movedItem, movedItem.id);
+				}
+
+				// Final pass: compact everything upward (if enabled)
+				if (getOption('compaction') === 'on') {
+					compactItems(items, movedItem.id);
+				}
+			}
+
+			// Reorder layout - items between old and new position shift to fill the gap
+			// This creates a "list reorder" effect rather than "push down"
+			function reorderLayout(items, movedId, oldPos, newPos) {
+				console.group('[reorderLayout] Start');
+				console.log('movedId:', movedId, 'oldPos:', oldPos, 'newPos:', newPos);
+				console.log(
+					'items:',
+					items.map((it) => `${it.id}:(${it.x},${it.y})`).join(', '),
+				);
+
+				const result = items.map((it) => ({ ...it }));
+				const movedItem = result.find((it) => it.id === movedId);
+				if (!movedItem) {
+					console.groupEnd();
+					return result;
+				}
+
+				const dx = newPos.x - oldPos.x;
+				const dy = newPos.y - oldPos.y;
+
+				// Determine shift amounts based on configuration
+				const shiftMode = getOption('reorderShift');
+				const shiftX = shiftMode === 'movement' ? Math.abs(dx) : movedItem.w;
+				const shiftY = shiftMode === 'movement' ? Math.abs(dy) : movedItem.h;
+
+				console.log(
+					'dx:',
+					dx,
+					'dy:',
+					dy,
+					'movedItem size:',
+					movedItem.w,
+					'x',
+					movedItem.h,
+					'shiftMode:',
+					shiftMode,
+					'shiftX:',
+					shiftX,
+					'shiftY:',
+					shiftY,
+				);
+
+				// Move the item to its new position
+				movedItem.x = Math.max(
+					0,
+					Math.min(currentColCount - movedItem.w, newPos.x),
+				);
+				movedItem.y = Math.max(0, Math.min(GRID_ROWS - movedItem.h, newPos.y));
+				console.log('movedItem new pos:', movedItem.x, movedItem.y);
+
+				if (dy !== 0) {
+					// Vertical movement - shift items that overlap horizontally
+					const movingDown = dy > 0;
+					const minY = movingDown ? oldPos.y : newPos.y;
+					const maxY = movingDown
+						? newPos.y + movedItem.h
+						: oldPos.y + movedItem.h;
+					console.log(
+						'[dy] movingDown:',
+						movingDown,
+						'range Y:',
+						minY,
+						'-',
+						maxY,
+					);
+
+					for (const item of result) {
+						if (item.id === movedId) continue;
+
+						// Check horizontal overlap with moved item
+						const hOverlap =
+							item.x < oldPos.x + movedItem.w && item.x + item.w > oldPos.x;
+						if (!hOverlap) continue;
+
+						// Check if item is in the affected range
+						const itemTop = item.y;
+						const itemBottom = item.y + item.h;
+						const inRange = itemTop < maxY && itemBottom > minY;
+
+						if (inRange) {
+							const oldY = item.y;
+							if (movingDown) {
+								// Moving down: shift affected items UP
+								item.y = Math.max(0, item.y - shiftY);
+							} else {
+								// Moving up: shift affected items DOWN
+								item.y = item.y + shiftY;
+							}
+							console.log(
+								`[dy] ${item.id}: y ${oldY} -> ${item.y} (shift by ${shiftY})`,
+							);
+						}
+					}
+				}
+
+				if (dx !== 0) {
+					// Horizontal movement - shift items that overlap vertically
+					const movingRight = dx > 0;
+					const minX = movingRight ? oldPos.x : newPos.x;
+					const maxX = movingRight
+						? newPos.x + movedItem.w
+						: oldPos.x + movedItem.w;
+					console.log(
+						'[dx] movingRight:',
+						movingRight,
+						'range X:',
+						minX,
+						'-',
+						maxX,
+					);
+
+					for (const item of result) {
+						if (item.id === movedId) continue;
+
+						// Check vertical overlap with moved item
+						const vOverlap =
+							item.y < oldPos.y + movedItem.h && item.y + item.h > oldPos.y;
+						if (!vOverlap) continue;
+
+						// Check if item is in the affected range
+						const itemLeft = item.x;
+						const itemRight = item.x + item.w;
+						const inRange = itemLeft < maxX && itemRight > minX;
+
+						if (inRange) {
+							const oldX = item.x;
+							if (movingRight) {
+								// Moving right: shift affected items LEFT
+								item.x = Math.max(0, item.x - shiftX);
+							} else {
+								// Moving left: shift affected items RIGHT
+								item.x = item.x + shiftX;
+							}
+							console.log(
+								`[dx] ${item.id}: x ${oldX} -> ${item.x} (shift by ${shiftX})`,
+							);
+						}
+					}
+				}
+
+				// Fix any collisions created by the shifts
+				console.log(
+					'After shifts:',
+					result.map((it) => `${it.id}:(${it.x},${it.y})`).join(', '),
+				);
+				// Check all pairs and push down any overlapping items
+				let hasOverlaps = true;
+				let iterations = 0;
+				while (hasOverlaps && iterations < 50) {
+					hasOverlaps = false;
+					iterations++;
+					for (const item of result) {
+						for (const other of result) {
+							if (item.id === other.id) continue;
+							if (itemsOverlap(item, other)) {
+								// Determine which item to move - never move the placed item
+								let toMove;
+								if (item.id === movedId) {
+									toMove = other;
+								} else if (other.id === movedId) {
+									toMove = item;
+								} else {
+									// Neither is the moved item, move the one with higher Y
+									toMove =
+										item.y > other.y || (item.y === other.y && item.x > other.x)
+											? item
+											: other;
+								}
+								// Push below the collision
+								const stayItem = toMove === item ? other : item;
+								const oldY = toMove.y;
+								toMove.y = stayItem.y + stayItem.h;
+								console.log(
+									`[collision] ${toMove.id} overlaps ${stayItem.id}: y ${oldY} -> ${toMove.y}`,
+								);
+								hasOverlaps = true;
+							}
+						}
+					}
+				}
+
+				// Compact to fill any remaining gaps (but keep moved item in place) - if enabled
+				if (getOption('compaction') === 'on') {
+					console.log(
+						'Before compact:',
+						result.map((it) => `${it.id}:(${it.x},${it.y})`).join(', '),
+					);
+					compactItems(result, movedId);
+					console.log(
+						'After compact:',
+						result.map((it) => `${it.id}:(${it.x},${it.y})`).join(', '),
+					);
+				} else {
+					console.log('Compaction disabled, skipping');
+				}
+				console.groupEnd();
+
+				return result;
+			}
+
+			// Swap layout - exchange positions between dragged item and target item
+			// Maximum predictability: exactly 2 items ever move (plus optional compaction)
+			function swapLayout(items, movedId, oldPos, newPos) {
+				const result = items.map((it) => ({ ...it }));
+				const movedItem = result.find((it) => it.id === movedId);
+				if (!movedItem) return result;
+
+				// Find item at target position (if any)
+				const targetItem = result.find(
+					(it) =>
+						it.id !== movedId &&
+						itemsOverlap({ ...movedItem, x: newPos.x, y: newPos.y }, it),
+				);
+
+				// Move dragged item to target
+				movedItem.x = clamp(newPos.x, 0, currentColCount - movedItem.w);
+				movedItem.y = clamp(newPos.y, 0, GRID_ROWS - movedItem.h);
+
+				if (targetItem) {
+					// Swap: move target item to dragged item's old position
+					targetItem.x = oldPos.x;
+					targetItem.y = oldPos.y;
+
+					// Best-fit: clamp to grid bounds
+					targetItem.x = clamp(targetItem.x, 0, currentColCount - targetItem.w);
+					targetItem.y = clamp(targetItem.y, 0, GRID_ROWS - targetItem.h);
+
+					// Check for collisions caused by size mismatch
+					const hasCollision = result.some(
+						(it) =>
+							it.id !== targetItem.id &&
+							it.id !== movedId &&
+							itemsOverlap(targetItem, it),
+					);
+					if (hasCollision) {
+						// Use push-down to resolve
+						fixCollisions(result, targetItem);
+					}
+				}
+
+				// Optional: compact if enabled
+				if (getOption('compaction') === 'on') {
+					compactItems(result, movedId);
+				}
+
+				return result;
+			}
+
+			// Insert layout - shift items by exactly 1 cell opposite to movement direction
+			// High predictability: like inserting into a list, each item moves minimally
+			function insertLayout(items, movedId, oldPos, newPos) {
+				const result = items.map((it) => ({ ...it }));
+				const movedItem = result.find((it) => it.id === movedId);
+				if (!movedItem) return result;
+
+				const dx = newPos.x - oldPos.x;
+				const dy = newPos.y - oldPos.y;
+
+				// Move the item to new position
+				movedItem.x = clamp(newPos.x, 0, currentColCount - movedItem.w);
+				movedItem.y = clamp(newPos.y, 0, GRID_ROWS - movedItem.h);
+
+				// Shift affected items by 1 cell OPPOSITE to movement direction
+				if (dy !== 0) {
+					const movingDown = dy > 0;
+					const minY = movingDown ? oldPos.y : newPos.y;
+					const maxY = movingDown
+						? newPos.y + movedItem.h
+						: oldPos.y + movedItem.h;
+
+					for (const item of result) {
+						if (item.id === movedId) continue;
+						// Check horizontal overlap with moved item's original column
+						if (item.x < oldPos.x + movedItem.w && item.x + item.w > oldPos.x) {
+							if (item.y >= minY && item.y < maxY) {
+								// Shift by 1 cell opposite to movement
+								if (movingDown) {
+									item.y = Math.max(0, item.y - 1);
+								} else {
+									item.y = item.y + 1;
+								}
+							}
+						}
+					}
+				}
+
+				if (dx !== 0) {
+					const movingRight = dx > 0;
+					const minX = movingRight ? oldPos.x : newPos.x;
+					const maxX = movingRight
+						? newPos.x + movedItem.w
+						: oldPos.x + movedItem.w;
+
+					for (const item of result) {
+						if (item.id === movedId) continue;
+						// Check vertical overlap with moved item's original row
+						if (item.y < oldPos.y + movedItem.h && item.y + item.h > oldPos.y) {
+							if (item.x >= minX && item.x < maxX) {
+								// Shift by 1 cell opposite to movement
+								if (movingRight) {
+									item.x = Math.max(0, item.x - 1);
+								} else {
+									item.x = item.x + 1;
+								}
+							}
+						}
+					}
+				}
+
+				// Resolve any collisions created by shifts
+				resolveAllCollisions(result, movedId);
+
+				if (getOption('compaction') === 'on') {
+					compactItems(result, movedId);
+				}
+
+				return result;
+			}
+
+			// Snap-to-gap layout - no collision, find nearest valid position
+			// Maximum predictability for other items: nothing else moves
+			function snapToGapLayout(items, movedId, oldPos, newPos) {
+				const result = items.map((it) => ({ ...it }));
+				const movedItem = result.find((it) => it.id === movedId);
+				if (!movedItem) return result;
+
+				const occupied = createOccupancyGrid(result, movedId);
+
+				if (
+					canPlace(
+						occupied,
+						newPos.x,
+						newPos.y,
+						movedItem.w,
+						movedItem.h,
+						movedId,
+					)
+				) {
+					movedItem.x = newPos.x;
+					movedItem.y = newPos.y;
+				} else {
+					// Find nearest valid position, preferring drag direction
+					const direction = {
+						dx: newPos.x - oldPos.x,
+						dy: newPos.y - oldPos.y,
+					};
+					const nearest = findNearestGapDirectional(
+						occupied,
+						newPos,
+						movedItem.w,
+						movedItem.h,
+						direction,
+					);
+					if (nearest) {
+						movedItem.x = nearest.x;
+						movedItem.y = nearest.y;
+					}
+					// else: keep original position (couldn't find valid spot)
+				}
+
+				return result;
+			}
+
+			// Direction-aware gap search - prioritize positions in drag direction
+			function findNearestGapDirectional(occupied, target, w, h, direction) {
+				const maxRadius = Math.max(currentColCount, GRID_ROWS);
+				const dirX = Math.sign(direction.dx) || 0;
+				const dirY = Math.sign(direction.dy) || 0;
+
+				for (let r = 1; r < maxRadius; r++) {
+					const candidates = [];
+
+					// Collect all valid positions at this Manhattan distance
+					for (let dy = -r; dy <= r; dy++) {
+						for (let dx = -r; dx <= r; dx++) {
+							// Skip if not at exact Manhattan distance r
+							if (Math.abs(dx) + Math.abs(dy) !== r) continue;
+
+							const x = target.x + dx;
+							const y = target.y + dy;
+
+							if (canPlace(occupied, x, y, w, h)) {
+								// Score: prefer positions aligned with drag direction
+								const alignScore =
+									(dirX * dx > 0 ? 1 : 0) + (dirY * dy > 0 ? 1 : 0);
+								candidates.push({ x, y, alignScore });
+							}
+						}
+					}
+
+					if (candidates.length > 0) {
+						// Return candidate most aligned with drag direction
+						candidates.sort((a, b) => b.alignScore - a.alignScore);
+						return { x: candidates[0].x, y: candidates[0].y };
+					}
+				}
+				return null;
+			}
+
+			// Resolve all collisions between items (used by insert algorithm)
+			function resolveAllCollisions(items, movedId) {
+				let hasCollisions = true;
+				let iterations = 0;
+
+				while (hasCollisions && iterations < 50) {
+					hasCollisions = false;
+					iterations++;
+
+					for (const item of items) {
+						for (const other of items) {
+							if (item.id === other.id) continue;
+							if (itemsOverlap(item, other)) {
+								// Determine which item to move - never move the placed item
+								let toMove;
+								if (item.id === movedId) {
+									toMove = other;
+								} else if (other.id === movedId) {
+									toMove = item;
+								} else {
+									// Neither is the moved item, move the one with higher Y
+									toMove =
+										item.y > other.y || (item.y === other.y && item.x > other.x)
+											? item
+											: other;
+								}
+								// Push below the collision
+								const stayItem = toMove === item ? other : item;
+								toMove.y = stayItem.y + stayItem.h;
+								hasCollisions = true;
+							}
+						}
+					}
+				}
+			}
+
+			// Calculate layout with item at target position
+			// Uses original positions as base to prevent drift
+			function calculateLayout(movedId, targetPos, originalPositions) {
+				if (!movedId || !targetPos || !originalPositions) {
+					return items.map((item) => ({ ...item }));
+				}
+
+				// Start from original positions (prevents cascading drift)
+				const result = items.map((item) => {
+					const orig = originalPositions.get(item.id);
+					if (orig) {
+						return { ...item, x: orig.x, y: orig.y };
+					}
+					return { ...item };
+				});
+
+				// Set moved item to target position
+				const movedItem = result.find((i) => i.id === movedId);
+				if (!movedItem) return result;
+
+				movedItem.x = targetPos.x;
+				movedItem.y = targetPos.y;
+
+				// Fix collisions using push-down cascade
+				fixCollisions(result, movedItem, originalPositions);
+
+				return result;
+			}
+
+			// Convert pixel position to grid coordinates with hysteresis
+			function pixelToGridCoords(
+				pixelX,
+				pixelY,
+				gridRect,
+				currentTarget,
+				itemW,
+				itemH,
+			) {
+				const relX = pixelX - gridRect.left;
+				const relY = pixelY - gridRect.top;
+
+				const cellWithGap = CELL_SIZE + GAP;
+				const fracX = relX / cellWithGap;
+				const fracY = relY / cellWithGap;
+
+				let targetX = Math.floor(fracX);
+				let targetY = Math.floor(fracY);
+
+				// Apply hysteresis
+				if (currentTarget) {
+					const currentCenterX = currentTarget.x + 0.5;
+					const currentCenterY = currentTarget.y + 0.5;
+
+					const distX = Math.abs(fracX - currentCenterX);
+					const distY = Math.abs(fracY - currentCenterY);
+
+					if (distX < 0.5 + HYSTERESIS && distY < 0.5 + HYSTERESIS) {
+						const newCenterX = targetX + 0.5;
+						const newCenterY = targetY + 0.5;
+						const newDistX = Math.abs(fracX - newCenterX);
+						const newDistY = Math.abs(fracY - newCenterY);
+
+						if (
+							!(newDistX < distX - HYSTERESIS || newDistY < distY - HYSTERESIS)
+						) {
+							targetX = currentTarget.x;
+							targetY = currentTarget.y;
+						}
+					}
+				}
+
+				targetX = Math.max(0, Math.min(currentColCount - itemW, targetX));
+				targetY = Math.max(0, Math.min(GRID_ROWS - itemH, targetY));
+
+				return { x: targetX, y: targetY };
+			}
+
+			// Render items to the grid
+			// Layout is always CSS-driven: either layout-styles (normal) or preview-styles (during drag)
+			function renderItems(draggedId = null, dropTarget = null) {
+				const existingElements = {};
+				grid.querySelectorAll('.grid-item').forEach((el) => {
+					existingElements[el.id] = el;
+				});
+
+				grid.querySelectorAll('.drop-placeholder').forEach((el) => el.remove());
+
+				// Show drop placeholder during drag
+				if (draggedId && dropTarget) {
+					const draggedItem = items.find((i) => i.id === draggedId);
+					if (draggedItem) {
+						const placeholder = document.createElement('div');
+						placeholder.className = 'drop-placeholder';
+						placeholder.style.gridColumn = `${dropTarget.x + 1} / span ${draggedItem.w}`;
+						placeholder.style.gridRow = `${dropTarget.y + 1} / span ${draggedItem.h}`;
+						grid.appendChild(placeholder);
+					}
+				}
+
+				items.forEach((item) => {
+					let el = existingElements[item.id];
+					const isDragging = item.id === draggedId;
+
+					if (!el) {
+						el = document.createElement('div');
+						el.className = 'grid-item';
+						el.id = item.id;
+						el.addEventListener('mousedown', handleMouseDown);
+						el.addEventListener('click', handleClick);
+						grid.appendChild(el);
+					}
+
+					el.textContent = `${item.label} (${item.w}×${item.h})`;
+					el.dataset.color = item.color;
+					el.style.viewTransitionName = isDragging ? 'dragging' : item.id;
+
+					if (!isDragging) {
+						el.style.position = '';
+						el.style.left = '';
+						el.style.top = '';
+						el.style.width = '';
+						el.style.height = '';
+						// CSS handles positioning (layout-styles or preview-styles)
+						el.style.gridColumn = '';
+						el.style.gridRow = '';
+						el.classList.remove('dragging');
+					}
+
+					if (selectedItemId === item.id) {
+						el.classList.add('selected');
+					} else {
+						el.classList.remove('selected');
+					}
+
+					delete existingElements[item.id];
+				});
+
+				Object.values(existingElements).forEach((el) => el.remove());
+			}
+
+			function handleClick(e) {
+				if (didDrag) {
+					didDrag = false;
+					return;
+				}
+
+				const itemId = e.currentTarget.id;
+				if (selectedItemId === itemId) {
+					// Clicking selected item deselects and exits keyboard mode
+					selectedItemId = null;
+					keyboardMode = false;
+				} else {
+					// Clicking new item selects and enters keyboard mode
+					selectedItemId = itemId;
+					keyboardMode = true;
+				}
+				renderItems();
+				updateDebug();
+			}
+
+			function handleMouseDown(e) {
+				if (e.button !== 0) return;
+
+				const el = e.currentTarget;
+				const item = items.find((i) => i.id === el.id);
+				if (!item) return;
+
+				// Prevent text selection (especially important for Safari)
+				e.preventDefault();
+				document.body.classList.add('is-dragging');
+
+				didDrag = false;
+
+				const rect = el.getBoundingClientRect();
+				const gridRect = grid.getBoundingClientRect();
+
+				// Store original positions of ALL items at drag start (Blento technique #1)
+				const originalPositions = new Map();
+				for (const it of items) {
+					originalPositions.set(it.id, { x: it.x, y: it.y });
+				}
+
+				dragState = {
+					itemId: item.id,
+					startX: item.x,
+					startY: item.y,
+					offsetX: e.clientX - rect.left,
+					offsetY: e.clientY - rect.top,
+					gridRect: gridRect,
+					currentTarget: { x: item.x, y: item.y },
+					initialRect: rect,
+					dragStarted: false,
+					// Store original positions to reset from during drag
+					originalPositions: originalPositions,
+					// Store the current preview layout to use on drop
+					previewLayout: null,
+					// Track last target for hysteresis (Blento technique #3)
+					lastTargetId: null,
+					lastPlacement: null,
+				};
+
+				document.addEventListener('mousemove', handleMouseMove);
+				document.addEventListener('mouseup', handleMouseUp);
+			}
+
+			function handleMouseMove(e) {
+				if (!dragState) return;
+
+				didDrag = true;
+
+				const el = document.getElementById(dragState.itemId);
+				const item = items.find((i) => i.id === dragState.itemId);
+				if (!el || !item) return;
+
+				// Start visual drag on first move
+				if (!dragState.dragStarted) {
+					dragState.dragStarted = true;
+					const rect = dragState.initialRect;
+					el.classList.add('dragging');
+					el.style.position = 'fixed';
+					el.style.left = `${rect.left}px`;
+					el.style.top = `${rect.top}px`;
+					el.style.width = `${rect.width}px`;
+					el.style.height = `${rect.height}px`;
+					el.style.gridColumn = '';
+					el.style.gridRow = '';
+					el.style.viewTransitionName = 'dragging';
+					selectedItemId = dragState.itemId;
+					keyboardMode = true; // Enter keyboard mode so user can fine-tune with keys
+				}
+
+				// Move element with cursor
+				const newLeft = e.clientX - dragState.offsetX;
+				const newTop = e.clientY - dragState.offsetY;
+				el.style.left = `${newLeft}px`;
+				el.style.top = `${newTop}px`;
+
+				const cellWithGap = CELL_SIZE + GAP;
+				const cardWidth = item.w * cellWithGap;
+				const cardHeight = item.h * cellWithGap;
+				const now = performance.now();
+
+				// Calculate target based on card center position
+				const cardCenterX = newLeft + cardWidth / 2;
+				const cardCenterY = newTop + cardHeight / 2;
+				const newTarget = pixelToGridCoords(
+					cardCenterX,
+					cardCenterY,
+					dragState.gridRect,
+					dragState.currentTarget, // Apply hysteresis from current target
+					item.w,
+					item.h,
+				);
+
+				const targetChanged =
+					newTarget.x !== dragState.currentTarget.x ||
+					newTarget.y !== dragState.currentTarget.y;
+
+				// Simple debounce to prevent rapid jitter
+				const timeSinceLastChange = now - (dragState.lastTargetChangeTime || 0);
+				const canChangeTarget = timeSinceLastChange >= TARGET_CHANGE_DEBOUNCE;
+
+				if (targetChanged && canChangeTarget) {
+					dragState.currentTarget = newTarget;
+					dragState.lastTargetChangeTime = now;
+
+					// Use selected algorithm for drag preview
+					const oldPos = dragState.originalPositions.get(dragState.itemId);
+					let newLayout;
+					switch (getAlgorithm('drag')) {
+						case 'swap':
+							newLayout = swapLayout(
+								items,
+								dragState.itemId,
+								oldPos,
+								dragState.currentTarget,
+							);
+							break;
+						case 'insert':
+							newLayout = insertLayout(
+								items,
+								dragState.itemId,
+								oldPos,
+								dragState.currentTarget,
+							);
+							break;
+						case 'snap-to-gap':
+							newLayout = snapToGapLayout(
+								items,
+								dragState.itemId,
+								oldPos,
+								dragState.currentTarget,
+							);
+							break;
+						case 'reorder':
+							newLayout = reorderLayout(
+								items,
+								dragState.itemId,
+								oldPos,
+								dragState.currentTarget,
+							);
+							break;
+						default: // 'push-down'
+							newLayout = calculateLayout(
+								dragState.itemId,
+								dragState.currentTarget,
+								dragState.originalPositions,
+							);
+					}
+
+					// Store preview layout for use on drop
+					dragState.previewLayout = newLayout;
+
+					// Inject preview CSS (will be used by View Transition)
+					// Use View Transitions for smooth animation during drag
+					if (document.startViewTransition) {
+						const dropTarget = dragState.currentTarget;
+						document.startViewTransition(() => {
+							injectPreviewCSS(newLayout, currentColCount);
+							renderItems(dragState?.itemId, dropTarget);
+							updateDebug();
+						});
+					} else {
+						injectPreviewCSS(newLayout, currentColCount);
+						renderItems(dragState?.itemId, dragState.currentTarget);
+						updateDebug();
+					}
+				}
+			}
+
+			function handleMouseUp(e) {
+				if (!dragState) return;
+
+				document.removeEventListener('mousemove', handleMouseMove);
+				document.removeEventListener('mouseup', handleMouseUp);
+				document.body.classList.remove('is-dragging');
+
+				const item = items.find((i) => i.id === dragState.itemId);
+				const draggedItemId = dragState.itemId;
+				const visualDragStarted = dragState.dragStarted;
+				const finalTarget = { ...dragState.currentTarget };
+				const originalPositions = dragState.originalPositions;
+				// Use the preview layout that was shown during drag (ensures consistency)
+				const previewLayout = dragState.previewLayout;
+
+				dragState = null;
+
+				if (item && visualDragStarted) {
+					// Use the preview layout if available, otherwise recalculate
+					// This ensures the drop state matches exactly what was shown during drag
+					let finalLayout;
+					if (previewLayout) {
+						finalLayout = previewLayout;
+					} else {
+						const oldPos = originalPositions.get(draggedItemId);
+						switch (getAlgorithm('drag')) {
+							case 'swap':
+								finalLayout = swapLayout(
+									items,
+									draggedItemId,
+									oldPos,
+									finalTarget,
+								);
+								break;
+							case 'insert':
+								finalLayout = insertLayout(
+									items,
+									draggedItemId,
+									oldPos,
+									finalTarget,
+								);
+								break;
+							case 'snap-to-gap':
+								finalLayout = snapToGapLayout(
+									items,
+									draggedItemId,
+									oldPos,
+									finalTarget,
+								);
+								break;
+							case 'reorder':
+								finalLayout = reorderLayout(
+									items,
+									draggedItemId,
+									oldPos,
+									finalTarget,
+								);
+								break;
+							default: // 'push-down'
+								finalLayout = calculateLayout(
+									draggedItemId,
+									finalTarget,
+									originalPositions,
+								);
+						}
+					}
+
+					const draggedEl = document.getElementById(draggedItemId);
+
+					// Capture current visual position for dropped element (FLIP: First)
+					const firstRect = draggedEl?.getBoundingClientRect();
+
+					// Exclude dropped element from view transition - we'll animate it via FLIP
+					if (draggedEl) {
+						draggedEl.style.viewTransitionName = 'none';
+					}
+
+					const commitDropUpdate = () => {
+						// Clear dragged element styles
+						if (draggedEl) {
+							draggedEl.classList.remove('dragging');
+							draggedEl.style.position = '';
+							draggedEl.style.left = '';
+							draggedEl.style.top = '';
+							draggedEl.style.width = '';
+							draggedEl.style.height = '';
+						}
+
+						// Save positions based on current column count
+						const newPositions = {};
+						for (const it of finalLayout) {
+							newPositions[it.id] = { x: it.x, y: it.y };
+						}
+
+						if (currentColCount === MAX_COLS) {
+							canonicalPositions = newPositions;
+						} else {
+							layoutOverrides[currentColCount] = newPositions;
+						}
+
+						// Regenerate layout CSS and clear preview CSS
+						// Since preview positions match the new layout positions,
+						// non-dragged items won't animate (already in position)
+						injectLayoutCSS();
+						clearPreviewCSS();
+
+						// Update items and render
+						items = finalLayout;
+						renderItems();
+						updateDebug();
+					};
+
+					// Use View Transition for other items
+					if (document.startViewTransition) {
+						document.startViewTransition(commitDropUpdate);
+					} else {
+						commitDropUpdate();
+					}
+
+					// FLIP animation for dropped element (runs after DOM update)
+					requestAnimationFrame(() => {
+						if (draggedEl && firstRect) {
+							const lastRect = draggedEl.getBoundingClientRect();
+							const deltaX = firstRect.left - lastRect.left;
+							const deltaY = firstRect.top - lastRect.top;
+
+							// Only animate if there's movement
+							if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+								draggedEl.classList.add('dropping');
+
+								const animation = draggedEl.animate(
+									[
+										{ transform: `translate(${deltaX}px, ${deltaY}px)` },
+										{ transform: 'translate(0, 0)' },
+									],
+									{
+										duration: 200,
+										easing: 'cubic-bezier(0.2, 0, 0, 1)',
+									},
+								);
+
+								animation.onfinish = () => {
+									draggedEl.classList.remove('dropping');
+									draggedEl.style.viewTransitionName = draggedItemId;
+								};
+							} else {
+								draggedEl.style.viewTransitionName = draggedItemId;
+							}
+						}
+					});
+				} else {
+					// Drag cancelled - clear preview CSS
+					clearPreviewCSS();
+					updateDebug();
+				}
+			}
+
+			// Keyboard navigation
+			document.addEventListener('keydown', (e) => {
+				const key = e.key.toLowerCase();
+				const code = e.code;
+
+				// Escape always exits keyboard mode
+				if (key === 'escape') {
+					if (keyboardMode || selectedItemId) {
+						e.preventDefault();
+						selectedItemId = null;
+						keyboardMode = false;
+						renderItems();
+						updateDebug();
+					}
+					return;
+				}
+
+				// 'K' (Shift+k) enters keyboard mode
+				if (
+					!keyboardMode &&
+					e.key === 'K' &&
+					e.shiftKey &&
+					!e.ctrlKey &&
+					!e.metaKey &&
+					!e.altKey
+				) {
+					e.preventDefault();
+					keyboardMode = true;
+					// Select first item (top-left) if nothing selected
+					if (!selectedItemId && items.length > 0) {
+						const topLeft = [...items].sort(
+							(a, b) => a.y - b.y || a.x - b.x,
+						)[0];
+						selectedItemId = topLeft.id;
+					}
+					renderItems();
+					updateDebug();
+					return;
+				}
+
+				// 'c' key for manual compact (works in keyboard mode only)
+				if (
+					keyboardMode &&
+					key === 'c' &&
+					!e.ctrlKey &&
+					!e.metaKey &&
+					!e.altKey
+				) {
+					e.preventDefault();
+					triggerManualCompact();
+					return;
+				}
+
+				// All other navigation requires keyboard mode and selection
+				if (!keyboardMode || !selectedItemId) return;
+
+				const item = items.find((i) => i.id === selectedItemId);
+				if (!item) return;
+
+				let dx = 0,
+					dy = 0;
+
+				// Use e.code for vim keys (Alt+hjkl produces special chars on macOS)
+				switch (true) {
+					case key === 'h' || code === 'KeyH' || key === 'arrowleft':
+						dx = -1;
+						break;
+					case key === 'l' || code === 'KeyL' || key === 'arrowright':
+						dx = 1;
+						break;
+					case key === 'k' || code === 'KeyK' || key === 'arrowup':
+						dy = -1;
+						break;
+					case key === 'j' || code === 'KeyJ' || key === 'arrowdown':
+						dy = 1;
+						break;
+					default:
+						return; // Don't handle other keys - let them pass through
+				}
+
+				e.preventDefault();
+
+				// Alt+nav: select adjacent card instead of moving
+				if (e.altKey && !e.ctrlKey && !e.metaKey) {
+					const adjacent = findAdjacentItem(item, dx, dy);
+					if (adjacent) {
+						selectedItemId = adjacent.id;
+						renderItems();
+						updateDebug();
+					}
+					return;
+				}
+
+				// Ctrl+nav: jump/reorder (leap over adjacent cards)
+				if (e.ctrlKey || e.metaKey) {
+					const { target: jumpTarget } = findJumpTarget(item, dx, dy);
+
+					if (jumpTarget.x !== item.x || jumpTarget.y !== item.y) {
+						const oldPos = { x: item.x, y: item.y };
+						const newPos = { x: jumpTarget.x, y: jumpTarget.y };
+
+						// Use selected algorithm for jump
+						let newLayout;
+						switch (getAlgorithm('jump')) {
+							case 'swap':
+								newLayout = swapLayout(items, selectedItemId, oldPos, newPos);
+								break;
+							case 'insert':
+								newLayout = insertLayout(items, selectedItemId, oldPos, newPos);
+								break;
+							case 'snap-to-gap':
+								newLayout = snapToGapLayout(
+									items,
+									selectedItemId,
+									oldPos,
+									newPos,
+								);
+								break;
+							case 'reorder':
+								newLayout = reorderLayout(
+									items,
+									selectedItemId,
+									oldPos,
+									newPos,
+								);
+								break;
+							default: {
+								// 'push-down'
+								const originalPositions = new Map();
+								for (const it of items) {
+									originalPositions.set(it.id, { x: it.x, y: it.y });
+								}
+								newLayout = calculateLayout(
+									selectedItemId,
+									newPos,
+									originalPositions,
+								);
+							}
+						}
+
+						const savePositions = () => {
+							const newPositions = {};
+							for (const it of newLayout) {
+								newPositions[it.id] = { x: it.x, y: it.y };
+							}
+							if (currentColCount === MAX_COLS) {
+								canonicalPositions = newPositions;
+							} else {
+								layoutOverrides[currentColCount] = newPositions;
+							}
+						};
+
+						if (document.startViewTransition) {
+							document.startViewTransition(() => {
+								items = newLayout;
+								savePositions();
+								injectLayoutCSS();
+								renderItems();
+								updateDebug();
+							});
+						} else {
+							items = newLayout;
+							savePositions();
+							injectLayoutCSS();
+							renderItems();
+							updateDebug();
+						}
+					}
+					return;
+				}
+
+				// No modifier: nudge (amount based on configuration)
+				const nudgeAmount = getOption('nudgeAmount');
+				const moveDx = nudgeAmount === 'item-size' ? dx * item.w : dx;
+				const moveDy = nudgeAmount === 'item-size' ? dy * item.h : dy;
+				console.log(
+					'[nudge] amount:',
+					nudgeAmount,
+					'dx:',
+					dx,
+					'dy:',
+					dy,
+					'moveDx:',
+					moveDx,
+					'moveDy:',
+					moveDy,
+				);
+
+				const newX = Math.max(
+					0,
+					Math.min(currentColCount - item.w, item.x + moveDx),
+				);
+				const newY = Math.max(0, Math.min(GRID_ROWS - item.h, item.y + moveDy));
+
+				if (newX !== item.x || newY !== item.y) {
+					const oldPos = { x: item.x, y: item.y };
+					const newPos = { x: newX, y: newY };
+
+					// Use selected algorithm for nudge
+					let newLayout;
+					switch (getAlgorithm('nudge')) {
+						case 'swap':
+							newLayout = swapLayout(items, selectedItemId, oldPos, newPos);
+							break;
+						case 'insert':
+							newLayout = insertLayout(items, selectedItemId, oldPos, newPos);
+							break;
+						case 'snap-to-gap':
+							newLayout = snapToGapLayout(
+								items,
+								selectedItemId,
+								oldPos,
+								newPos,
+							);
+							break;
+						case 'reorder':
+							newLayout = reorderLayout(items, selectedItemId, oldPos, newPos);
+							break;
+						default: {
+							// 'push-down'
+							const originalPositions = new Map();
+							for (const it of items) {
+								originalPositions.set(it.id, { x: it.x, y: it.y });
+							}
+							newLayout = calculateLayout(
+								selectedItemId,
+								newPos,
+								originalPositions,
+							);
+						}
+					}
+
+					// Save positions based on current column count
+					const savePositions = () => {
+						const newPositions = {};
+						for (const it of newLayout) {
+							newPositions[it.id] = { x: it.x, y: it.y };
+						}
+
+						if (currentColCount === MAX_COLS) {
+							canonicalPositions = newPositions;
+						} else {
+							layoutOverrides[currentColCount] = newPositions;
+						}
+					};
+
+					if (document.startViewTransition) {
+						document.startViewTransition(() => {
+							items = newLayout;
+							savePositions();
+							injectLayoutCSS();
+							renderItems();
+							updateDebug();
+						});
+					} else {
+						items = newLayout;
+						savePositions();
+						injectLayoutCSS();
+						renderItems();
+						updateDebug();
+					}
+				}
+			});
+
+			// Click outside to deselect
+			document.addEventListener('click', (e) => {
+				if (
+					!e.target.closest('.grid-item') &&
+					!e.target.closest('.debug-panel') &&
+					selectedItemId
+				) {
+					selectedItemId = null;
+					renderItems();
+					updateDebug();
+				}
+			});
+
+			function updateDebug() {
+				const hasOverride = layoutOverrides[currentColCount] !== undefined;
+				const overrideKeys = Object.keys(layoutOverrides)
+					.map(Number)
+					.sort((a, b) => b - a);
+
+				const lines = [
+					`<strong>Columns: ${currentColCount}</strong> ${currentColCount === MAX_COLS ? '(canonical)' : hasOverride ? '(override)' : '(auto-derived)'}`,
+					overrideKeys.length > 0
+						? `Overrides: ${overrideKeys.join(', ')} cols`
+						: '',
+					'',
+					`Selected: ${selectedItemId || 'none'}${keyboardMode ? ' (keyboard mode)' : ''}`,
+					`Dragging: ${dragState?.itemId || 'none'}`,
+					dragState
+						? `Target: (${dragState.currentTarget.x}, ${dragState.currentTarget.y})`
+						: '',
+					'',
+					'Items:',
+				];
+
+				items.forEach((item) => {
+					const marker = item.id === selectedItemId ? '>' : ' ';
+					lines.push(
+						`${marker} ${item.label}: (${item.x},${item.y}) ${item.w}×${item.h}`,
+					);
+				});
+
+				debug(lines.filter((l) => l !== '').join('<br>'));
+			}
+
+			// Initialize: detect columns and build items
+			function init() {
+				currentColCount = getColumnCount();
+
+				// Generate and inject CSS for all column counts
+				// CSS container queries handle responsive layout - no JS needed on resize
+				injectLayoutCSS();
+
+				updateItemsForCurrentColumns();
+				renderItems();
+				updateDebug();
+
+				// Click on grid background exits keyboard mode
+				grid.addEventListener('click', (e) => {
+					if (e.target === grid && keyboardMode) {
+						keyboardMode = false;
+						selectedItemId = null;
+						renderItems();
+						updateDebug();
+					}
+				});
+
+				// Watch for resize - only to update debug display and items array
+				// (CSS handles actual layout via container queries)
+				const resizeObserver = new ResizeObserver(() => {
+					handleColumnCountChange();
+				});
+				resizeObserver.observe(grid);
+
+				// Wire up algorithm selector dropdowns
+				document.getElementById('alg-drag')?.addEventListener('change', (e) => {
+					layoutAlgorithms.drag = e.target.value;
+				});
+				document
+					.getElementById('alg-nudge')
+					?.addEventListener('change', (e) => {
+						layoutAlgorithms.nudge = e.target.value;
+					});
+				document.getElementById('alg-jump')?.addEventListener('change', (e) => {
+					layoutAlgorithms.jump = e.target.value;
+				});
+
+				// Wire up layout option dropdowns
+				document
+					.getElementById('opt-nudge-amount')
+					?.addEventListener('change', (e) => {
+						layoutOptions.nudgeAmount = e.target.value;
+					});
+				document
+					.getElementById('opt-reorder-shift')
+					?.addEventListener('change', (e) => {
+						layoutOptions.reorderShift = e.target.value;
+					});
+				document
+					.getElementById('opt-compaction')
+					?.addEventListener('change', (e) => {
+						layoutOptions.compaction = e.target.value;
+					});
+
+				// Wire up manual compact button
+				document
+					.getElementById('btn-compact')
+					?.addEventListener('click', triggerManualCompact);
+			}
+
+			// Start
+			init();
+		</script>
+	</body>
+</html>

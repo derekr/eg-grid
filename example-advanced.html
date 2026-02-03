@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gridiot - Advanced Multi-Cell Example</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a2e;
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    /* Container wrapper for container queries */
+    .grid-wrapper {
+      container-type: inline-size;
+      max-width: 1216px;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      grid-auto-rows: 184px;
+      gap: 16px;
+    }
+
+    .item {
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 18px;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      /* Scroll margin for camera - keeps item away from viewport edges */
+      scroll-margin: 25vh 10vw;
+      -webkit-touch-callout: none;
+      transition: filter 0.2s ease;
+      view-transition-name: var(--item-id);
+    }
+
+    /* Drag states */
+    .item[data-gridiot-dragging] {
+      cursor: grabbing;
+      transform: scale(1.02);
+      filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
+      z-index: 100;
+    }
+
+    .item[data-gridiot-dropping] {
+      z-index: 100;
+    }
+
+    /* Selected state */
+    .item[data-gridiot-selected] {
+      outline: 3px solid #fbbf24;
+      outline-offset: 2px;
+      z-index: 50;
+    }
+
+    /* Resizing state */
+    .item[data-gridiot-resizing] {
+      z-index: 100;
+      outline: 2px solid rgba(251, 191, 36, 0.5);
+      outline-offset: 2px;
+    }
+
+    /* Keyboard mode indicator */
+    .grid[data-gridiot-keyboard-mode] {
+      outline: 2px solid rgba(251, 191, 36, 0.3);
+      outline-offset: 4px;
+    }
+
+    /* Color variants */
+    .item[data-color="1"] { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .item[data-color="2"] { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .item[data-color="3"] { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .item[data-color="4"] { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .item[data-color="5"] { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .item[data-color="6"] { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
+
+    /* Drop placeholder */
+    .drop-placeholder {
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px dashed rgba(255, 255, 255, 0.4);
+      border-radius: 12px;
+      pointer-events: none;
+      view-transition-name: none;
+    }
+
+    /* View Transition styles */
+    ::view-transition-group(*) {
+      animation-duration: 200ms;
+      animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    /* Disable crossfade to prevent ghosting */
+    ::view-transition-old(*) {
+      animation: none;
+      opacity: 0;
+    }
+
+    ::view-transition-new(*) {
+      animation: none;
+    }
+
+    /* Don't animate the dragging item */
+    ::view-transition-old(dragging),
+    ::view-transition-new(dragging),
+    ::view-transition-group(dragging) {
+      animation: none;
+    }
+
+    /* Don't animate the resizing item (FLIP handles it) */
+    ::view-transition-old(resizing),
+    ::view-transition-new(resizing),
+    ::view-transition-group(resizing) {
+      animation: none;
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      ::view-transition-group(*),
+      ::view-transition-old(*),
+      ::view-transition-new(*) {
+        animation: none !important;
+      }
+
+      .item[data-gridiot-dragging] {
+        transform: none;
+      }
+    }
+
+    /* Instructions panel */
+    .instructions {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      max-width: 300px;
+      z-index: 1000;
+      view-transition-name: instructions-panel;
+    }
+
+    /* Keep fixed panels above transitioning grid items */
+    ::view-transition-group(instructions-panel),
+    ::view-transition-group(dev-overlay) {
+      z-index: 1000;
+    }
+
+    .instructions h3 {
+      margin-bottom: 8px;
+    }
+
+    .instructions ul {
+      margin-left: 20px;
+    }
+
+    .instructions li {
+      margin-bottom: 4px;
+    }
+
+    /*
+     * Initial item positions removed - layout-styles handles all positioning.
+     * Server renders layout-styles with container queries for all breakpoints.
+     * JS only injects CSS when user interacts (drags items).
+     */
+  </style>
+  <!--
+    Responsive layout CSS - server-rendered, JS only modifies on user interaction.
+
+    Structure:
+    1. Fallback rules (canonical 6-col positions) - apply immediately, no container query
+    2. Container queries for each breakpoint - apply once container is sized
+
+    JS only regenerates this when user drags items to create overrides.
+  -->
+  <style id="layout-styles">
+/* Fallback: canonical 6-col layout (applies immediately before container queries) */
+#item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+#item-2 { grid-column: 3 / span 2; grid-row: 1 / span 1; }
+#item-3 { grid-column: 5 / span 2; grid-row: 1 / span 1; }
+#item-4 { grid-column: 3 / span 1; grid-row: 2 / span 2; }
+#item-5 { grid-column: 4 / span 1; grid-row: 2 / span 1; }
+#item-6 { grid-column: 5 / span 2; grid-row: 2 / span 2; }
+#item-7 { grid-column: 1 / span 3; grid-row: 4 / span 1; }
+#item-8 { grid-column: 4 / span 1; grid-row: 3 / span 1; }
+#item-9 { grid-column: 1 / span 2; grid-row: 5 / span 1; }
+#item-10 { grid-column: 3 / span 2; grid-row: 5 / span 2; }
+#item-11 { grid-column: 5 / span 2; grid-row: 5 / span 1; }
+#item-12 { grid-column: 5 / span 1; grid-row: 6 / span 1; }
+#item-13 { grid-column: 6 / span 1; grid-row: 6 / span 1; }
+#item-14 { grid-column: 1 / span 2; grid-row: 6 / span 1; }
+#item-15 { grid-column: 1 / span 4; grid-row: 7 / span 1; }
+#item-16 { grid-column: 5 / span 2; grid-row: 7 / span 2; }
+#item-17 { grid-column: 1 / span 2; grid-row: 8 / span 1; }
+#item-18 { grid-column: 3 / span 2; grid-row: 8 / span 1; }
+
+/* 5 columns (derived) */
+@container (min-width: 984px) and (max-width: 1183px) {
+  #grid { grid-template-columns: repeat(5, 1fr); }
+  #item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+  #item-2 { grid-column: 3 / span 2; grid-row: 1 / span 1; }
+  #item-3 { grid-column: 3 / span 2; grid-row: 2 / span 1; }
+  #item-4 { grid-column: 5 / span 1; grid-row: 1 / span 2; }
+  #item-5 { grid-column: 1 / span 1; grid-row: 3 / span 1; }
+  #item-6 { grid-column: 2 / span 2; grid-row: 3 / span 2; }
+  #item-7 { grid-column: 4 / span 2; grid-row: 3 / span 1; }
+  #item-8 { grid-column: 4 / span 1; grid-row: 4 / span 1; }
+  #item-9 { grid-column: 1 / span 2; grid-row: 5 / span 1; }
+  #item-10 { grid-column: 3 / span 2; grid-row: 5 / span 2; }
+  #item-11 { grid-column: 5 / span 1; grid-row: 4 / span 1; }
+  #item-12 { grid-column: 5 / span 1; grid-row: 5 / span 1; }
+  #item-13 { grid-column: 5 / span 1; grid-row: 6 / span 1; }
+  #item-14 { grid-column: 1 / span 2; grid-row: 6 / span 1; }
+  #item-15 { grid-column: 1 / span 4; grid-row: 7 / span 1; }
+  #item-16 { grid-column: 1 / span 2; grid-row: 8 / span 2; }
+  #item-17 { grid-column: 3 / span 2; grid-row: 8 / span 1; }
+  #item-18 { grid-column: 5 / span 1; grid-row: 7 / span 1; }
+}
+
+/* 4 columns (derived) */
+@container (min-width: 784px) and (max-width: 983px) {
+  #grid { grid-template-columns: repeat(4, 1fr); }
+  #item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+  #item-2 { grid-column: 3 / span 2; grid-row: 1 / span 1; }
+  #item-3 { grid-column: 3 / span 2; grid-row: 2 / span 1; }
+  #item-4 { grid-column: 3 / span 1; grid-row: 3 / span 2; }
+  #item-5 { grid-column: 4 / span 1; grid-row: 3 / span 1; }
+  #item-6 { grid-column: 1 / span 2; grid-row: 3 / span 2; }
+  #item-7 { grid-column: 1 / span 3; grid-row: 5 / span 1; }
+  #item-8 { grid-column: 4 / span 1; grid-row: 4 / span 1; }
+  #item-9 { grid-column: 1 / span 2; grid-row: 6 / span 1; }
+  #item-10 { grid-column: 3 / span 2; grid-row: 6 / span 2; }
+  #item-11 { grid-column: 1 / span 2; grid-row: 7 / span 1; }
+  #item-12 { grid-column: 4 / span 1; grid-row: 5 / span 1; }
+  #item-13 { grid-column: 1 / span 1; grid-row: 8 / span 1; }
+  #item-14 { grid-column: 1 / span 3; grid-row: 9 / span 1; }
+  #item-15 { grid-column: 1 / span 4; grid-row: 10 / span 1; }
+  #item-16 { grid-column: 2 / span 2; grid-row: 8 / span 2; }
+  #item-17 { grid-column: 1 / span 2; grid-row: 11 / span 1; }
+  #item-18 { grid-column: 3 / span 2; grid-row: 11 / span 1; }
+}
+
+/* 3 columns (derived) */
+@container (min-width: 584px) and (max-width: 783px) {
+  #grid { grid-template-columns: repeat(3, 1fr); }
+  #item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+  #item-2 { grid-column: 1 / span 2; grid-row: 3 / span 1; }
+  #item-3 { grid-column: 3 / span 1; grid-row: 1 / span 1; }
+  #item-4 { grid-column: 3 / span 1; grid-row: 2 / span 2; }
+  #item-5 { grid-column: 1 / span 1; grid-row: 4 / span 1; }
+  #item-6 { grid-column: 2 / span 2; grid-row: 4 / span 2; }
+  #item-7 { grid-column: 1 / span 3; grid-row: 6 / span 1; }
+  #item-8 { grid-column: 1 / span 1; grid-row: 5 / span 1; }
+  #item-9 { grid-column: 1 / span 2; grid-row: 7 / span 1; }
+  #item-10 { grid-column: 1 / span 2; grid-row: 8 / span 2; }
+  #item-11 { grid-column: 3 / span 1; grid-row: 7 / span 1; }
+  #item-12 { grid-column: 3 / span 1; grid-row: 8 / span 1; }
+  #item-13 { grid-column: 3 / span 1; grid-row: 9 / span 1; }
+  #item-14 { grid-column: 1 / span 3; grid-row: 10 / span 1; }
+  #item-15 { grid-column: 1 / span 3; grid-row: 11 / span 1; }
+  #item-16 { grid-column: 1 / span 2; grid-row: 12 / span 2; }
+  #item-17 { grid-column: 1 / span 2; grid-row: 14 / span 1; }
+  #item-18 { grid-column: 3 / span 1; grid-row: 12 / span 1; }
+}
+
+/* 2 columns (derived) */
+@container (min-width: 384px) and (max-width: 583px) {
+  #grid { grid-template-columns: repeat(2, 1fr); }
+  #item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+  #item-2 { grid-column: 1 / span 2; grid-row: 3 / span 1; }
+  #item-3 { grid-column: 1 / span 2; grid-row: 4 / span 1; }
+  #item-4 { grid-column: 1 / span 1; grid-row: 5 / span 2; }
+  #item-5 { grid-column: 2 / span 1; grid-row: 5 / span 1; }
+  #item-6 { grid-column: 1 / span 2; grid-row: 7 / span 2; }
+  #item-7 { grid-column: 1 / span 2; grid-row: 9 / span 1; }
+  #item-8 { grid-column: 2 / span 1; grid-row: 6 / span 1; }
+  #item-9 { grid-column: 1 / span 2; grid-row: 10 / span 1; }
+  #item-10 { grid-column: 1 / span 2; grid-row: 11 / span 2; }
+  #item-11 { grid-column: 1 / span 2; grid-row: 13 / span 1; }
+  #item-12 { grid-column: 1 / span 1; grid-row: 14 / span 1; }
+  #item-13 { grid-column: 2 / span 1; grid-row: 14 / span 1; }
+  #item-14 { grid-column: 1 / span 2; grid-row: 15 / span 1; }
+  #item-15 { grid-column: 1 / span 2; grid-row: 16 / span 1; }
+  #item-16 { grid-column: 1 / span 2; grid-row: 17 / span 2; }
+  #item-17 { grid-column: 1 / span 2; grid-row: 19 / span 1; }
+  #item-18 { grid-column: 1 / span 2; grid-row: 20 / span 1; }
+}
+
+/* 1 column (derived) */
+@container (max-width: 383px) {
+  #grid { grid-template-columns: repeat(1, 1fr); }
+  #item-1 { grid-column: 1 / span 1; grid-row: 1 / span 2; }
+  #item-2 { grid-column: 1 / span 1; grid-row: 3 / span 1; }
+  #item-3 { grid-column: 1 / span 1; grid-row: 4 / span 1; }
+  #item-4 { grid-column: 1 / span 1; grid-row: 5 / span 2; }
+  #item-5 { grid-column: 1 / span 1; grid-row: 7 / span 1; }
+  #item-6 { grid-column: 1 / span 1; grid-row: 8 / span 2; }
+  #item-7 { grid-column: 1 / span 1; grid-row: 10 / span 1; }
+  #item-8 { grid-column: 1 / span 1; grid-row: 11 / span 1; }
+  #item-9 { grid-column: 1 / span 1; grid-row: 12 / span 1; }
+  #item-10 { grid-column: 1 / span 1; grid-row: 13 / span 2; }
+  #item-11 { grid-column: 1 / span 1; grid-row: 15 / span 1; }
+  #item-12 { grid-column: 1 / span 1; grid-row: 16 / span 1; }
+  #item-13 { grid-column: 1 / span 1; grid-row: 17 / span 1; }
+  #item-14 { grid-column: 1 / span 1; grid-row: 18 / span 1; }
+  #item-15 { grid-column: 1 / span 1; grid-row: 19 / span 1; }
+  #item-16 { grid-column: 1 / span 1; grid-row: 20 / span 2; }
+  #item-17 { grid-column: 1 / span 1; grid-row: 22 / span 1; }
+  #item-18 { grid-column: 1 / span 1; grid-row: 23 / span 1; }
+}
+  </style>
+</head>
+<body>
+  <div class="grid-wrapper">
+  <div class="grid" id="grid">
+    <!-- 2x2 item -->
+    <div
+      id="item-1"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart A"
+      data-gridiot-colspan="2"
+      data-gridiot-rowspan="2"
+      data-id="item-1"
+      data-color="1"
+      data-column="1"
+      data-row="1"
+      style="--item-id: item-1"
+    >A (2×2)</div>
+
+    <!-- 2x1 item -->
+    <div
+      id="item-2"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart B"
+      data-gridiot-colspan="2"
+      data-id="item-2"
+      data-color="2"
+      data-column="3"
+      data-row="1"
+      style="--item-id: item-2"
+    >B (2×1)</div>
+
+    <!-- 2x1 item -->
+    <div
+      id="item-3"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart C"
+      data-gridiot-colspan="2"
+      data-id="item-3"
+      data-color="3"
+      data-column="5"
+      data-row="1"
+      style="--item-id: item-3"
+    >C (2×1)</div>
+
+    <!-- 1x2 item -->
+    <div
+      id="item-4"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart D"
+      data-gridiot-rowspan="2"
+      data-id="item-4"
+      data-color="4"
+      data-column="3"
+      data-row="2"
+      style="--item-id: item-4"
+    >D (1×2)</div>
+
+    <!-- 1x1 item -->
+    <div
+      id="item-5"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart E"
+      data-id="item-5"
+      data-color="5"
+      data-column="4"
+      data-row="2"
+      style="--item-id: item-5"
+    >E (1×1)</div>
+
+    <!-- 2x2 item -->
+    <div
+      id="item-6"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart F"
+      data-gridiot-colspan="2"
+      data-gridiot-rowspan="2"
+      data-id="item-6"
+      data-color="6"
+      data-column="5"
+      data-row="2"
+      style="--item-id: item-6"
+    >F (2×2)</div>
+
+    <!-- 3x1 item -->
+    <div
+      id="item-7"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart G"
+      data-gridiot-colspan="3"
+      data-id="item-7"
+      data-color="1"
+      data-column="1"
+      data-row="4"
+      style="--item-id: item-7"
+    >G (3×1)</div>
+
+    <!-- 1x1 item -->
+    <div
+      id="item-8"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart H"
+      data-id="item-8"
+      data-color="2"
+      data-column="4"
+      data-row="3"
+      style="--item-id: item-8"
+    >H (1×1)</div>
+
+    <!-- 2x1 item -->
+    <div
+      id="item-9"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart I"
+      data-gridiot-colspan="2"
+      data-id="item-9"
+      data-color="3"
+      data-column="1"
+      data-row="5"
+      style="--item-id: item-9"
+    >I (2×1)</div>
+
+    <!-- Additional items for scroll testing -->
+    <div
+      id="item-10"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart J"
+      data-gridiot-colspan="2"
+      data-gridiot-rowspan="2"
+      data-id="item-10"
+      data-color="4"
+      data-column="3"
+      data-row="5"
+      style="--item-id: item-10"
+    >J (2×2)</div>
+
+    <div
+      id="item-11"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart K"
+      data-gridiot-colspan="2"
+      data-id="item-11"
+      data-color="5"
+      data-column="5"
+      data-row="5"
+      style="--item-id: item-11"
+    >K (2×1)</div>
+
+    <div
+      id="item-12"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart L"
+      data-id="item-12"
+      data-color="6"
+      data-column="5"
+      data-row="6"
+      style="--item-id: item-12"
+    >L (1×1)</div>
+
+    <div
+      id="item-13"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart M"
+      data-id="item-13"
+      data-color="1"
+      data-column="6"
+      data-row="6"
+      style="--item-id: item-13"
+    >M (1×1)</div>
+
+    <div
+      id="item-14"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart N"
+      data-gridiot-colspan="2"
+      data-id="item-14"
+      data-color="2"
+      data-column="1"
+      data-row="6"
+      style="--item-id: item-14"
+    >N (2×1)</div>
+
+    <div
+      id="item-15"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart O"
+      data-gridiot-colspan="4"
+      data-id="item-15"
+      data-color="3"
+      data-column="1"
+      data-row="7"
+      style="--item-id: item-15"
+    >O (4×1)</div>
+
+    <div
+      id="item-16"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart P"
+      data-gridiot-colspan="2"
+      data-gridiot-rowspan="2"
+      data-id="item-16"
+      data-color="4"
+      data-column="5"
+      data-row="7"
+      style="--item-id: item-16"
+    >P (2×2)</div>
+
+    <div
+      id="item-17"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart Q"
+      data-gridiot-colspan="2"
+      data-id="item-17"
+      data-color="5"
+      data-column="1"
+      data-row="8"
+      style="--item-id: item-17"
+    >Q (2×1)</div>
+
+    <div
+      id="item-18"
+      class="item"
+      data-gridiot-item
+      data-gridiot-label="Chart R"
+      data-gridiot-colspan="2"
+      data-id="item-18"
+      data-color="6"
+      data-column="3"
+      data-row="8"
+      style="--item-id: item-18"
+    >R (2×1)</div>
+  </div>
+  </div><!-- .grid-wrapper -->
+
+  <div class="instructions">
+    <h3>Gridiot Advanced Example</h3>
+    <ul>
+      <li><b>Mouse:</b> Click to select, drag to move</li>
+      <li><b>Shift+K:</b> Toggle keyboard mode</li>
+      <li><b>Arrows/hjkl:</b> Nudge selected item</li>
+      <li><b>Ctrl+nav:</b> Jump by item size</li>
+      <li><b>Alt+nav:</b> Select adjacent item</li>
+      <li><b>Enter/Space:</b> Pick up / drop</li>
+      <li><b>Escape:</b> Cancel / deselect</li>
+      <li><b>Shift+D:</b> Toggle dev overlay</li>
+      <li><b>Corners:</b> Drag to resize items</li>
+      <li><b>Resize window:</b> Responsive column reflow</li>
+    </ul>
+  </div>
+
+  <!-- Preview CSS during drag - higher specificity than layout-styles -->
+  <style id="preview-styles"></style>
+
+  <script type="module">
+    import { init, createLayoutModel, attachResponsive } from './dist/gridiot.js';
+    import { attachPushAlgorithm, readItemsFromDOM, compactUp, layoutToCSS } from './dist/algorithm-push.js';
+    import { attachDevOverlay } from './dist/dev-overlay.js';
+    import { attachPlaceholder } from './dist/placeholder.js';
+    import { attachCamera } from './dist/camera.js';
+    import { attachResize } from './dist/resize.js';
+
+    const gridElement = document.getElementById('grid');
+    const layoutStyleElement = document.getElementById('layout-styles');
+    const previewStyleElement = document.getElementById('preview-styles');
+
+    // Read initial items from DOM to build layout model
+    // Uses data attributes for initial positions (data-column, data-row)
+    // Falls back to computed styles if data attributes not present
+    function readItemDefinitions() {
+      const elements = gridElement.querySelectorAll('[data-gridiot-item]');
+      const items = [];
+      const positions = new Map();
+
+      for (const el of elements) {
+        const id = el.dataset.id || el.id;
+        const width = parseInt(el.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
+        const height = parseInt(el.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
+
+        // Prefer data attributes for initial position (cleaner than inline styles)
+        let column = parseInt(el.dataset.column, 10);
+        let row = parseInt(el.dataset.row, 10);
+
+        // Fall back to computed styles if data attributes not set
+        if (!column || !row) {
+          const style = getComputedStyle(el);
+          column = column || parseInt(style.gridColumnStart, 10) || 1;
+          row = row || parseInt(style.gridRowStart, 10) || 1;
+        }
+
+        items.push({ id, width, height });
+        positions.set(id, { column, row });
+      }
+
+      return { items, positions };
+    }
+
+    const { items, positions } = readItemDefinitions();
+
+    // Create responsive layout model
+    const layoutModel = createLayoutModel({
+      maxColumns: 6,
+      items,
+      canonicalPositions: positions,
+    });
+
+    // Initialize Gridiot
+    // Disable plugins that will be manually attached with custom options
+    const grid = init(gridElement, {
+      disablePlugins: ['algorithm-push', 'placeholder', 'camera', 'resize'],
+    });
+
+    // Attach responsive plugin - handles CSS for all breakpoints
+    const detachResponsive = attachResponsive(gridElement, {
+      layoutModel,
+      styleElement: layoutStyleElement,
+      cellSize: 184,
+      gap: 16,
+    }, grid);
+
+    // Track algorithm options for runtime changes
+    let algorithmOptions = {
+      styleElement: previewStyleElement,  // Preview CSS during drag
+      layoutModel,  // Save to layout model on drag-end
+      compaction: true,
+      core: grid  // Pass core for provider registration
+    };
+    let detachAlgorithm = null;
+
+    function attachAlgorithm() {
+      if (detachAlgorithm) detachAlgorithm();
+      detachAlgorithm = attachPushAlgorithm(gridElement, algorithmOptions);
+    }
+
+    // Manual compact function
+    function compactNow() {
+      const items = readItemsFromDOM(gridElement);
+      compactUp(items, ''); // No item to exclude
+
+      // Save compacted positions to layout model
+      const positions = new Map();
+      for (const item of items) {
+        positions.set(item.id, { column: item.column, row: item.row });
+      }
+      layoutModel.saveLayout(layoutModel.currentColumnCount, positions);
+    }
+
+    // Initial attach
+    attachAlgorithm();
+
+    // Dev overlay (Shift+D to toggle) - pass core for provider access
+    const devOverlay = attachDevOverlay(gridElement, { visible: false, core: grid });
+
+    // Register compaction config option
+    devOverlay.registerOption({
+      key: 'compaction',
+      label: 'Compact items upward',
+      type: 'boolean',
+      value: algorithmOptions.compaction,
+      onChange: (value) => {
+        algorithmOptions.compaction = value;
+        attachAlgorithm();
+      }
+    });
+
+    // Register compact now action
+    devOverlay.registerOption({
+      key: 'compact-now',
+      label: 'Compact Now',
+      type: 'action',
+      onAction: compactNow
+    });
+
+    // Drop placeholder - shows where the item will land
+    const placeholder = attachPlaceholder(gridElement, {
+      className: 'drop-placeholder'
+    });
+
+    // Camera - auto-scroll when dragging near edges or selecting off-screen items
+    const camera = attachCamera(gridElement, {
+      mode: 'contain',
+      edgeSize: 80,
+      scrollSpeed: 12,
+      scrollMargin: 64,  // Padding from viewport edge for context
+      settleDelay: 50,
+      core: grid  // Register camera provider for layout coordination
+    });
+
+    // Resize - drag corners to resize items
+    // The push algorithm now handles resize events automatically (resize-start, resize-move, resize-end)
+    // so items shift in real-time during resize just like during drag
+    const resize = attachResize(gridElement, {
+      handles: 'corners',
+      handleSize: 16,
+      minSize: { colspan: 1, rowspan: 1 },
+      maxSize: { colspan: 6, rowspan: 6 },
+      showSizeLabel: true,
+      core: grid
+    });
+
+    console.log('Gridiot initialized with push algorithm + responsive layout');
+    console.log('Resize window to see responsive column reflow');
+    console.log('Press Shift+D to toggle dev overlay');
+  </script>
+</body>
+</html>

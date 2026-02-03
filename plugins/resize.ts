@@ -1,0 +1,798 @@
+/**
+ * Resize plugin for Gridiot
+ *
+ * Allows users to resize grid items by dragging corners/edges.
+ * Resizes modify colspan/rowspan using actual CSS grid changes during resize.
+ *
+ * Usage:
+ *   import { attachResize } from 'gridiot/resize';
+ *
+ *   const detach = attachResize(gridElement, {
+ *     handles: 'corners',  // 'corners' | 'edges' | 'all'
+ *     handleSize: 12,
+ *     minSize: { colspan: 1, rowspan: 1 },
+ *     maxSize: { colspan: 6, rowspan: 6 },
+ *   });
+ */
+
+import { registerPlugin } from '../engine';
+import type {
+	GridCell,
+	GridiotCore,
+	ResizeCancelDetail,
+	ResizeEndDetail,
+	ResizeHandle,
+	ResizeMoveDetail,
+	ResizePluginOptions,
+	ResizeStartDetail,
+	ResizeState,
+} from '../types';
+import { animateFLIPWithTracking } from '../utils/flip';
+
+const DEBUG = false;
+function log(...args: unknown[]) {
+	if (DEBUG) console.log('[resize]', ...args);
+}
+
+export interface ResizeOptions {
+	/** Which handles to show: 'corners' | 'edges' | 'all' (default: 'corners') */
+	handles?: 'corners' | 'edges' | 'all';
+	/** Size of the hit zone for handles in pixels (default: 12) */
+	handleSize?: number;
+	/** Minimum size in grid cells (default: { colspan: 1, rowspan: 1 }) */
+	minSize?: { colspan: number; rowspan: number };
+	/** Maximum size in grid cells (default: { colspan: 6, rowspan: 6 }) */
+	maxSize?: { colspan: number; rowspan: number };
+	/** Show size label during resize (default: true) */
+	showSizeLabel?: boolean;
+	/** GridiotCore instance for provider registration */
+	core?: GridiotCore;
+}
+
+interface ActiveResize {
+	item: HTMLElement;
+	pointerId: number;
+	handle: ResizeHandle;
+	/** Original cell position at start of resize - never changes */
+	startCell: GridCell;
+	/** Original size at start of resize - never changes */
+	originalSize: { colspan: number; rowspan: number };
+	/** Current position (may differ from startCell for NW/NE/SW handles) */
+	currentCell: GridCell;
+	/** Current size during resize */
+	currentSize: { colspan: number; rowspan: number };
+	originalGridColumn: string;
+	originalGridRow: string;
+	sizeLabel: HTMLElement | null;
+	/** Initial bounding rect for smooth resize */
+	initialRect: DOMRect;
+	/** Pointer position at start */
+	startPointerX: number;
+	startPointerY: number;
+}
+
+/**
+ * Detect which resize handle (if any) is under the pointer
+ */
+function detectHandle(
+	e: PointerEvent,
+	item: HTMLElement,
+	size: number,
+	mode: 'corners' | 'edges' | 'all',
+): ResizeHandle | null {
+	const rect = item.getBoundingClientRect();
+	const x = e.clientX - rect.left;
+	const y = e.clientY - rect.top;
+
+	const nearLeft = x < size;
+	const nearRight = x > rect.width - size;
+	const nearTop = y < size;
+	const nearBottom = y > rect.height - size;
+
+	// Corners
+	if (mode === 'corners' || mode === 'all') {
+		if (nearTop && nearLeft) return 'nw';
+		if (nearTop && nearRight) return 'ne';
+		if (nearBottom && nearLeft) return 'sw';
+		if (nearBottom && nearRight) return 'se';
+	}
+
+	// Edges (only if not at corners)
+	if (mode === 'edges' || mode === 'all') {
+		if (nearTop) return 'n';
+		if (nearBottom) return 's';
+		if (nearLeft) return 'w';
+		if (nearRight) return 'e';
+	}
+
+	return null;
+}
+
+/**
+ * Get cursor style for a resize handle
+ */
+function getCursor(handle: ResizeHandle | null): string {
+	switch (handle) {
+		case 'nw':
+		case 'se':
+			return 'nwse-resize';
+		case 'ne':
+		case 'sw':
+			return 'nesw-resize';
+		case 'n':
+		case 's':
+			return 'ns-resize';
+		case 'e':
+		case 'w':
+			return 'ew-resize';
+		default:
+			return '';
+	}
+}
+
+/**
+ * Calculate new size based on pointer position and handle
+ */
+function calculateNewSize(
+	core: GridiotCore,
+	handle: ResizeHandle,
+	startCell: GridCell,
+	originalSize: { colspan: number; rowspan: number },
+	pointerX: number,
+	pointerY: number,
+	minSize: { colspan: number; rowspan: number },
+	maxSize: { colspan: number; rowspan: number },
+): { colspan: number; rowspan: number; column: number; row: number } {
+	const gridInfo = core.getGridInfo();
+	const maxColumn = gridInfo.columns.length;
+	const maxRow = gridInfo.rows.length;
+
+	// Get pointer cell, clamping to grid bounds if outside
+	// This allows resizing to continue even when pointer is outside grid
+	let pointerCell = core.getCellFromPoint(pointerX, pointerY);
+	if (!pointerCell) {
+		// Clamp to grid bounds based on pointer position relative to grid
+		const rect = gridInfo.rect;
+		const cellWidth = gridInfo.cellWidth + gridInfo.gap;
+		const cellHeight = gridInfo.cellHeight + gridInfo.gap;
+
+		let column: number;
+		let row: number;
+
+		if (pointerX < rect.left) {
+			column = 1;
+		} else if (pointerX > rect.right) {
+			column = maxColumn;
+		} else {
+			column = Math.max(1, Math.min(maxColumn, Math.floor((pointerX - rect.left) / cellWidth) + 1));
+		}
+
+		if (pointerY < rect.top) {
+			row = 1;
+		} else if (pointerY > rect.bottom) {
+			row = maxRow;
+		} else {
+			row = Math.max(1, Math.min(maxRow, Math.floor((pointerY - rect.top) / cellHeight) + 1));
+		}
+
+		pointerCell = { column, row };
+	}
+
+	let newColspan = originalSize.colspan;
+	let newRowspan = originalSize.rowspan;
+	let newColumn = startCell.column;
+	let newRow = startCell.row;
+
+	// Handle horizontal resizing
+	if (handle === 'e' || handle === 'se' || handle === 'ne') {
+		// Right edge: column stays, span grows right
+		newColspan = Math.max(
+			minSize.colspan,
+			Math.min(
+				maxSize.colspan,
+				pointerCell.column - startCell.column + 1,
+				maxColumn - startCell.column + 1,
+			),
+		);
+	} else if (handle === 'w' || handle === 'sw' || handle === 'nw') {
+		// Left edge: column moves left, right edge stays fixed
+		const rightEdge = startCell.column + originalSize.colspan - 1;
+		const newLeft = Math.max(1, Math.min(pointerCell.column, rightEdge));
+		newColspan = Math.max(
+			minSize.colspan,
+			Math.min(maxSize.colspan, rightEdge - newLeft + 1),
+		);
+		newColumn = rightEdge - newColspan + 1;
+	}
+
+	// Handle vertical resizing
+	if (handle === 's' || handle === 'se' || handle === 'sw') {
+		// Bottom edge: row stays, span grows down
+		newRowspan = Math.max(
+			minSize.rowspan,
+			Math.min(
+				maxSize.rowspan,
+				pointerCell.row - startCell.row + 1,
+				maxRow - startCell.row + 1,
+			),
+		);
+	} else if (handle === 'n' || handle === 'ne' || handle === 'nw') {
+		// Top edge: row moves up, bottom edge stays fixed
+		const bottomEdge = startCell.row + originalSize.rowspan - 1;
+		const newTop = Math.max(1, Math.min(pointerCell.row, bottomEdge));
+		newRowspan = Math.max(
+			minSize.rowspan,
+			Math.min(maxSize.rowspan, bottomEdge - newTop + 1),
+		);
+		newRow = bottomEdge - newRowspan + 1;
+	}
+
+	return {
+		colspan: newColspan,
+		rowspan: newRowspan,
+		column: newColumn,
+		row: newRow,
+	};
+}
+
+/**
+ * Create a size label element
+ */
+function createSizeLabel(): HTMLElement {
+	const label = document.createElement('div');
+	label.className = 'gridiot-resize-label';
+	label.style.cssText = `
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		background: rgba(0, 0, 0, 0.8);
+		color: white;
+		padding: 4px 8px;
+		border-radius: 4px;
+		font-size: 14px;
+		font-weight: 600;
+		font-family: system-ui, sans-serif;
+		pointer-events: none;
+		z-index: 1000;
+		white-space: nowrap;
+	`;
+	return label;
+}
+
+/**
+ * Attach resize functionality to a grid element.
+ *
+ * @param gridElement - The grid container element
+ * @param options - Configuration options
+ * @returns Cleanup function to detach resize
+ */
+export function attachResize(
+	gridElement: HTMLElement,
+	options: ResizeOptions = {},
+): {
+	setSize(item: HTMLElement, size: { colspan: number; rowspan: number }): void;
+	destroy(): void;
+} {
+	const {
+		handles = 'corners',
+		handleSize = 12,
+		minSize = { colspan: 1, rowspan: 1 },
+		maxSize = { colspan: 6, rowspan: 6 },
+		showSizeLabel = true,
+		core,
+	} = options;
+
+	let activeResize: ActiveResize | null = null;
+	let hoveredItem: HTMLElement | null = null;
+	let hoveredHandle: ResizeHandle | null = null;
+
+	// Register provider if core is provided
+	if (core) {
+		core.providers.register<ResizeState | null>('resize', () => {
+			if (!activeResize) return null;
+			return {
+				item: activeResize.item,
+				originalSize: activeResize.originalSize,
+				currentSize: activeResize.currentSize,
+				handle: activeResize.handle,
+			};
+		});
+	}
+
+	function emit<T>(event: string, detail: T): void {
+		gridElement.dispatchEvent(
+			new CustomEvent(`gridiot:${event}`, {
+				bubbles: true,
+				detail,
+			}),
+		);
+	}
+
+	function getCore(): GridiotCore {
+		if (core) return core;
+		// Fallback: create minimal core-like interface from grid element
+		// This is for standalone usage without full gridiot initialization
+		return {
+			element: gridElement,
+			getCellFromPoint(x: number, y: number) {
+				const rect = gridElement.getBoundingClientRect();
+				if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+					return null;
+				}
+				const style = getComputedStyle(gridElement);
+				const columns = style.gridTemplateColumns.split(' ').filter(Boolean);
+				const rows = style.gridTemplateRows.split(' ').filter(Boolean);
+				const columnGap = parseFloat(style.columnGap) || 0;
+				const rowGap = parseFloat(style.rowGap) || 0;
+
+				const relX = x - rect.left;
+				const relY = y - rect.top;
+
+				const cellWidth =
+					(parseFloat(columns[0] ?? '0') || 0) + columnGap;
+				const cellHeight = (parseFloat(rows[0] ?? '0') || 0) + rowGap;
+
+				const column = cellWidth > 0 ? Math.floor(relX / cellWidth) + 1 : 1;
+				const row = cellHeight > 0 ? Math.floor(relY / cellHeight) + 1 : 1;
+
+				return {
+					column: Math.max(1, Math.min(column, columns.length)),
+					row: Math.max(1, Math.min(row, rows.length)),
+				};
+			},
+			getGridInfo() {
+				const rect = gridElement.getBoundingClientRect();
+				const style = getComputedStyle(gridElement);
+				const columns = style.gridTemplateColumns
+					.split(' ')
+					.filter(Boolean)
+					.map((v) => parseFloat(v) || 0);
+				const rows = style.gridTemplateRows
+					.split(' ')
+					.filter(Boolean)
+					.map((v) => parseFloat(v) || 0);
+				const columnGap = parseFloat(style.columnGap) || 0;
+
+				return {
+					rect,
+					columns,
+					rows,
+					gap: columnGap,
+					cellWidth: columns[0] || 0,
+					cellHeight: rows[0] || 0,
+				};
+			},
+			emit,
+			destroy() {},
+			selectedItem: null,
+			select() {},
+			deselect() {},
+			providers: {
+				register() {},
+				get() {
+					return undefined;
+				},
+				has() {
+					return false;
+				},
+			},
+		};
+	}
+
+	function startResize(item: HTMLElement, handle: ResizeHandle, e: PointerEvent) {
+		const colspan =
+			parseInt(item.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
+		const rowspan =
+			parseInt(item.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
+
+		const style = getComputedStyle(item);
+		const column = parseInt(style.gridColumnStart, 10) || 1;
+		const row = parseInt(style.gridRowStart, 10) || 1;
+
+		const originalSize = { colspan, rowspan };
+		const startCell = { column, row };
+		const initialRect = item.getBoundingClientRect();
+
+		// Create size label if enabled
+		let sizeLabel: HTMLElement | null = null;
+		if (showSizeLabel) {
+			sizeLabel = createSizeLabel();
+			sizeLabel.textContent = `${colspan}×${rowspan}`;
+			item.appendChild(sizeLabel);
+		}
+
+		activeResize = {
+			item,
+			pointerId: e.pointerId,
+			handle,
+			startCell,
+			originalSize,
+			currentCell: { ...startCell },
+			currentSize: { ...originalSize },
+			originalGridColumn: item.style.gridColumn,
+			originalGridRow: item.style.gridRow,
+			sizeLabel,
+			initialRect,
+			startPointerX: e.clientX,
+			startPointerY: e.clientY,
+		};
+
+		item.setAttribute('data-gridiot-resizing', '');
+		item.setPointerCapture(e.pointerId);
+
+		// Add event listeners to item (pointer capture sends events to this element)
+		item.addEventListener('pointermove', onItemPointerMove);
+		item.addEventListener('pointerup', onItemPointerUp);
+		item.addEventListener('pointercancel', onItemPointerCancel);
+
+		log('resize-start', { handle, startCell, originalSize });
+
+		// Emit resize-start BEFORE changing grid styles so originalPositions captures correct layout
+		emit<ResizeStartDetail>('resize-start', {
+			item,
+			cell: startCell,
+			colspan: originalSize.colspan,
+			rowspan: originalSize.rowspan,
+			handle,
+		});
+
+		// Switch to fixed positioning - CSS Grid ignores fixed positioned children
+		// No need to move item out of grid container
+		item.style.position = 'fixed';
+		item.style.left = `${initialRect.left}px`;
+		item.style.top = `${initialRect.top}px`;
+		item.style.width = `${initialRect.width}px`;
+		item.style.height = `${initialRect.height}px`;
+		item.style.zIndex = '100';
+		// Exclude from view transitions during resize
+		item.style.viewTransitionName = 'resizing';
+	}
+
+	function updateResize(e: PointerEvent) {
+		if (!activeResize) return;
+
+		const { item, handle, startCell, originalSize, currentCell, currentSize, sizeLabel, initialRect, startPointerX, startPointerY } =
+			activeResize;
+
+		const coreInstance = getCore();
+		const gridInfo = coreInstance.getGridInfo();
+
+		// Calculate pointer delta
+		const deltaX = e.clientX - startPointerX;
+		const deltaY = e.clientY - startPointerY;
+
+		// Calculate new visual dimensions based on handle
+		let newWidth = initialRect.width;
+		let newHeight = initialRect.height;
+		let newLeft = initialRect.left;
+		let newTop = initialRect.top;
+
+		// Minimum visual size (1 cell)
+		const minWidth = gridInfo.cellWidth;
+		const minHeight = gridInfo.cellHeight;
+		// Maximum visual size (clamped by maxSize config)
+		const maxWidthByConfig = maxSize.colspan * gridInfo.cellWidth + (maxSize.colspan - 1) * gridInfo.gap;
+		const maxHeightByConfig = maxSize.rowspan * gridInfo.cellHeight + (maxSize.rowspan - 1) * gridInfo.gap;
+		// Maximum visual size (clamped by grid bounds)
+		const maxWidthByGrid = gridInfo.rect.right - initialRect.left;
+		const maxHeightByGrid = gridInfo.rect.bottom - initialRect.top;
+		const maxWidth = Math.min(maxWidthByConfig, maxWidthByGrid);
+		const maxHeight = Math.min(maxHeightByConfig, maxHeightByGrid);
+
+		// Apply delta based on handle direction
+		if (handle === 'e' || handle === 'se' || handle === 'ne') {
+			newWidth = Math.max(minWidth, Math.min(maxWidth, initialRect.width + deltaX));
+		}
+		if (handle === 'w' || handle === 'sw' || handle === 'nw') {
+			// For left edge, clamp to grid left
+			const maxLeftShift = initialRect.left - gridInfo.rect.left;
+			const maxWidthFromLeft = Math.min(maxWidthByConfig, initialRect.width + maxLeftShift);
+			const widthChange = Math.max(-initialRect.width + minWidth, Math.min(maxWidthFromLeft - initialRect.width, -deltaX));
+			newWidth = initialRect.width + widthChange;
+			newLeft = initialRect.left - widthChange;
+		}
+		if (handle === 's' || handle === 'se' || handle === 'sw') {
+			newHeight = Math.max(minHeight, Math.min(maxHeight, initialRect.height + deltaY));
+		}
+		if (handle === 'n' || handle === 'ne' || handle === 'nw') {
+			// For top edge, clamp to grid top
+			const maxTopShift = initialRect.top - gridInfo.rect.top;
+			const maxHeightFromTop = Math.min(maxHeightByConfig, initialRect.height + maxTopShift);
+			const heightChange = Math.max(-initialRect.height + minHeight, Math.min(maxHeightFromTop - initialRect.height, -deltaY));
+			newHeight = initialRect.height + heightChange;
+			newTop = initialRect.top - heightChange;
+		}
+
+		// Apply smooth visual size
+		item.style.left = `${newLeft}px`;
+		item.style.top = `${newTop}px`;
+		item.style.width = `${newWidth}px`;
+		item.style.height = `${newHeight}px`;
+
+		// Calculate projected final grid size (what it will snap to)
+		const cellPlusGap = gridInfo.cellWidth + gridInfo.gap;
+		const rowPlusGap = gridInfo.cellHeight + gridInfo.gap;
+		const projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, Math.round((newWidth + gridInfo.gap) / cellPlusGap)));
+		const projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, Math.round((newHeight + gridInfo.gap) / rowPlusGap)));
+
+		// Calculate projected position for NW/NE/SW handles
+		const newSize = calculateNewSize(
+			coreInstance,
+			handle,
+			startCell,
+			originalSize,
+			e.clientX,
+			e.clientY,
+			minSize,
+			maxSize,
+		);
+
+		// Update tracking
+		activeResize.currentSize = { colspan: projectedColspan, rowspan: projectedRowspan };
+		activeResize.currentCell = { column: newSize.column, row: newSize.row };
+
+		// Update size label with projected final size
+		if (sizeLabel) {
+			sizeLabel.textContent = `${projectedColspan}×${projectedRowspan}`;
+		}
+
+		log('resize-move', { newSize: { colspan: projectedColspan, rowspan: projectedRowspan }, visual: { width: newWidth, height: newHeight } });
+
+		emit<ResizeMoveDetail>('resize-move', {
+			item,
+			cell: { column: newSize.column, row: newSize.row },
+			colspan: projectedColspan,
+			rowspan: projectedRowspan,
+			handle,
+		});
+	}
+
+	function cleanupResizeListeners(item: HTMLElement, pointerId: number) {
+		item.releasePointerCapture(pointerId);
+		item.removeEventListener('pointermove', onItemPointerMove);
+		item.removeEventListener('pointerup', onItemPointerUp);
+		item.removeEventListener('pointercancel', onItemPointerCancel);
+	}
+
+	function finishResize() {
+		if (!activeResize) return;
+
+		const { item, pointerId, currentSize, currentCell, originalSize, sizeLabel } = activeResize;
+
+		// Clean up item event listeners
+		cleanupResizeListeners(item, pointerId);
+
+		// FLIP: Capture current visual position (First)
+		const firstRect = item.getBoundingClientRect();
+
+		// Update data attributes to reflect new size
+		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
+		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
+
+		// Remove size label before clearing styles
+		if (sizeLabel) {
+			sizeLabel.remove();
+		}
+
+		// Exclude from View Transitions during FLIP
+		item.style.viewTransitionName = 'none';
+
+		// Clear fixed positioning, return to grid flow
+		item.style.position = '';
+		item.style.left = '';
+		item.style.top = '';
+		item.style.width = '';
+		item.style.height = '';
+		item.style.zIndex = '';
+
+		// Set final grid position
+		item.style.gridColumn = `${currentCell.column} / span ${currentSize.colspan}`;
+		item.style.gridRow = `${currentCell.row} / span ${currentSize.rowspan}`;
+
+		item.removeAttribute('data-gridiot-resizing');
+
+		log('resize-end', { originalSize, newSize: currentSize, currentCell });
+
+		emit<ResizeEndDetail>('resize-end', {
+			item,
+			cell: currentCell,
+			colspan: currentSize.colspan,
+			rowspan: currentSize.rowspan,
+		});
+
+		// FLIP: Animate from visual to final position (with scale for resize)
+		requestAnimationFrame(() => {
+			animateFLIPWithTracking(item, firstRect, {
+				includeScale: true,
+				transformOrigin: 'top left',
+			});
+		});
+
+		activeResize = null;
+	}
+
+	function cancelResize() {
+		if (!activeResize) return;
+
+		const { item, pointerId, originalGridColumn, originalGridRow, sizeLabel } = activeResize;
+
+		// Clean up item event listeners
+		cleanupResizeListeners(item, pointerId);
+
+		// Remove size label
+		if (sizeLabel) {
+			sizeLabel.remove();
+		}
+
+		// Clear fixed positioning
+		item.style.position = '';
+		item.style.left = '';
+		item.style.top = '';
+		item.style.width = '';
+		item.style.height = '';
+		item.style.zIndex = '';
+
+		// Restore original grid position
+		item.style.gridColumn = originalGridColumn;
+		item.style.gridRow = originalGridRow;
+
+		// Restore view transition name
+		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
+		if (itemId) {
+			item.style.viewTransitionName = itemId;
+		} else {
+			item.style.viewTransitionName = '';
+		}
+
+		item.removeAttribute('data-gridiot-resizing');
+
+		log('resize-cancel');
+
+		emit<ResizeCancelDetail>('resize-cancel', {
+			item,
+		});
+
+		activeResize = null;
+	}
+
+	// --- Event handlers ---
+
+	// Use capture phase to intercept before pointer plugin
+	const onPointerDown = (e: PointerEvent) => {
+		const item = (e.target as HTMLElement).closest(
+			'[data-gridiot-item]',
+		) as HTMLElement | null;
+		if (!item) return;
+
+		const handle = detectHandle(e, item, handleSize, handles);
+		if (!handle) return; // Not on handle - let pointer plugin handle drag
+
+		// Stop event from reaching pointer plugin
+		e.stopPropagation();
+		e.preventDefault();
+
+		startResize(item, handle, e);
+	};
+
+	// Item-specific handlers (added during resize, removed on finish/cancel)
+	const onItemPointerMove = (e: PointerEvent) => {
+		if (activeResize && e.pointerId === activeResize.pointerId) {
+			updateResize(e);
+		}
+	};
+
+	const onItemPointerUp = (e: PointerEvent) => {
+		if (activeResize && e.pointerId === activeResize.pointerId) {
+			finishResize();
+		}
+	};
+
+	const onItemPointerCancel = (e: PointerEvent) => {
+		if (activeResize && e.pointerId === activeResize.pointerId) {
+			cancelResize();
+		}
+	};
+
+	// Grid-level hover handler for cursor changes
+	const onPointerMove = (e: PointerEvent) => {
+		// Skip hover handling during active resize
+		if (activeResize) return;
+
+		// Handle hover cursor changes
+		const item = (e.target as HTMLElement).closest(
+			'[data-gridiot-item]',
+		) as HTMLElement | null;
+
+		if (item) {
+			const handle = detectHandle(e, item, handleSize, handles);
+
+			if (handle !== hoveredHandle || item !== hoveredItem) {
+				// Restore previous item's cursor
+				if (hoveredItem && hoveredItem !== item) {
+					hoveredItem.style.cursor = '';
+				}
+
+				hoveredItem = item;
+				hoveredHandle = handle;
+
+				// Set cursor based on handle
+				item.style.cursor = getCursor(handle) || '';
+			}
+		} else if (hoveredItem) {
+			hoveredItem.style.cursor = '';
+			hoveredItem = null;
+			hoveredHandle = null;
+		}
+	};
+
+	const onKeyDown = (e: KeyboardEvent) => {
+		if (e.key === 'Escape' && activeResize) {
+			cancelResize();
+		}
+	};
+
+	// Register event listeners
+	gridElement.addEventListener('pointerdown', onPointerDown, { capture: true });
+	gridElement.addEventListener('pointermove', onPointerMove);
+	document.addEventListener('keydown', onKeyDown);
+
+	// Public API
+	function setSize(
+		item: HTMLElement,
+		size: { colspan: number; rowspan: number },
+	) {
+		const clampedColspan = Math.max(
+			minSize.colspan,
+			Math.min(maxSize.colspan, size.colspan),
+		);
+		const clampedRowspan = Math.max(
+			minSize.rowspan,
+			Math.min(maxSize.rowspan, size.rowspan),
+		);
+
+		const style = getComputedStyle(item);
+		const column = parseInt(style.gridColumnStart, 10) || 1;
+		const row = parseInt(style.gridRowStart, 10) || 1;
+
+		item.setAttribute('data-gridiot-colspan', String(clampedColspan));
+		item.setAttribute('data-gridiot-rowspan', String(clampedRowspan));
+		item.style.gridColumn = `${column} / span ${clampedColspan}`;
+		item.style.gridRow = `${row} / span ${clampedRowspan}`;
+
+		emit<ResizeEndDetail>('resize-end', {
+			item,
+			cell: { column, row },
+			colspan: clampedColspan,
+			rowspan: clampedRowspan,
+		});
+	}
+
+	function destroy() {
+		gridElement.removeEventListener('pointerdown', onPointerDown, {
+			capture: true,
+		});
+		gridElement.removeEventListener('pointermove', onPointerMove);
+		document.removeEventListener('keydown', onKeyDown);
+
+		if (activeResize) {
+			cancelResize();
+		}
+	}
+
+	return { setSize, destroy };
+}
+
+// Register as a plugin for auto-initialization via init()
+registerPlugin({
+	name: 'resize',
+	init(core, options?: ResizePluginOptions & { core?: GridiotCore }) {
+		const instance = attachResize(core.element, {
+			...options,
+			core: options?.core ?? core,
+		});
+		return () => instance.destroy();
+	},
+});
+
+export type { ResizeHandle };
