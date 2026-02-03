@@ -15,28 +15,48 @@ registerPlugin({
 		// Local held item state (will migrate to state machine interaction tracking)
 		let heldItem: HTMLElement | null = null;
 
+		// Track pending viewTransitionName restoration to avoid race conditions
+		let pendingVtnRestore: { item: HTMLElement; timeoutId: number } | null = null;
+
 		/**
-		 * Get direction from key, supporting both arrows and vim-style hjkl
+		 * Get direction from key, supporting both arrows and vim-style hjkl.
+		 * Uses both e.key and e.code to handle Alt+hjkl on Mac (Alt produces special chars).
 		 */
 		const getDirection = (
 			key: string,
+			code: string,
 		): 'up' | 'down' | 'left' | 'right' | null => {
 			switch (key) {
 				case 'ArrowUp':
+					return 'up';
+				case 'ArrowDown':
+					return 'down';
+				case 'ArrowLeft':
+					return 'left';
+				case 'ArrowRight':
+					return 'right';
 				case 'k':
 				case 'K':
 					return 'up';
-				case 'ArrowDown':
 				case 'j':
 				case 'J':
 					return 'down';
-				case 'ArrowLeft':
 				case 'h':
 				case 'H':
 					return 'left';
-				case 'ArrowRight':
 				case 'l':
 				case 'L':
+					return 'right';
+			}
+			// Fallback to code for Alt+hjkl on Mac (Alt produces special characters)
+			switch (code) {
+				case 'KeyK':
+					return 'up';
+				case 'KeyJ':
+					return 'down';
+				case 'KeyH':
+					return 'left';
+				case 'KeyL':
 					return 'right';
 				default:
 					return null;
@@ -154,7 +174,7 @@ registerPlugin({
 			if (!keyboardMode && !focusInGrid && !hasSelection) return;
 
 			const selectedItem = core.selectedItem;
-			const direction = getDirection(e.key);
+			const direction = getDirection(e.key, e.code);
 
 			// Cancel drag or deselect with Escape
 			if (e.key === 'Escape') {
@@ -246,9 +266,16 @@ registerPlugin({
 						return;
 					}
 
+					// Cancel any pending viewTransitionName restoration
+					if (pendingVtnRestore) {
+						clearTimeout(pendingVtnRestore.timeoutId);
+						// Restore the previous item's viewTransitionName immediately
+						pendingVtnRestore.item.style.removeProperty('view-transition-name');
+						pendingVtnRestore = null;
+					}
+
 					// Mark item as resizing so CSS can disable its View Transition animation
 					// (matches pointer resize behavior - item snaps, others animate)
-					const originalViewTransitionName = (selectedItem.style as any).viewTransitionName || '';
 					(selectedItem.style as any).viewTransitionName = 'resizing';
 
 					// Emit resize events for algorithm and other plugins to handle
@@ -279,10 +306,16 @@ registerPlugin({
 					});
 
 					// Restore viewTransitionName after View Transition completes (200ms)
-					// Using setTimeout since we don't have a handle to the transition
-					setTimeout(() => {
-						(selectedItem.style as any).viewTransitionName = originalViewTransitionName;
+					// Track the timeout so we can cancel it if another resize starts
+					const itemToRestore = selectedItem;
+					const timeoutId = window.setTimeout(() => {
+						// Remove inline style to let CSS take over
+						itemToRestore.style.removeProperty('view-transition-name');
+						if (pendingVtnRestore?.item === itemToRestore) {
+							pendingVtnRestore = null;
+						}
 					}, 250);
+					pendingVtnRestore = { item: itemToRestore, timeoutId };
 
 					log('resize', { direction, newColspan, newRowspan });
 					return;
