@@ -8,7 +8,8 @@
  *   import { attachResize } from 'gridiot/resize';
  *
  *   const detach = attachResize(gridElement, {
- *     handles: 'corners',  // 'corners' | 'edges' | 'all'
+ *     core,                 // GridiotCore instance (required)
+ *     handles: 'corners',   // 'corners' | 'edges' | 'all'
  *     handleSize: 12,
  *     minSize: { colspan: 1, rowspan: 1 },
  *     maxSize: { colspan: 6, rowspan: 6 },
@@ -29,12 +30,9 @@ import type {
 } from '../types';
 import { animateFLIPWithTracking } from '../utils/flip';
 
-const DEBUG = false;
-function log(...args: unknown[]) {
-	if (DEBUG) console.log('[resize]', ...args);
-}
-
 export interface ResizeOptions {
+	/** GridiotCore instance (required) */
+	core: GridiotCore;
 	/** Which handles to show: 'corners' | 'edges' | 'all' (default: 'corners') */
 	handles?: 'corners' | 'edges' | 'all';
 	/** Size of the hit zone for handles in pixels (default: 12) */
@@ -45,8 +43,6 @@ export interface ResizeOptions {
 	maxSize?: { colspan: number; rowspan: number };
 	/** Show size label during resize (default: true) */
 	showSizeLabel?: boolean;
-	/** GridiotCore instance for provider registration */
-	core?: GridiotCore;
 }
 
 interface ActiveResize {
@@ -69,7 +65,10 @@ interface ActiveResize {
 	/** Pointer position at start */
 	startPointerX: number;
 	startPointerY: number;
+	/** Placeholder element (currently unused but kept for API compatibility) */
+	placeholder: HTMLElement | null;
 }
+
 
 /**
  * Detect which resize handle (if any) is under the pointer
@@ -269,36 +268,34 @@ function createSizeLabel(): HTMLElement {
  */
 export function attachResize(
 	gridElement: HTMLElement,
-	options: ResizeOptions = {},
+	options: ResizeOptions,
 ): {
 	setSize(item: HTMLElement, size: { colspan: number; rowspan: number }): void;
 	destroy(): void;
 } {
 	const {
+		core,
 		handles = 'corners',
 		handleSize = 12,
 		minSize = { colspan: 1, rowspan: 1 },
 		maxSize = { colspan: 6, rowspan: 6 },
 		showSizeLabel = true,
-		core,
 	} = options;
 
 	let activeResize: ActiveResize | null = null;
 	let hoveredItem: HTMLElement | null = null;
 	let hoveredHandle: ResizeHandle | null = null;
 
-	// Register provider if core is provided
-	if (core) {
-		core.providers.register<ResizeState | null>('resize', () => {
-			if (!activeResize) return null;
-			return {
-				item: activeResize.item,
-				originalSize: activeResize.originalSize,
-				currentSize: activeResize.currentSize,
-				handle: activeResize.handle,
-			};
-		});
-	}
+	// Register provider for inter-plugin state access
+	core.providers.register<ResizeState | null>('resize', () => {
+		if (!activeResize) return null;
+		return {
+			item: activeResize.item,
+			originalSize: activeResize.originalSize,
+			currentSize: activeResize.currentSize,
+			handle: activeResize.handle,
+		};
+	});
 
 	function emit<T>(event: string, detail: T): void {
 		gridElement.dispatchEvent(
@@ -307,77 +304,6 @@ export function attachResize(
 				detail,
 			}),
 		);
-	}
-
-	function getCore(): GridiotCore {
-		if (core) return core;
-		// Fallback: create minimal core-like interface from grid element
-		// This is for standalone usage without full gridiot initialization
-		return {
-			element: gridElement,
-			getCellFromPoint(x: number, y: number) {
-				const rect = gridElement.getBoundingClientRect();
-				if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-					return null;
-				}
-				const style = getComputedStyle(gridElement);
-				const columns = style.gridTemplateColumns.split(' ').filter(Boolean);
-				const rows = style.gridTemplateRows.split(' ').filter(Boolean);
-				const columnGap = parseFloat(style.columnGap) || 0;
-				const rowGap = parseFloat(style.rowGap) || 0;
-
-				const relX = x - rect.left;
-				const relY = y - rect.top;
-
-				const cellWidth =
-					(parseFloat(columns[0] ?? '0') || 0) + columnGap;
-				const cellHeight = (parseFloat(rows[0] ?? '0') || 0) + rowGap;
-
-				const column = cellWidth > 0 ? Math.floor(relX / cellWidth) + 1 : 1;
-				const row = cellHeight > 0 ? Math.floor(relY / cellHeight) + 1 : 1;
-
-				return {
-					column: Math.max(1, Math.min(column, columns.length)),
-					row: Math.max(1, Math.min(row, rows.length)),
-				};
-			},
-			getGridInfo() {
-				const rect = gridElement.getBoundingClientRect();
-				const style = getComputedStyle(gridElement);
-				const columns = style.gridTemplateColumns
-					.split(' ')
-					.filter(Boolean)
-					.map((v) => parseFloat(v) || 0);
-				const rows = style.gridTemplateRows
-					.split(' ')
-					.filter(Boolean)
-					.map((v) => parseFloat(v) || 0);
-				const columnGap = parseFloat(style.columnGap) || 0;
-
-				return {
-					rect,
-					columns,
-					rows,
-					gap: columnGap,
-					cellWidth: columns[0] || 0,
-					cellHeight: rows[0] || 0,
-				};
-			},
-			emit,
-			destroy() {},
-			selectedItem: null,
-			select() {},
-			deselect() {},
-			providers: {
-				register() {},
-				get() {
-					return undefined;
-				},
-				has() {
-					return false;
-				},
-			},
-		};
 	}
 
 	function startResize(item: HTMLElement, handle: ResizeHandle, e: PointerEvent) {
@@ -416,6 +342,7 @@ export function attachResize(
 			initialRect,
 			startPointerX: e.clientX,
 			startPointerY: e.clientY,
+			placeholder: null, // Will be set below if enabled
 		};
 
 		item.setAttribute('data-gridiot-resizing', '');
@@ -426,8 +353,6 @@ export function attachResize(
 		item.addEventListener('pointerup', onItemPointerUp);
 		item.addEventListener('pointercancel', onItemPointerCancel);
 
-		log('resize-start', { handle, startCell, originalSize });
-
 		// Emit resize-start BEFORE changing grid styles so originalPositions captures correct layout
 		emit<ResizeStartDetail>('resize-start', {
 			item,
@@ -437,8 +362,10 @@ export function attachResize(
 			handle,
 		});
 
-		// Switch to fixed positioning - CSS Grid ignores fixed positioned children
-		// No need to move item out of grid container
+		activeResize.placeholder = null;
+
+		// Switch to fixed positioning - item follows cursor in viewport coordinates
+		// CSS Grid ignores fixed positioned children, allowing the grid to reflow
 		item.style.position = 'fixed';
 		item.style.left = `${initialRect.left}px`;
 		item.style.top = `${initialRect.top}px`;
@@ -455,8 +382,7 @@ export function attachResize(
 		const { item, handle, startCell, originalSize, currentCell, currentSize, sizeLabel, initialRect, startPointerX, startPointerY } =
 			activeResize;
 
-		const coreInstance = getCore();
-		const gridInfo = coreInstance.getGridInfo();
+		const gridInfo = core.getGridInfo();
 
 		// Calculate pointer delta
 		const deltaX = e.clientX - startPointerX;
@@ -504,7 +430,7 @@ export function attachResize(
 			newTop = initialRect.top - heightChange;
 		}
 
-		// Apply smooth visual size
+		// Apply smooth visual size (fixed positioning uses viewport coordinates)
 		item.style.left = `${newLeft}px`;
 		item.style.top = `${newTop}px`;
 		item.style.width = `${newWidth}px`;
@@ -513,12 +439,58 @@ export function attachResize(
 		// Calculate projected final grid size (what it will snap to)
 		const cellPlusGap = gridInfo.cellWidth + gridInfo.gap;
 		const rowPlusGap = gridInfo.cellHeight + gridInfo.gap;
-		const projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, Math.round((newWidth + gridInfo.gap) / cellPlusGap)));
-		const projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, Math.round((newHeight + gridInfo.gap) / rowPlusGap)));
+
+		// Calculate raw ratios
+		const rawColspanRatio = (newWidth + gridInfo.gap) / cellPlusGap;
+		const rawRowspanRatio = (newHeight + gridInfo.gap) / rowPlusGap;
+
+		// Bias calculation for resize direction:
+		// When resizing SE (making bigger), use a lower threshold (0.3 instead of 0.5)
+		// to be more generous about giving the user the larger size
+		const isGrowingWidth = handle === 'e' || handle === 'se' || handle === 'ne';
+		const isGrowingHeight = handle === 's' || handle === 'se' || handle === 'sw';
+
+		// Use floor + threshold approach for more predictable snapping
+		// If we're past 30% into the next cell when growing, give the user that cell
+		const GROW_THRESHOLD = 0.3;
+		const SHRINK_THRESHOLD = 0.7;
+
+		let projectedColspan: number;
+		let projectedRowspan: number;
+
+		if (isGrowingWidth) {
+			// When growing: floor, then add 1 if we're past the threshold
+			projectedColspan = Math.floor(rawColspanRatio);
+			if (rawColspanRatio - projectedColspan >= GROW_THRESHOLD) {
+				projectedColspan += 1;
+			}
+		} else {
+			// When shrinking: ceil, then subtract 1 if we're below the threshold
+			projectedColspan = Math.ceil(rawColspanRatio);
+			if (projectedColspan - rawColspanRatio > (1 - SHRINK_THRESHOLD)) {
+				projectedColspan -= 1;
+			}
+		}
+
+		if (isGrowingHeight) {
+			projectedRowspan = Math.floor(rawRowspanRatio);
+			if (rawRowspanRatio - projectedRowspan >= GROW_THRESHOLD) {
+				projectedRowspan += 1;
+			}
+		} else {
+			projectedRowspan = Math.ceil(rawRowspanRatio);
+			if (projectedRowspan - rawRowspanRatio > (1 - SHRINK_THRESHOLD)) {
+				projectedRowspan -= 1;
+			}
+		}
+
+		// Apply min/max constraints
+		projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, projectedColspan));
+		projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, projectedRowspan));
 
 		// Calculate projected position for NW/NE/SW handles
 		const newSize = calculateNewSize(
-			coreInstance,
+			core,
 			handle,
 			startCell,
 			originalSize,
@@ -536,8 +508,6 @@ export function attachResize(
 		if (sizeLabel) {
 			sizeLabel.textContent = `${projectedColspan}×${projectedRowspan}`;
 		}
-
-		log('resize-move', { newSize: { colspan: projectedColspan, rowspan: projectedRowspan }, visual: { width: newWidth, height: newHeight } });
 
 		emit<ResizeMoveDetail>('resize-move', {
 			item,
@@ -558,7 +528,12 @@ export function attachResize(
 	function finishResize() {
 		if (!activeResize) return;
 
-		const { item, pointerId, currentSize, currentCell, originalSize, sizeLabel } = activeResize;
+		const { item, pointerId, currentSize, currentCell, originalSize, sizeLabel, initialRect, placeholder } = activeResize;
+
+		// Remove placeholder if it exists
+		if (placeholder) {
+			placeholder.remove();
+		}
 
 		// Clean up item event listeners
 		cleanupResizeListeners(item, pointerId);
@@ -570,29 +545,10 @@ export function attachResize(
 		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
 		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
 
-		// Remove size label before clearing styles
+		// Remove size label before animations
 		if (sizeLabel) {
 			sizeLabel.remove();
 		}
-
-		// Exclude from View Transitions during FLIP
-		item.style.viewTransitionName = 'none';
-
-		// Clear fixed positioning, return to grid flow
-		item.style.position = '';
-		item.style.left = '';
-		item.style.top = '';
-		item.style.width = '';
-		item.style.height = '';
-		item.style.zIndex = '';
-
-		// Set final grid position
-		item.style.gridColumn = `${currentCell.column} / span ${currentSize.colspan}`;
-		item.style.gridRow = `${currentCell.row} / span ${currentSize.rowspan}`;
-
-		item.removeAttribute('data-gridiot-resizing');
-
-		log('resize-end', { originalSize, newSize: currentSize, currentCell });
 
 		emit<ResizeEndDetail>('resize-end', {
 			item,
@@ -601,12 +557,48 @@ export function attachResize(
 			rowspan: currentSize.rowspan,
 		});
 
-		// FLIP: Animate from visual to final position (with scale for resize)
+		// Helper to apply final grid state
+		const applyFinalState = () => {
+			// Clear fixed/absolute positioning
+			item.style.position = '';
+			item.style.left = '';
+			item.style.top = '';
+			item.style.width = '';
+			item.style.height = '';
+			item.style.zIndex = '';
+
+			// Set final grid position
+			item.style.gridColumn = `${currentCell.column} / span ${currentSize.colspan}`;
+			item.style.gridRow = `${currentCell.row} / span ${currentSize.rowspan}`;
+
+			item.removeAttribute('data-gridiot-resizing');
+		};
+
+		// Exclude from View Transitions during FLIP animation
+		item.style.viewTransitionName = 'none';
+
+		// Apply final state immediately (return to grid flow)
+		applyFinalState();
+
+		// FLIP: Animate from captured visual position to new grid position
 		requestAnimationFrame(() => {
-			animateFLIPWithTracking(item, firstRect, {
+			const animation = animateFLIPWithTracking(item, firstRect, {
 				includeScale: true,
 				transformOrigin: 'top left',
+				onFinish: () => {
+					// Explicitly clear any transform that might persist
+					item.style.transform = '';
+				},
 			});
+
+			// If no animation was needed, ensure cleanup
+			if (!animation) {
+				item.style.transform = '';
+				const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
+				if (itemId) {
+					item.style.viewTransitionName = itemId;
+				}
+			}
 		});
 
 		activeResize = null;
@@ -615,10 +607,15 @@ export function attachResize(
 	function cancelResize() {
 		if (!activeResize) return;
 
-		const { item, pointerId, originalGridColumn, originalGridRow, sizeLabel } = activeResize;
+		const { item, pointerId, originalGridColumn, originalGridRow, sizeLabel, placeholder } = activeResize;
 
 		// Clean up item event listeners
 		cleanupResizeListeners(item, pointerId);
+
+		// Remove placeholder if it exists
+		if (placeholder) {
+			placeholder.remove();
+		}
 
 		// Remove size label
 		if (sizeLabel) {
@@ -646,8 +643,6 @@ export function attachResize(
 		}
 
 		item.removeAttribute('data-gridiot-resizing');
-
-		log('resize-cancel');
 
 		emit<ResizeCancelDetail>('resize-cancel', {
 			item,
@@ -694,7 +689,7 @@ export function attachResize(
 		}
 	};
 
-	// Grid-level hover handler for cursor changes
+	// Grid-level hover handler for cursor changes and handle hover state
 	const onPointerMove = (e: PointerEvent) => {
 		// Skip hover handling during active resize
 		if (activeResize) return;
@@ -708,19 +703,31 @@ export function attachResize(
 			const handle = detectHandle(e, item, handleSize, handles);
 
 			if (handle !== hoveredHandle || item !== hoveredItem) {
-				// Restore previous item's cursor
+				// Clear previous item's hover state
 				if (hoveredItem && hoveredItem !== item) {
 					hoveredItem.style.cursor = '';
+					hoveredItem.removeAttribute('data-gridiot-handle-hover');
+				}
+
+				// Clear hover attribute if handle changed on same item
+				if (hoveredItem === item && hoveredHandle && !handle) {
+					item.removeAttribute('data-gridiot-handle-hover');
 				}
 
 				hoveredItem = item;
 				hoveredHandle = handle;
 
-				// Set cursor based on handle
+				// Set cursor and hover attribute based on handle
 				item.style.cursor = getCursor(handle) || '';
+				if (handle) {
+					item.setAttribute('data-gridiot-handle-hover', handle);
+				} else {
+					item.removeAttribute('data-gridiot-handle-hover');
+				}
 			}
 		} else if (hoveredItem) {
 			hoveredItem.style.cursor = '';
+			hoveredItem.removeAttribute('data-gridiot-handle-hover');
 			hoveredItem = null;
 			hoveredHandle = null;
 		}
