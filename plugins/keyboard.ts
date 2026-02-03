@@ -1,5 +1,6 @@
 import { getItemCell, registerPlugin } from '../engine';
-import type { GridCell } from '../types';
+import type { GridCell, ItemPosition } from '../types';
+import { isDragging, isResizing } from '../state-machine';
 
 const DEBUG = false;
 function log(...args: unknown[]) {
@@ -9,14 +10,71 @@ function log(...args: unknown[]) {
 registerPlugin({
 	name: 'keyboard',
 	init(core) {
-		// Use state machine for keyboard mode
+		// Use state machine for all interaction state
 		const { stateMachine } = core;
-
-		// Local held item state (will migrate to state machine interaction tracking)
-		let heldItem: HTMLElement | null = null;
 
 		// Track pending viewTransitionName restoration to avoid race conditions
 		let pendingVtnRestore: { item: HTMLElement; timeoutId: number } | null = null;
+
+		/**
+		 * Helper to get current column count from grid
+		 */
+		const getColumnCount = (): number => {
+			return core.getGridInfo().columns.length;
+		};
+
+		/**
+		 * Helper to capture all item positions from DOM
+		 */
+		const capturePositions = (): Map<string, ItemPosition> => {
+			const positions = new Map<string, ItemPosition>();
+			const items = core.element.querySelectorAll('[data-gridiot-item]');
+			for (const item of items) {
+				const id = item.id || (item as HTMLElement).getAttribute('data-gridiot-item') || '';
+				if (id) {
+					const cell = getItemCell(item as HTMLElement);
+					positions.set(id, { column: cell.column, row: cell.row });
+				}
+			}
+			return positions;
+		};
+
+		/**
+		 * Helper to capture all item sizes from DOM
+		 */
+		const captureSizes = (): Map<string, { width: number; height: number }> => {
+			const sizes = new Map<string, { width: number; height: number }>();
+			const items = core.element.querySelectorAll('[data-gridiot-item]');
+			for (const item of items) {
+				const el = item as HTMLElement;
+				const id = el.id || el.getAttribute('data-gridiot-item') || '';
+				if (id) {
+					const width = parseInt(el.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
+					const height = parseInt(el.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
+					sizes.set(id, { width, height });
+				}
+			}
+			return sizes;
+		};
+
+		/**
+		 * Check if currently holding an item (keyboard drag in progress)
+		 */
+		const isHoldingItem = (): boolean => {
+			const state = stateMachine.getState();
+			return isDragging(state) && state.interaction?.mode === 'keyboard';
+		};
+
+		/**
+		 * Get the held item element from state machine
+		 */
+		const getHeldItem = (): HTMLElement | null => {
+			const state = stateMachine.getState();
+			if (isDragging(state) && state.interaction?.mode === 'keyboard') {
+				return state.interaction.element;
+			}
+			return null;
+		};
 
 		/**
 		 * Get direction from key, supporting both arrows and vim-style hjkl.
@@ -179,10 +237,11 @@ registerPlugin({
 			// Cancel drag or deselect with Escape
 			if (e.key === 'Escape') {
 				e.preventDefault();
+				const heldItem = getHeldItem();
 				if (heldItem) {
 					heldItem.removeAttribute('data-gridiot-dragging');
 					core.emit('drag-cancel', { item: heldItem });
-					heldItem = null;
+					stateMachine.transition({ type: 'CANCEL_INTERACTION' });
 				} else if (selectedItem) {
 					core.deselect();
 				}
@@ -199,20 +258,41 @@ registerPlugin({
 				if (!selectedItem) return;
 				e.preventDefault();
 
+				const heldItem = getHeldItem();
 				if (heldItem) {
-					// Drop the held item
-					const cell = getItemCell(heldItem);
+					// Drop the held item - use target cell from state machine
+					const state = stateMachine.getState();
+					const targetCell = state.interaction?.targetCell ?? getItemCell(heldItem);
 					const size = getItemSize(heldItem);
 					heldItem.removeAttribute('data-gridiot-dragging');
-					core.emit('drag-end', { item: heldItem, cell, colspan: size.colspan, rowspan: size.rowspan });
-					log('drop', { cell });
-					heldItem = null;
+					core.emit('drag-end', { item: heldItem, cell: targetCell, colspan: size.colspan, rowspan: size.rowspan });
+					stateMachine.transition({ type: 'COMMIT_INTERACTION' });
+					stateMachine.transition({ type: 'FINISH_COMMIT' });
+					log('drop', { cell: targetCell });
 				} else {
 					// Pick up the selected item
-					heldItem = selectedItem;
-					const size = getItemSize(heldItem);
-					heldItem.setAttribute('data-gridiot-dragging', '');
-					core.emit('drag-start', { item: heldItem, cell: getItemCell(heldItem), colspan: size.colspan, rowspan: size.rowspan });
+					const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
+					const size = getItemSize(selectedItem);
+					const startCell = getItemCell(selectedItem);
+
+					// Start interaction via state machine
+					stateMachine.transition({
+						type: 'START_INTERACTION',
+						context: {
+							type: 'drag',
+							mode: 'keyboard',
+							itemId,
+							element: selectedItem,
+							columnCount: getColumnCount(),
+							originalPositions: capturePositions(),
+							originalSizes: captureSizes(),
+							targetCell: startCell,
+							currentSize: { colspan: size.colspan, rowspan: size.rowspan },
+						},
+					});
+
+					selectedItem.setAttribute('data-gridiot-dragging', '');
+					core.emit('drag-start', { item: selectedItem, cell: startCell, colspan: size.colspan, rowspan: size.rowspan });
 					log('pick up');
 				}
 				return;
@@ -269,10 +349,27 @@ registerPlugin({
 					// Cancel any pending viewTransitionName restoration
 					if (pendingVtnRestore) {
 						clearTimeout(pendingVtnRestore.timeoutId);
-						// Restore the previous item's viewTransitionName immediately
 						pendingVtnRestore.item.style.removeProperty('view-transition-name');
 						pendingVtnRestore = null;
 					}
+
+					const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
+
+					// Start resize interaction via state machine
+					stateMachine.transition({
+						type: 'START_INTERACTION',
+						context: {
+							type: 'resize',
+							mode: 'keyboard',
+							itemId,
+							element: selectedItem,
+							columnCount: getColumnCount(),
+							originalPositions: capturePositions(),
+							originalSizes: captureSizes(),
+							targetCell: currentCell,
+							currentSize: { colspan: newColspan, rowspan: newRowspan },
+						},
+					});
 
 					// Mark item as resizing so CSS can disable its View Transition animation
 					// (matches pointer resize behavior - item snaps, others animate)
@@ -305,11 +402,14 @@ registerPlugin({
 						rowspan: newRowspan,
 					});
 
+					// Complete the interaction via state machine
+					stateMachine.transition({ type: 'COMMIT_INTERACTION' });
+					stateMachine.transition({ type: 'FINISH_COMMIT' });
+
 					// Restore viewTransitionName after View Transition completes (200ms)
 					// Track the timeout so we can cancel it if another resize starts
 					const itemToRestore = selectedItem;
 					const timeoutId = window.setTimeout(() => {
-						// Remove inline style to let CSS take over
 						itemToRestore.style.removeProperty('view-transition-name');
 						if (pendingVtnRestore?.item === itemToRestore) {
 							pendingVtnRestore = null;
@@ -345,8 +445,13 @@ registerPlugin({
 					return;
 				}
 
+				const heldItem = getHeldItem();
 				if (heldItem) {
-					// Moving a held item
+					// Moving a held item - update state machine with new target
+					stateMachine.transition({
+						type: 'UPDATE_INTERACTION',
+						targetCell,
+					});
 					core.emit('drag-move', { item: heldItem, cell: targetCell, x: 0, y: 0, colspan: itemSize.colspan, rowspan: itemSize.rowspan });
 					log('move', { direction, amount, targetCell });
 				} else {
