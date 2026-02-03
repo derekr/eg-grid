@@ -151,6 +151,10 @@ export interface LayoutState {
 	columns: number;
 }
 
+// Re-export state machine types for convenience
+import type { GridiotStateMachine, GridiotState, StateTransition } from './state-machine';
+export type { GridiotStateMachine, GridiotState, StateTransition };
+
 export interface GridiotCore {
 	element: HTMLElement;
 	getCellFromPoint(x: number, y: number): GridCell | null;
@@ -158,13 +162,16 @@ export interface GridiotCore {
 	emit<T>(event: string, detail: T): void;
 	destroy(): void;
 
-	// Selection state
+	// Selection state (legacy, backed by state machine)
 	selectedItem: HTMLElement | null;
 	select(item: HTMLElement | null): void;
 	deselect(): void;
 
 	// Provider registry for plugin communication
 	providers: ProviderRegistry;
+
+	// Centralized state machine for interaction management
+	stateMachine: GridiotStateMachine;
 }
 
 export interface Plugin<T = unknown> {

@@ -9,7 +9,10 @@ function log(...args: unknown[]) {
 registerPlugin({
 	name: 'keyboard',
 	init(core) {
-		let keyboardMode = false;
+		// Use state machine for keyboard mode
+		const { stateMachine } = core;
+
+		// Local held item state (will migrate to state machine interaction tracking)
 		let heldItem: HTMLElement | null = null;
 
 		/**
@@ -124,7 +127,8 @@ registerPlugin({
 			// Toggle keyboard mode with Shift+G (G for Grid)
 			if (e.key === 'G' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
 				e.preventDefault();
-				keyboardMode = !keyboardMode;
+				stateMachine.transition({ type: 'TOGGLE_KEYBOARD_MODE' });
+				const keyboardMode = stateMachine.getState().keyboardModeActive;
 				log('keyboard mode:', keyboardMode);
 
 				if (keyboardMode) {
@@ -146,6 +150,7 @@ registerPlugin({
 			const focused = document.activeElement as HTMLElement | null;
 			const focusInGrid = focused && core.element.contains(focused);
 			const hasSelection = core.selectedItem !== null;
+			const keyboardMode = stateMachine.getState().keyboardModeActive;
 			if (!keyboardMode && !focusInGrid && !hasSelection) return;
 
 			const selectedItem = core.selectedItem;
@@ -161,7 +166,10 @@ registerPlugin({
 				} else if (selectedItem) {
 					core.deselect();
 				}
-				keyboardMode = false;
+				// Turn off keyboard mode if it's active
+				if (stateMachine.getState().keyboardModeActive) {
+					stateMachine.transition({ type: 'TOGGLE_KEYBOARD_MODE' });
+				}
 				core.element.removeAttribute('data-gridiot-keyboard-mode');
 				return;
 			}

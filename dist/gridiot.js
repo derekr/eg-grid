@@ -1,3 +1,152 @@
+// state-machine.ts
+function createInitialState() {
+  return {
+    phase: "idle",
+    selectedItemId: null,
+    interaction: null,
+    keyboardModeActive: false
+  };
+}
+function reducer(state, action) {
+  switch (action.type) {
+    case "SELECT": {
+      if (state.phase !== "idle" && state.phase !== "selected") {
+        return state;
+      }
+      return {
+        ...state,
+        phase: "selected",
+        selectedItemId: action.itemId
+      };
+    }
+    case "DESELECT": {
+      if (state.phase !== "selected") {
+        return state;
+      }
+      return {
+        ...state,
+        phase: "idle",
+        selectedItemId: null
+      };
+    }
+    case "START_INTERACTION": {
+      if (state.phase !== "selected") {
+        return state;
+      }
+      const { context } = action;
+      return {
+        ...state,
+        phase: "interacting",
+        interaction: {
+          ...context,
+          // Derive animation strategy from mode
+          useFlip: context.mode === "pointer",
+          useViewTransition: context.mode === "keyboard"
+        }
+      };
+    }
+    case "UPDATE_INTERACTION": {
+      if (state.phase !== "interacting" || !state.interaction) {
+        return state;
+      }
+      return {
+        ...state,
+        interaction: {
+          ...state.interaction,
+          targetCell: action.targetCell,
+          currentSize: action.currentSize ?? state.interaction.currentSize
+        }
+      };
+    }
+    case "COMMIT_INTERACTION": {
+      if (state.phase !== "interacting") {
+        return state;
+      }
+      return {
+        ...state,
+        phase: "committing"
+      };
+    }
+    case "CANCEL_INTERACTION": {
+      if (state.phase !== "interacting") {
+        return state;
+      }
+      return {
+        ...state,
+        phase: "selected",
+        interaction: null
+      };
+    }
+    case "FINISH_COMMIT": {
+      if (state.phase !== "committing") {
+        return state;
+      }
+      return {
+        ...state,
+        phase: "selected",
+        interaction: null
+      };
+    }
+    case "TOGGLE_KEYBOARD_MODE": {
+      return {
+        ...state,
+        keyboardModeActive: !state.keyboardModeActive
+      };
+    }
+    default:
+      return state;
+  }
+}
+function canTransition(state, action) {
+  switch (action.type) {
+    case "SELECT":
+      return state.phase === "idle" || state.phase === "selected";
+    case "DESELECT":
+      return state.phase === "selected";
+    case "START_INTERACTION":
+      return state.phase === "selected";
+    case "UPDATE_INTERACTION":
+      return state.phase === "interacting" && state.interaction !== null;
+    case "COMMIT_INTERACTION":
+      return state.phase === "interacting";
+    case "CANCEL_INTERACTION":
+      return state.phase === "interacting";
+    case "FINISH_COMMIT":
+      return state.phase === "committing";
+    case "TOGGLE_KEYBOARD_MODE":
+      return true;
+    // Always allowed
+    default:
+      return false;
+  }
+}
+function createStateMachine(initialState) {
+  let state = initialState ?? createInitialState();
+  const listeners = /* @__PURE__ */ new Set();
+  return {
+    getState() {
+      return state;
+    },
+    transition(action) {
+      const nextState = reducer(state, action);
+      if (nextState !== state) {
+        state = nextState;
+        for (const listener of listeners) {
+          listener(state, action);
+        }
+      }
+      return state;
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    canTransition(action) {
+      return canTransition(state, action);
+    }
+  };
+}
+
 // engine.ts
 var plugins = /* @__PURE__ */ new Map();
 function registerPlugin(plugin) {
@@ -14,7 +163,8 @@ function init(element, options = {}) {
     disablePlugins = []
   } = options;
   const cleanups = [];
-  let selectedItem = null;
+  const stateMachine = createStateMachine();
+  let selectedElement = null;
   const providerMap = /* @__PURE__ */ new Map();
   const providers = {
     register(capability, provider) {
@@ -36,25 +186,32 @@ function init(element, options = {}) {
   const core = {
     element,
     providers,
-    // Selection state
+    stateMachine,
+    // Selection state (backed by state machine)
     get selectedItem() {
-      return selectedItem;
+      return selectedElement;
     },
     set selectedItem(item) {
       this.select(item);
     },
     select(item) {
-      if (item === selectedItem) return;
-      const previousItem = selectedItem;
+      if (item === selectedElement) return;
+      const previousItem = selectedElement;
       if (previousItem) {
         previousItem.removeAttribute("data-gridiot-selected");
       }
-      selectedItem = item;
       if (item) {
+        const itemId = item.id || item.getAttribute("data-gridiot-item") || "";
+        stateMachine.transition({ type: "SELECT", itemId, element: item });
+        selectedElement = item;
         item.setAttribute("data-gridiot-selected", "");
         this.emit("select", { item });
-      } else if (previousItem) {
-        this.emit("deselect", { item: previousItem });
+      } else {
+        stateMachine.transition({ type: "DESELECT" });
+        selectedElement = null;
+        if (previousItem) {
+          this.emit("deselect", { item: previousItem });
+        }
       }
     },
     deselect() {
@@ -126,6 +283,7 @@ function init(element, options = {}) {
     attributes: true,
     attributeFilter: ["style", "class"]
   });
+  providers.register("state", () => stateMachine.getState());
   for (const plugin of plugins.values()) {
     if (disablePlugins.includes(plugin.name)) {
       continue;
@@ -296,7 +454,7 @@ function log(...args) {
 registerPlugin({
   name: "keyboard",
   init(core) {
-    let keyboardMode = false;
+    const { stateMachine } = core;
     let heldItem = null;
     const getDirection = (key) => {
       switch (key) {
@@ -377,9 +535,10 @@ registerPlugin({
     const onKeyDown = (e) => {
       if (e.key === "G" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault();
-        keyboardMode = !keyboardMode;
-        log("keyboard mode:", keyboardMode);
-        if (keyboardMode) {
+        stateMachine.transition({ type: "TOGGLE_KEYBOARD_MODE" });
+        const keyboardMode2 = stateMachine.getState().keyboardModeActive;
+        log("keyboard mode:", keyboardMode2);
+        if (keyboardMode2) {
           core.element.setAttribute("data-gridiot-keyboard-mode", "");
           if (!core.selectedItem) {
             const firstItem = core.element.querySelector("[data-gridiot-item]");
@@ -395,6 +554,7 @@ registerPlugin({
       const focused = document.activeElement;
       const focusInGrid = focused && core.element.contains(focused);
       const hasSelection = core.selectedItem !== null;
+      const keyboardMode = stateMachine.getState().keyboardModeActive;
       if (!keyboardMode && !focusInGrid && !hasSelection) return;
       const selectedItem = core.selectedItem;
       const direction = getDirection(e.key);
@@ -407,7 +567,9 @@ registerPlugin({
         } else if (selectedItem) {
           core.deselect();
         }
-        keyboardMode = false;
+        if (stateMachine.getState().keyboardModeActive) {
+          stateMachine.transition({ type: "TOGGLE_KEYBOARD_MODE" });
+        }
         core.element.removeAttribute("data-gridiot-keyboard-mode");
         return;
       }

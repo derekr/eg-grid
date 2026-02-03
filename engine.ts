@@ -1,4 +1,5 @@
 import type { GridCell, GridiotCore, InitOptions, Plugin, PluginOptions, ProviderRegistry } from './types';
+import { createStateMachine, type GridiotStateMachine } from './state-machine';
 
 // Global plugin registry
 const plugins = new Map<string, Plugin>();
@@ -27,7 +28,11 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 
 	const cleanups: (() => void)[] = [];
 
-	let selectedItem: HTMLElement | null = null;
+	// Create centralized state machine
+	const stateMachine = createStateMachine();
+
+	// Track selected element (state machine stores itemId, we need the element)
+	let selectedElement: HTMLElement | null = null;
 
 	// Provider registry for inter-plugin communication
 	const providerMap = new Map<string, () => unknown>();
@@ -54,33 +59,39 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 	const core: GridiotCore = {
 		element,
 		providers,
+		stateMachine,
 
-		// Selection state
+		// Selection state (backed by state machine)
 		get selectedItem() {
-			return selectedItem;
+			return selectedElement;
 		},
 		set selectedItem(item: HTMLElement | null) {
 			this.select(item);
 		},
 
 		select(item: HTMLElement | null): void {
-			if (item === selectedItem) return;
+			if (item === selectedElement) return;
 
-			const previousItem = selectedItem;
+			const previousItem = selectedElement;
 
 			// Remove selection from previous item
 			if (previousItem) {
 				previousItem.removeAttribute('data-gridiot-selected');
 			}
 
-			// Set new selection
-			selectedItem = item;
-
+			// Update state machine and local element reference
 			if (item) {
+				const itemId = item.id || item.getAttribute('data-gridiot-item') || '';
+				stateMachine.transition({ type: 'SELECT', itemId, element: item });
+				selectedElement = item;
 				item.setAttribute('data-gridiot-selected', '');
 				this.emit('select', { item });
-			} else if (previousItem) {
-				this.emit('deselect', { item: previousItem });
+			} else {
+				stateMachine.transition({ type: 'DESELECT' });
+				selectedElement = null;
+				if (previousItem) {
+					this.emit('deselect', { item: previousItem });
+				}
 			}
 		},
 
@@ -173,6 +184,9 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 		attributes: true,
 		attributeFilter: ['style', 'class'],
 	});
+
+	// Register state machine provider for plugin access
+	providers.register('state', () => stateMachine.getState());
 
 	// Initialize all registered plugins with options
 	for (const plugin of plugins.values()) {
