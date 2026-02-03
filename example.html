@@ -211,10 +211,10 @@
 
 		<script type="module">
 			// Import core gridiot (includes pointer, keyboard, accessibility)
-			import { init } from './dist/gridiot.js';
+			import { init } from './bundles/index.ts';
 
 			// Import push algorithm (algorithms are separate, pluggable)
-			import { attachPushAlgorithm } from './dist/algorithm-push.js';
+			import { attachPushAlgorithm } from './plugins/algorithm-push.ts';
 
 			const grid = init(document.getElementById('grid'));
 

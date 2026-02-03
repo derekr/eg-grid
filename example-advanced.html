@@ -695,12 +695,12 @@
   <style id="preview-styles"></style>
 
   <script type="module">
-    import { init, createLayoutModel, attachResponsive } from './dist/gridiot.js';
-    import { attachPushAlgorithm, readItemsFromDOM, compactUp, layoutToCSS } from './dist/algorithm-push.js';
-    import { attachDevOverlay } from './dist/dev-overlay.js';
-    import { attachPlaceholder } from './dist/placeholder.js';
-    import { attachCamera } from './dist/camera.js';
-    import { attachResize } from './dist/resize.js';
+    import { init, createLayoutModel, attachResponsive } from './bundles/index.ts';
+    import { attachPushAlgorithm, readItemsFromDOM, compactUp, layoutToCSS } from './plugins/algorithm-push.ts';
+    import { attachDevOverlay } from './plugins/dev-overlay.ts';
+    import { attachPlaceholder } from './plugins/placeholder.ts';
+    import { attachCamera } from './plugins/camera.ts';
+    import { attachResize } from './plugins/resize.ts';
 
     const gridElement = document.getElementById('grid');
     const layoutStyleElement = document.getElementById('layout-styles');
