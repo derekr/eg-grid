@@ -1,4 +1,4 @@
-// gridiot/engine.ts
+// engine.ts
 var plugins = /* @__PURE__ */ new Map();
 function registerPlugin(plugin) {
   plugins.set(plugin.name, plugin);
@@ -174,7 +174,7 @@ function setItemCell(item, cell) {
   item.style.gridRow = String(cell.row);
 }
 
-// gridiot/utils/flip.ts
+// utils/flip.ts
 function animateFLIP(element, firstRect, options = {}) {
   const {
     duration = 200,
@@ -251,7 +251,7 @@ function animateFLIPWithTracking(element, firstRect, options = {}) {
   return animation;
 }
 
-// gridiot/plugins/pointer.ts
+// plugins/pointer.ts
 var HYSTERESIS = 0.4;
 var TARGET_CHANGE_DEBOUNCE = 40;
 var DRAG_THRESHOLD = 5;

@@ -1,4 +1,4 @@
-// gridiot/engine.ts
+// engine.ts
 var plugins = /* @__PURE__ */ new Map();
 function registerPlugin(plugin) {
   plugins.set(plugin.name, plugin);
@@ -174,7 +174,7 @@ function setItemCell(item, cell) {
   item.style.gridRow = String(cell.row);
 }
 
-// gridiot/plugins/accessibility.ts
+// plugins/accessibility.ts
 registerPlugin({
   name: "accessibility",
   init(core) {
@@ -288,7 +288,7 @@ registerPlugin({
   }
 });
 
-// gridiot/plugins/keyboard.ts
+// plugins/keyboard.ts
 var DEBUG = false;
 function log(...args) {
   if (DEBUG) console.log("[keyboard]", ...args);
@@ -302,15 +302,19 @@ registerPlugin({
       switch (key) {
         case "ArrowUp":
         case "k":
+        case "K":
           return "up";
         case "ArrowDown":
         case "j":
+        case "J":
           return "down";
         case "ArrowLeft":
         case "h":
+        case "H":
           return "left";
         case "ArrowRight":
         case "l":
+        case "L":
           return "right";
         default:
           return null;
@@ -371,7 +375,7 @@ registerPlugin({
       };
     };
     const onKeyDown = (e) => {
-      if (e.key === "K" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (e.key === "G" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault();
         keyboardMode = !keyboardMode;
         log("keyboard mode:", keyboardMode);
@@ -428,7 +432,7 @@ registerPlugin({
       }
       if (direction) {
         e.preventDefault();
-        if (e.altKey && !e.ctrlKey && selectedItem) {
+        if (e.altKey && !e.ctrlKey && !e.shiftKey && selectedItem) {
           const fromCell = getItemCell(selectedItem);
           const adjacentItem = findItemInDirection(fromCell, direction, selectedItem);
           if (adjacentItem) {
@@ -441,6 +445,52 @@ registerPlugin({
         const currentCell = getItemCell(selectedItem);
         const itemSize = getItemSize(selectedItem);
         const gridInfo = core.getGridInfo();
+        if (e.shiftKey && !e.ctrlKey && !e.altKey) {
+          let newColspan = itemSize.colspan;
+          let newRowspan = itemSize.rowspan;
+          switch (direction) {
+            case "right":
+              newColspan = Math.min(itemSize.colspan + 1, gridInfo.columns.length - currentCell.column + 1);
+              break;
+            case "left":
+              newColspan = Math.max(1, itemSize.colspan - 1);
+              break;
+            case "down":
+              newRowspan = itemSize.rowspan + 1;
+              break;
+            case "up":
+              newRowspan = Math.max(1, itemSize.rowspan - 1);
+              break;
+          }
+          if (newColspan === itemSize.colspan && newRowspan === itemSize.rowspan) {
+            return;
+          }
+          const originalViewTransitionName = selectedItem.style.viewTransitionName || "";
+          selectedItem.style.viewTransitionName = "none";
+          const handle = direction === "right" || direction === "down" ? "se" : direction === "left" ? "w" : "n";
+          core.emit("resize-start", {
+            item: selectedItem,
+            cell: currentCell,
+            colspan: itemSize.colspan,
+            rowspan: itemSize.rowspan,
+            handle
+          });
+          selectedItem.setAttribute("data-gridiot-colspan", String(newColspan));
+          selectedItem.setAttribute("data-gridiot-rowspan", String(newRowspan));
+          selectedItem.style.gridColumn = `${currentCell.column} / span ${newColspan}`;
+          selectedItem.style.gridRow = `${currentCell.row} / span ${newRowspan}`;
+          core.emit("resize-end", {
+            item: selectedItem,
+            cell: currentCell,
+            colspan: newColspan,
+            rowspan: newRowspan
+          });
+          requestAnimationFrame(() => {
+            selectedItem.style.viewTransitionName = originalViewTransitionName;
+          });
+          log("resize", { direction, newColspan, newRowspan });
+          return;
+        }
         let amount = 1;
         if (e.ctrlKey || e.metaKey) {
           amount = direction === "up" || direction === "down" ? itemSize.rowspan : itemSize.colspan;
@@ -474,7 +524,7 @@ registerPlugin({
   }
 });
 
-// gridiot/utils/flip.ts
+// utils/flip.ts
 function animateFLIP(element, firstRect, options = {}) {
   const {
     duration = 200,
@@ -567,7 +617,7 @@ function animateFLIPWithTracking(element, firstRect, options = {}) {
   return animation;
 }
 
-// gridiot/plugins/pointer.ts
+// plugins/pointer.ts
 var HYSTERESIS = 0.4;
 var TARGET_CHANGE_DEBOUNCE = 40;
 var DRAG_THRESHOLD = 5;
@@ -810,7 +860,7 @@ registerPlugin({
   }
 });
 
-// gridiot/plugins/camera.ts
+// plugins/camera.ts
 function findScrollParent(element) {
   let parent = element.parentElement;
   while (parent) {
@@ -1082,11 +1132,7 @@ registerPlugin({
   }
 });
 
-// gridiot/plugins/resize.ts
-var DEBUG3 = false;
-function log3(...args) {
-  if (DEBUG3) console.log("[resize]", ...args);
-}
+// plugins/resize.ts
 function detectHandle(e, item, size, mode) {
   const rect = item.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -1222,29 +1268,27 @@ function createSizeLabel() {
 	`;
   return label;
 }
-function attachResize(gridElement, options = {}) {
+function attachResize(gridElement, options) {
   const {
+    core,
     handles = "corners",
     handleSize = 12,
     minSize = { colspan: 1, rowspan: 1 },
     maxSize = { colspan: 6, rowspan: 6 },
-    showSizeLabel = true,
-    core
+    showSizeLabel = true
   } = options;
   let activeResize = null;
   let hoveredItem = null;
   let hoveredHandle = null;
-  if (core) {
-    core.providers.register("resize", () => {
-      if (!activeResize) return null;
-      return {
-        item: activeResize.item,
-        originalSize: activeResize.originalSize,
-        currentSize: activeResize.currentSize,
-        handle: activeResize.handle
-      };
-    });
-  }
+  core.providers.register("resize", () => {
+    if (!activeResize) return null;
+    return {
+      item: activeResize.item,
+      originalSize: activeResize.originalSize,
+      currentSize: activeResize.currentSize,
+      handle: activeResize.handle
+    };
+  });
   function emit(event, detail) {
     gridElement.dispatchEvent(
       new CustomEvent(`gridiot:${event}`, {
@@ -1252,66 +1296,6 @@ function attachResize(gridElement, options = {}) {
         detail
       })
     );
-  }
-  function getCore() {
-    if (core) return core;
-    return {
-      element: gridElement,
-      getCellFromPoint(x, y) {
-        const rect = gridElement.getBoundingClientRect();
-        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-          return null;
-        }
-        const style = getComputedStyle(gridElement);
-        const columns = style.gridTemplateColumns.split(" ").filter(Boolean);
-        const rows = style.gridTemplateRows.split(" ").filter(Boolean);
-        const columnGap = parseFloat(style.columnGap) || 0;
-        const rowGap = parseFloat(style.rowGap) || 0;
-        const relX = x - rect.left;
-        const relY = y - rect.top;
-        const cellWidth = (parseFloat(columns[0] ?? "0") || 0) + columnGap;
-        const cellHeight = (parseFloat(rows[0] ?? "0") || 0) + rowGap;
-        const column = cellWidth > 0 ? Math.floor(relX / cellWidth) + 1 : 1;
-        const row = cellHeight > 0 ? Math.floor(relY / cellHeight) + 1 : 1;
-        return {
-          column: Math.max(1, Math.min(column, columns.length)),
-          row: Math.max(1, Math.min(row, rows.length))
-        };
-      },
-      getGridInfo() {
-        const rect = gridElement.getBoundingClientRect();
-        const style = getComputedStyle(gridElement);
-        const columns = style.gridTemplateColumns.split(" ").filter(Boolean).map((v) => parseFloat(v) || 0);
-        const rows = style.gridTemplateRows.split(" ").filter(Boolean).map((v) => parseFloat(v) || 0);
-        const columnGap = parseFloat(style.columnGap) || 0;
-        return {
-          rect,
-          columns,
-          rows,
-          gap: columnGap,
-          cellWidth: columns[0] || 0,
-          cellHeight: rows[0] || 0
-        };
-      },
-      emit,
-      destroy() {
-      },
-      selectedItem: null,
-      select() {
-      },
-      deselect() {
-      },
-      providers: {
-        register() {
-        },
-        get() {
-          return void 0;
-        },
-        has() {
-          return false;
-        }
-      }
-    };
   }
   function startResize(item, handle, e) {
     const colspan = parseInt(item.getAttribute("data-gridiot-colspan") || "1", 10) || 1;
@@ -1341,14 +1325,17 @@ function attachResize(gridElement, options = {}) {
       sizeLabel,
       initialRect,
       startPointerX: e.clientX,
-      startPointerY: e.clientY
+      startPointerY: e.clientY,
+      placeholder: null
+      // Will be set below if enabled
     };
     item.setAttribute("data-gridiot-resizing", "");
+    item.setAttribute("data-gridiot-handle-active", handle);
+    item.removeAttribute("data-gridiot-handle-hover");
     item.setPointerCapture(e.pointerId);
     item.addEventListener("pointermove", onItemPointerMove);
     item.addEventListener("pointerup", onItemPointerUp);
     item.addEventListener("pointercancel", onItemPointerCancel);
-    log3("resize-start", { handle, startCell, originalSize });
     emit("resize-start", {
       item,
       cell: startCell,
@@ -1356,6 +1343,7 @@ function attachResize(gridElement, options = {}) {
       rowspan: originalSize.rowspan,
       handle
     });
+    activeResize.placeholder = null;
     item.style.position = "fixed";
     item.style.left = `${initialRect.left}px`;
     item.style.top = `${initialRect.top}px`;
@@ -1367,8 +1355,7 @@ function attachResize(gridElement, options = {}) {
   function updateResize(e) {
     if (!activeResize) return;
     const { item, handle, startCell, originalSize, currentCell, currentSize, sizeLabel, initialRect, startPointerX, startPointerY } = activeResize;
-    const coreInstance = getCore();
-    const gridInfo = coreInstance.getGridInfo();
+    const gridInfo = core.getGridInfo();
     const deltaX = e.clientX - startPointerX;
     const deltaY = e.clientY - startPointerY;
     let newWidth = initialRect.width;
@@ -1409,10 +1396,40 @@ function attachResize(gridElement, options = {}) {
     item.style.height = `${newHeight}px`;
     const cellPlusGap = gridInfo.cellWidth + gridInfo.gap;
     const rowPlusGap = gridInfo.cellHeight + gridInfo.gap;
-    const projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, Math.round((newWidth + gridInfo.gap) / cellPlusGap)));
-    const projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, Math.round((newHeight + gridInfo.gap) / rowPlusGap)));
+    const rawColspanRatio = (newWidth + gridInfo.gap) / cellPlusGap;
+    const rawRowspanRatio = (newHeight + gridInfo.gap) / rowPlusGap;
+    const isGrowingWidth = handle === "e" || handle === "se" || handle === "ne";
+    const isGrowingHeight = handle === "s" || handle === "se" || handle === "sw";
+    const GROW_THRESHOLD = 0.3;
+    const SHRINK_THRESHOLD = 0.7;
+    let projectedColspan;
+    let projectedRowspan;
+    if (isGrowingWidth) {
+      projectedColspan = Math.floor(rawColspanRatio);
+      if (rawColspanRatio - projectedColspan >= GROW_THRESHOLD) {
+        projectedColspan += 1;
+      }
+    } else {
+      projectedColspan = Math.ceil(rawColspanRatio);
+      if (projectedColspan - rawColspanRatio > 1 - SHRINK_THRESHOLD) {
+        projectedColspan -= 1;
+      }
+    }
+    if (isGrowingHeight) {
+      projectedRowspan = Math.floor(rawRowspanRatio);
+      if (rawRowspanRatio - projectedRowspan >= GROW_THRESHOLD) {
+        projectedRowspan += 1;
+      }
+    } else {
+      projectedRowspan = Math.ceil(rawRowspanRatio);
+      if (projectedRowspan - rawRowspanRatio > 1 - SHRINK_THRESHOLD) {
+        projectedRowspan -= 1;
+      }
+    }
+    projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, projectedColspan));
+    projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, projectedRowspan));
     const newSize = calculateNewSize(
-      coreInstance,
+      core,
       handle,
       startCell,
       originalSize,
@@ -1426,7 +1443,6 @@ function attachResize(gridElement, options = {}) {
     if (sizeLabel) {
       sizeLabel.textContent = `${projectedColspan}\xD7${projectedRowspan}`;
     }
-    log3("resize-move", { newSize: { colspan: projectedColspan, rowspan: projectedRowspan }, visual: { width: newWidth, height: newHeight } });
     emit("resize-move", {
       item,
       cell: { column: newSize.column, row: newSize.row },
@@ -1443,7 +1459,10 @@ function attachResize(gridElement, options = {}) {
   }
   function finishResize() {
     if (!activeResize) return;
-    const { item, pointerId, currentSize, currentCell, originalSize, sizeLabel } = activeResize;
+    const { item, pointerId, currentSize, currentCell, originalSize, sizeLabel, initialRect, placeholder } = activeResize;
+    if (placeholder) {
+      placeholder.remove();
+    }
     cleanupResizeListeners(item, pointerId);
     const firstRect = item.getBoundingClientRect();
     item.setAttribute("data-gridiot-colspan", String(currentSize.colspan));
@@ -1451,35 +1470,51 @@ function attachResize(gridElement, options = {}) {
     if (sizeLabel) {
       sizeLabel.remove();
     }
-    item.style.viewTransitionName = "none";
-    item.style.position = "";
-    item.style.left = "";
-    item.style.top = "";
-    item.style.width = "";
-    item.style.height = "";
-    item.style.zIndex = "";
-    item.style.gridColumn = `${currentCell.column} / span ${currentSize.colspan}`;
-    item.style.gridRow = `${currentCell.row} / span ${currentSize.rowspan}`;
-    item.removeAttribute("data-gridiot-resizing");
-    log3("resize-end", { originalSize, newSize: currentSize, currentCell });
     emit("resize-end", {
       item,
       cell: currentCell,
       colspan: currentSize.colspan,
       rowspan: currentSize.rowspan
     });
+    const applyFinalState = () => {
+      item.style.position = "";
+      item.style.left = "";
+      item.style.top = "";
+      item.style.width = "";
+      item.style.height = "";
+      item.style.zIndex = "";
+      item.style.gridColumn = `${currentCell.column} / span ${currentSize.colspan}`;
+      item.style.gridRow = `${currentCell.row} / span ${currentSize.rowspan}`;
+      item.removeAttribute("data-gridiot-resizing");
+      item.removeAttribute("data-gridiot-handle-active");
+    };
+    item.style.viewTransitionName = "none";
+    applyFinalState();
     requestAnimationFrame(() => {
-      animateFLIPWithTracking(item, firstRect, {
+      const animation = animateFLIPWithTracking(item, firstRect, {
         includeScale: true,
-        transformOrigin: "top left"
+        transformOrigin: "top left",
+        onFinish: () => {
+          item.style.transform = "";
+        }
       });
+      if (!animation) {
+        item.style.transform = "";
+        const itemId = item.style.getPropertyValue("--item-id") || item.id || item.dataset.id;
+        if (itemId) {
+          item.style.viewTransitionName = itemId;
+        }
+      }
     });
     activeResize = null;
   }
   function cancelResize() {
     if (!activeResize) return;
-    const { item, pointerId, originalGridColumn, originalGridRow, sizeLabel } = activeResize;
+    const { item, pointerId, originalGridColumn, originalGridRow, sizeLabel, placeholder } = activeResize;
     cleanupResizeListeners(item, pointerId);
+    if (placeholder) {
+      placeholder.remove();
+    }
     if (sizeLabel) {
       sizeLabel.remove();
     }
@@ -1498,7 +1533,7 @@ function attachResize(gridElement, options = {}) {
       item.style.viewTransitionName = "";
     }
     item.removeAttribute("data-gridiot-resizing");
-    log3("resize-cancel");
+    item.removeAttribute("data-gridiot-handle-active");
     emit("resize-cancel", {
       item
     });
@@ -1540,13 +1575,23 @@ function attachResize(gridElement, options = {}) {
       if (handle !== hoveredHandle || item !== hoveredItem) {
         if (hoveredItem && hoveredItem !== item) {
           hoveredItem.style.cursor = "";
+          hoveredItem.removeAttribute("data-gridiot-handle-hover");
+        }
+        if (hoveredItem === item && hoveredHandle && !handle) {
+          item.removeAttribute("data-gridiot-handle-hover");
         }
         hoveredItem = item;
         hoveredHandle = handle;
         item.style.cursor = getCursor(handle) || "";
+        if (handle) {
+          item.setAttribute("data-gridiot-handle-hover", handle);
+        } else {
+          item.removeAttribute("data-gridiot-handle-hover");
+        }
       }
     } else if (hoveredItem) {
       hoveredItem.style.cursor = "";
+      hoveredItem.removeAttribute("data-gridiot-handle-hover");
       hoveredItem = null;
       hoveredHandle = null;
     }
@@ -1605,7 +1650,7 @@ registerPlugin({
   }
 });
 
-// gridiot/plugins/placeholder.ts
+// plugins/placeholder.ts
 function attachPlaceholder(gridElement, options = {}) {
   const {
     className = "gridiot-placeholder",
@@ -1786,7 +1831,7 @@ registerPlugin({
   }
 });
 
-// gridiot/plugins/algorithm-push-core.ts
+// plugins/algorithm-push-core.ts
 function itemsOverlap(a, b) {
   return !(a.column + a.width <= b.column || b.column + b.width <= a.column || a.row + a.height <= b.row || b.row + b.height <= a.row);
 }
@@ -1843,18 +1888,19 @@ function layoutToCSS(items, options = {}) {
   const rules = [];
   for (const item of items) {
     const width = maxColumns ? Math.min(item.width, maxColumns) : item.width;
+    const column = maxColumns ? Math.max(1, Math.min(item.column, maxColumns - width + 1)) : item.column;
     const selector = `${selectorPrefix}${item.id}${selectorSuffix}${excludeSelector}`;
-    const gridColumn = `${item.column} / span ${width}`;
+    const gridColumn = `${column} / span ${width}`;
     const gridRow = `${item.row} / span ${item.height}`;
     rules.push(`${selector} { grid-column: ${gridColumn}; grid-row: ${gridRow}; }`);
   }
   return rules.join("\n");
 }
 
-// gridiot/plugins/algorithm-push.ts
-var DEBUG4 = false;
-function log4(...args) {
-  if (DEBUG4) console.log("[algorithm-push]", ...args);
+// plugins/algorithm-push.ts
+var DEBUG3 = false;
+function log3(...args) {
+  if (DEBUG3) console.log("[algorithm-push]", ...args);
 }
 function readItemsFromDOM(container) {
   const elements = container.querySelectorAll("[data-gridiot-item]");
@@ -1907,7 +1953,7 @@ function attachPushAlgorithm(gridElement, options = {}) {
     const rowspan = parseInt(item.getAttribute("data-gridiot-rowspan") || "1", 10) || 1;
     const colValue = `${cell.column} / span ${colspan}`;
     const rowValue = `${cell.row} / span ${rowspan}`;
-    log4("setItemCell", { id: getItemId(item), colValue, rowValue });
+    log3("setItemCell", { id: getItemId(item), colValue, rowValue });
     item.style.gridColumn = colValue;
     item.style.gridRow = rowValue;
   }
@@ -1949,13 +1995,13 @@ function attachPushAlgorithm(gridElement, options = {}) {
       }
     };
     if (useViewTransition && "startViewTransition" in document) {
-      log4("starting view transition, excludeId:", excludeId);
+      log3("starting view transition, excludeId:", excludeId);
       if (draggedElement && excludeId) {
         draggedElement.style.viewTransitionName = "dragging";
       }
       document.startViewTransition(applyChanges);
     } else {
-      log4("applying without view transition");
+      log3("applying without view transition");
       applyChanges();
     }
   }
@@ -1981,7 +2027,7 @@ function attachPushAlgorithm(gridElement, options = {}) {
       const css = layoutToCSS(items, { selectorPrefix, selectorSuffix, maxColumns: dragStartColumnCount });
       styleElement.textContent = css;
     }
-    log4("drag-start", {
+    log3("drag-start", {
       item: draggedItemId,
       positions: Array.from(originalPositions.entries())
     });
@@ -1994,7 +2040,7 @@ function attachPushAlgorithm(gridElement, options = {}) {
       const cameraState = core.providers.get("camera");
       if (cameraState?.isScrolling) {
         pendingCell = detail.cell;
-        log4("drag-move deferred (camera scrolling)", pendingCell);
+        log3("drag-move deferred (camera scrolling)", pendingCell);
         return;
       }
     }
@@ -2006,9 +2052,9 @@ function attachPushAlgorithm(gridElement, options = {}) {
       }
       return item;
     });
-    log4("drag-move", { targetCell: detail.cell });
+    log3("drag-move", { targetCell: detail.cell });
     const newLayout = calculateLayout(items, draggedItemId, detail.cell, { compact: compaction });
-    log4(
+    log3(
       "calculated layout",
       newLayout.map((it) => ({ id: it.id, col: it.column, row: it.row }))
     );
@@ -2017,7 +2063,7 @@ function attachPushAlgorithm(gridElement, options = {}) {
   const onDragEnd = (e) => {
     if (!draggedItemId || !originalPositions) return;
     const detail = e.detail;
-    log4("drag-end", { finalCell: detail.cell });
+    log3("drag-end", { finalCell: detail.cell });
     const items = readItemsFromDOM(gridElement).map((item) => {
       const original = originalPositions.get(item.id);
       if (original && item.id !== draggedItemId) {
@@ -2026,17 +2072,17 @@ function attachPushAlgorithm(gridElement, options = {}) {
       return item;
     });
     const finalLayout = calculateLayout(items, draggedItemId, detail.cell, { compact: compaction });
-    log4(
+    log3(
       "final layout",
       finalLayout.map((it) => ({ id: it.id, col: it.column, row: it.row }))
     );
     const isPointerDrag = draggedElement?.style.position === "fixed";
-    log4("drag-end isPointerDrag:", isPointerDrag, "position:", draggedElement?.style.position);
+    log3("drag-end isPointerDrag:", isPointerDrag, "position:", draggedElement?.style.position);
     if (draggedElement && draggedElement.style.viewTransitionName === "dragging") {
       draggedElement.style.viewTransitionName = "";
     }
     const useViewTransition = !isPointerDrag;
-    log4("drag-end useViewTransition:", useViewTransition);
+    log3("drag-end useViewTransition:", useViewTransition);
     applyLayout(finalLayout, null, useViewTransition);
     if (layoutModel && dragStartColumnCount) {
       const positions = /* @__PURE__ */ new Map();
@@ -2044,10 +2090,10 @@ function attachPushAlgorithm(gridElement, options = {}) {
         positions.set(item.id, { column: item.column, row: item.row });
       }
       layoutModel.saveLayout(dragStartColumnCount, positions);
-      log4("saved layout to model for", dragStartColumnCount, "columns");
+      log3("saved layout to model for", dragStartColumnCount, "columns");
       if (styleElement) {
         styleElement.textContent = "";
-        log4("cleared preview styles");
+        log3("cleared preview styles");
       }
     }
     draggedItemId = null;
@@ -2094,10 +2140,10 @@ function attachPushAlgorithm(gridElement, options = {}) {
       cell = core?.getCellFromPoint(centerX, centerY) ?? null;
     }
     if (!cell) {
-      log4("camera-settled, no cell to update to");
+      log3("camera-settled, no cell to update to");
       return;
     }
-    log4("camera-settled, updating to cell", cell);
+    log3("camera-settled, updating to cell", cell);
     pendingCell = null;
     const items = readItemsFromDOM(gridElement).map((item) => {
       const original = originalPositions.get(item.id);
@@ -2142,7 +2188,7 @@ function attachPushAlgorithm(gridElement, options = {}) {
       styleElement.textContent = css;
     }
     lastResizeLayout = null;
-    log4("resize-start", {
+    log3("resize-start", {
       item: resizedItemId,
       cell: detail.cell,
       size: { colspan: detail.colspan, rowspan: detail.rowspan }
@@ -2179,9 +2225,9 @@ function attachPushAlgorithm(gridElement, options = {}) {
         });
       }
     }
-    log4("resize-move", { targetCell: detail.cell, size: { colspan: detail.colspan, rowspan: detail.rowspan } });
+    log3("resize-move", { targetCell: detail.cell, size: { colspan: detail.colspan, rowspan: detail.rowspan } });
     const newLayout = calculateLayout(items, resizedItemId, detail.cell, { compact: compaction });
-    log4(
+    log3(
       "calculated resize layout",
       newLayout.map((it) => ({ id: it.id, col: it.column, row: it.row, w: it.width, h: it.height }))
     );
@@ -2190,7 +2236,7 @@ function attachPushAlgorithm(gridElement, options = {}) {
   const onResizeEnd = (e) => {
     if (!resizedItemId || !resizeOriginalPositions) return;
     const detail = e.detail;
-    log4("resize-end", { finalCell: detail.cell, size: { colspan: detail.colspan, rowspan: detail.rowspan } });
+    log3("resize-end", { finalCell: detail.cell, size: { colspan: detail.colspan, rowspan: detail.rowspan } });
     const items = [];
     for (const [id, original] of resizeOriginalPositions) {
       if (id === resizedItemId) {
@@ -2212,7 +2258,7 @@ function attachPushAlgorithm(gridElement, options = {}) {
       }
     }
     const finalLayout = calculateLayout(items, resizedItemId, detail.cell, { compact: compaction });
-    log4(
+    log3(
       "final resize layout",
       finalLayout.map((it) => ({ id: it.id, col: it.column, row: it.row, w: it.width, h: it.height }))
     );
@@ -2224,10 +2270,10 @@ function attachPushAlgorithm(gridElement, options = {}) {
       }
       layoutModel.updateItemSize(resizedItemId, { width: detail.colspan, height: detail.rowspan });
       layoutModel.saveLayout(resizeStartColumnCount, positions);
-      log4("saved resize layout to model for", resizeStartColumnCount, "columns");
+      log3("saved resize layout to model for", resizeStartColumnCount, "columns");
       if (styleElement) {
         styleElement.textContent = "";
-        log4("cleared preview styles");
+        log3("cleared preview styles");
       }
     }
     resizedItemId = null;
@@ -2298,10 +2344,10 @@ registerPlugin({
   }
 });
 
-// gridiot/plugins/responsive.ts
-var DEBUG5 = false;
-function log5(...args) {
-  if (DEBUG5) console.log("[responsive]", ...args);
+// plugins/responsive.ts
+var DEBUG4 = false;
+function log4(...args) {
+  if (DEBUG4) console.log("[responsive]", ...args);
 }
 function attachResponsive(gridElement, options, core) {
   const { layoutModel, styleElement } = options;
@@ -2322,7 +2368,7 @@ function attachResponsive(gridElement, options, core) {
         cellSize = parseFloat(columns[0] ?? "184") || 184;
       }
     }
-    log5("Inferred grid metrics:", { cellSize, gap });
+    log4("Inferred grid metrics:", { cellSize, gap });
   }
   function detectColumnCount() {
     const style = getComputedStyle(gridElement);
@@ -2338,7 +2384,7 @@ function attachResponsive(gridElement, options, core) {
       gridSelector
     });
     styleElement.textContent = css;
-    log5("Injected CSS for all breakpoints");
+    log4("Injected CSS for all breakpoints");
   }
   if (core) {
     core.providers.register("responsive", () => ({
@@ -2352,10 +2398,10 @@ function attachResponsive(gridElement, options, core) {
   if (!hasServerRenderedCSS) {
     injectCSS();
   } else {
-    log5("Skipping initial CSS injection - server-rendered CSS detected");
+    log4("Skipping initial CSS injection - server-rendered CSS detected");
   }
   const unsubscribe = layoutModel.subscribe(() => {
-    log5("Layout model changed, regenerating CSS");
+    log4("Layout model changed, regenerating CSS");
     injectCSS();
   });
   let lastColumnCount = layoutModel.currentColumnCount;
@@ -2365,7 +2411,7 @@ function attachResponsive(gridElement, options, core) {
       const previousCount = lastColumnCount;
       lastColumnCount = newColumnCount;
       layoutModel.setCurrentColumnCount(newColumnCount);
-      log5("Column count changed:", previousCount, "->", newColumnCount);
+      log4("Column count changed:", previousCount, "->", newColumnCount);
       const detail = {
         previousCount,
         currentCount: newColumnCount
@@ -2398,7 +2444,7 @@ function ensureContainerWrapper(gridElement) {
   }
   if (parent) {
     parent.style.containerType = "inline-size";
-    log5("Applied container-type: inline-size to parent");
+    log4("Applied container-type: inline-size to parent");
     return parent;
   }
   console.warn(
@@ -2425,7 +2471,7 @@ registerPlugin({
   }
 });
 
-// gridiot/layout-model.ts
+// layout-model.ts
 var MAX_ROWS = 100;
 function createLayoutModel(options) {
   const { maxColumns, minColumns = 1, items: itemDefs } = options;

@@ -21,15 +21,19 @@ registerPlugin({
 			switch (key) {
 				case 'ArrowUp':
 				case 'k':
+				case 'K':
 					return 'up';
 				case 'ArrowDown':
 				case 'j':
+				case 'J':
 					return 'down';
 				case 'ArrowLeft':
 				case 'h':
+				case 'H':
 					return 'left';
 				case 'ArrowRight':
 				case 'l':
+				case 'L':
 					return 'right';
 				default:
 					return null;
@@ -117,8 +121,8 @@ registerPlugin({
 		};
 
 		const onKeyDown = (e: KeyboardEvent) => {
-			// Toggle keyboard mode with Shift+K
-			if (e.key === 'K' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+			// Toggle keyboard mode with Shift+G (G for Grid)
+			if (e.key === 'G' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
 				e.preventDefault();
 				keyboardMode = !keyboardMode;
 				log('keyboard mode:', keyboardMode);
@@ -191,7 +195,7 @@ registerPlugin({
 				e.preventDefault();
 
 				// Alt+nav: Select adjacent item
-				if (e.altKey && !e.ctrlKey && selectedItem) {
+				if (e.altKey && !e.ctrlKey && !e.shiftKey && selectedItem) {
 					const fromCell = getItemCell(selectedItem);
 					const adjacentItem = findItemInDirection(fromCell, direction, selectedItem);
 					if (adjacentItem) {
@@ -207,6 +211,75 @@ registerPlugin({
 				const currentCell = getItemCell(selectedItem);
 				const itemSize = getItemSize(selectedItem);
 				const gridInfo = core.getGridInfo();
+
+				// Shift+nav: Resize item (change colspan/rowspan)
+				if (e.shiftKey && !e.ctrlKey && !e.altKey) {
+					let newColspan = itemSize.colspan;
+					let newRowspan = itemSize.rowspan;
+
+					// Calculate new size based on direction
+					switch (direction) {
+						case 'right':
+							newColspan = Math.min(itemSize.colspan + 1, gridInfo.columns.length - currentCell.column + 1);
+							break;
+						case 'left':
+							newColspan = Math.max(1, itemSize.colspan - 1);
+							break;
+						case 'down':
+							newRowspan = itemSize.rowspan + 1; // No max for rows (grid auto-grows)
+							break;
+						case 'up':
+							newRowspan = Math.max(1, itemSize.rowspan - 1);
+							break;
+					}
+
+					// Skip if size didn't change (already at limit)
+					if (newColspan === itemSize.colspan && newRowspan === itemSize.rowspan) {
+						return;
+					}
+
+					// Exclude item from View Transitions during keyboard resize
+					// This prevents the item from transitioning from wrong origin
+					const originalViewTransitionName = (selectedItem.style as any).viewTransitionName || '';
+					(selectedItem.style as any).viewTransitionName = 'none';
+
+					// Emit resize events for algorithm and other plugins to handle
+					// Use 'se' handle for increases, appropriate edge for decreases
+					const handle = direction === 'right' || direction === 'down' ? 'se' :
+					               direction === 'left' ? 'w' : 'n';
+
+					core.emit('resize-start', {
+						item: selectedItem,
+						cell: currentCell,
+						colspan: itemSize.colspan,
+						rowspan: itemSize.rowspan,
+						handle,
+					});
+
+					// Update item data attributes (algorithm reads these for size)
+					selectedItem.setAttribute('data-gridiot-colspan', String(newColspan));
+					selectedItem.setAttribute('data-gridiot-rowspan', String(newRowspan));
+
+					// Set grid position directly - algorithm will also set CSS rules
+					// but we need inline styles for immediate visual feedback
+					selectedItem.style.gridColumn = `${currentCell.column} / span ${newColspan}`;
+					selectedItem.style.gridRow = `${currentCell.row} / span ${newRowspan}`;
+
+					core.emit('resize-end', {
+						item: selectedItem,
+						cell: currentCell,
+						colspan: newColspan,
+						rowspan: newRowspan,
+					});
+
+					// Restore viewTransitionName after a frame to allow layout to settle
+					requestAnimationFrame(() => {
+						(selectedItem.style as any).viewTransitionName = originalViewTransitionName;
+					});
+
+					log('resize', { direction, newColspan, newRowspan });
+					return;
+				}
 
 				// Calculate move amount
 				let amount = 1;
