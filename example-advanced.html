@@ -76,132 +76,103 @@
       outline-offset: 2px;
     }
 
-    /* Resize handle indicators - visible on hover */
+    /* Resize handle indicator - single pseudo-element, repositions based on handle */
     .item {
-      position: relative; /* for absolute positioning of pseudo-elements */
+      position: relative;
     }
 
-    /* Corner resize handles using ::after */
     .item::after {
       content: '';
       position: absolute;
-      width: 16px;
-      height: 16px;
       opacity: 0;
-      transition: opacity 0.15s ease, background 0.15s ease;
       pointer-events: none;
       border-radius: 3px;
+      background: rgba(59, 130, 246, 0.7);
+      /* No transition - instant feedback feels more responsive */
     }
 
-    /* Position at bottom-right by default (SE handle) */
-    .item::after {
-      bottom: 6px;
-      right: 6px;
-      background: rgba(255, 255, 255, 0.3);
-    }
-
-    /* Show handle on SE corner hover */
+    /* Corner handles - small squares */
     .item[data-gridiot-handle-hover="se"]::after {
       opacity: 1;
-      background: rgba(59, 130, 246, 0.7);
+      width: 14px;
+      height: 14px;
+      bottom: 4px;
+      right: 4px;
     }
 
-    /* Second pseudo-element for opposite corner using ::before */
-    .item::before {
-      content: '';
-      position: absolute;
-      width: 16px;
-      height: 16px;
-      opacity: 0;
-      transition: opacity 0.15s ease, background 0.15s ease;
-      pointer-events: none;
-      border-radius: 3px;
-      top: 6px;
-      left: 6px;
-      background: rgba(255, 255, 255, 0.3);
-    }
-
-    /* Show handle on NW corner hover */
-    .item[data-gridiot-handle-hover="nw"]::before {
+    .item[data-gridiot-handle-hover="sw"]::after {
       opacity: 1;
-      background: rgba(59, 130, 246, 0.7);
+      width: 14px;
+      height: 14px;
+      bottom: 4px;
+      left: 4px;
     }
 
-    /* NE corner - reposition ::after */
     .item[data-gridiot-handle-hover="ne"]::after {
       opacity: 1;
-      bottom: auto;
-      top: 6px;
-      right: 6px;
-      background: rgba(59, 130, 246, 0.7);
-    }
-
-    /* SW corner - reposition ::before */
-    .item[data-gridiot-handle-hover="sw"]::before {
-      opacity: 1;
-      top: auto;
-      bottom: 6px;
-      left: 6px;
-      background: rgba(59, 130, 246, 0.7);
-    }
-
-    /* Active state during resize - brighter */
-    .item[data-gridiot-handle-active="se"]::after,
-    .item[data-gridiot-handle-active="ne"]::after {
-      opacity: 1;
-      background: rgba(59, 130, 246, 0.95);
-      box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
-    }
-
-    .item[data-gridiot-handle-active="nw"]::before,
-    .item[data-gridiot-handle-active="sw"]::before {
-      opacity: 1;
-      background: rgba(59, 130, 246, 0.95);
-      box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
-    }
-
-    /* Edge handles - show a line instead of a square */
-    .item[data-gridiot-handle-hover="n"]::before,
-    .item[data-gridiot-handle-hover="s"]::before {
-      opacity: 1;
-      width: calc(100% - 40px);
-      height: 4px;
-      left: 20px;
-      border-radius: 2px;
-      background: rgba(59, 130, 246, 0.7);
-    }
-
-    .item[data-gridiot-handle-hover="n"]::before {
+      width: 14px;
+      height: 14px;
       top: 4px;
-      bottom: auto;
+      right: 4px;
     }
 
-    .item[data-gridiot-handle-hover="s"]::before {
-      bottom: 4px;
-      top: auto;
-    }
-
-    .item[data-gridiot-handle-hover="e"]::after,
-    .item[data-gridiot-handle-hover="w"]::after {
+    .item[data-gridiot-handle-hover="nw"]::after {
       opacity: 1;
-      width: 4px;
-      height: calc(100% - 40px);
-      top: 20px;
-      border-radius: 2px;
-      background: rgba(59, 130, 246, 0.7);
+      width: 14px;
+      height: 14px;
+      top: 4px;
+      left: 4px;
+    }
+
+    /* Edge handles - thin bars */
+    .item[data-gridiot-handle-hover="n"]::after {
+      opacity: 1;
+      height: 4px;
+      top: 4px;
+      left: 20px;
+      right: 20px;
+    }
+
+    .item[data-gridiot-handle-hover="s"]::after {
+      opacity: 1;
+      height: 4px;
+      bottom: 4px;
+      left: 20px;
+      right: 20px;
     }
 
     .item[data-gridiot-handle-hover="e"]::after {
+      opacity: 1;
+      width: 4px;
       right: 4px;
-      left: auto;
-      bottom: auto;
+      top: 20px;
+      bottom: 20px;
     }
 
     .item[data-gridiot-handle-hover="w"]::after {
+      opacity: 1;
+      width: 4px;
       left: 4px;
-      right: auto;
-      bottom: auto;
+      top: 20px;
+      bottom: 20px;
     }
+
+    /* Active state - brighter with glow */
+    .item[data-gridiot-handle-active]::after {
+      opacity: 1;
+      background: rgba(59, 130, 246, 0.95);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+    }
+
+    /* Reposition for active state too */
+    .item[data-gridiot-handle-active="se"]::after { width: 14px; height: 14px; bottom: 4px; right: 4px; top: auto; left: auto; }
+    .item[data-gridiot-handle-active="sw"]::after { width: 14px; height: 14px; bottom: 4px; left: 4px; top: auto; right: auto; }
+    .item[data-gridiot-handle-active="ne"]::after { width: 14px; height: 14px; top: 4px; right: 4px; bottom: auto; left: auto; }
+    .item[data-gridiot-handle-active="nw"]::after { width: 14px; height: 14px; top: 4px; left: 4px; bottom: auto; right: auto; }
+    .item[data-gridiot-handle-active="n"]::after { height: 4px; top: 4px; left: 20px; right: 20px; bottom: auto; width: auto; }
+    .item[data-gridiot-handle-active="s"]::after { height: 4px; bottom: 4px; left: 20px; right: 20px; top: auto; width: auto; }
+    .item[data-gridiot-handle-active="e"]::after { width: 4px; right: 4px; top: 20px; bottom: 20px; left: auto; height: auto; }
+    .item[data-gridiot-handle-active="w"]::after { width: 4px; left: 4px; top: 20px; bottom: 20px; right: auto; height: auto; }
 
     /* Keyboard mode indicator */
     .grid[data-gridiot-keyboard-mode] {
