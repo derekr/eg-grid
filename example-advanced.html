@@ -76,6 +76,133 @@
       outline-offset: 2px;
     }
 
+    /* Resize handle indicators - visible on hover */
+    .item {
+      position: relative; /* for absolute positioning of pseudo-elements */
+    }
+
+    /* Corner resize handles using ::after */
+    .item::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease;
+      pointer-events: none;
+      border-radius: 3px;
+    }
+
+    /* Position at bottom-right by default (SE handle) */
+    .item::after {
+      bottom: 6px;
+      right: 6px;
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Show handle on SE corner hover */
+    .item[data-gridiot-handle-hover="se"]::after {
+      opacity: 1;
+      background: rgba(59, 130, 246, 0.7);
+    }
+
+    /* Second pseudo-element for opposite corner using ::before */
+    .item::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease;
+      pointer-events: none;
+      border-radius: 3px;
+      top: 6px;
+      left: 6px;
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Show handle on NW corner hover */
+    .item[data-gridiot-handle-hover="nw"]::before {
+      opacity: 1;
+      background: rgba(59, 130, 246, 0.7);
+    }
+
+    /* NE corner - reposition ::after */
+    .item[data-gridiot-handle-hover="ne"]::after {
+      opacity: 1;
+      bottom: auto;
+      top: 6px;
+      right: 6px;
+      background: rgba(59, 130, 246, 0.7);
+    }
+
+    /* SW corner - reposition ::before */
+    .item[data-gridiot-handle-hover="sw"]::before {
+      opacity: 1;
+      top: auto;
+      bottom: 6px;
+      left: 6px;
+      background: rgba(59, 130, 246, 0.7);
+    }
+
+    /* Active state during resize - brighter */
+    .item[data-gridiot-handle-active="se"]::after,
+    .item[data-gridiot-handle-active="ne"]::after {
+      opacity: 1;
+      background: rgba(59, 130, 246, 0.95);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+    }
+
+    .item[data-gridiot-handle-active="nw"]::before,
+    .item[data-gridiot-handle-active="sw"]::before {
+      opacity: 1;
+      background: rgba(59, 130, 246, 0.95);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+    }
+
+    /* Edge handles - show a line instead of a square */
+    .item[data-gridiot-handle-hover="n"]::before,
+    .item[data-gridiot-handle-hover="s"]::before {
+      opacity: 1;
+      width: calc(100% - 40px);
+      height: 4px;
+      left: 20px;
+      border-radius: 2px;
+      background: rgba(59, 130, 246, 0.7);
+    }
+
+    .item[data-gridiot-handle-hover="n"]::before {
+      top: 4px;
+      bottom: auto;
+    }
+
+    .item[data-gridiot-handle-hover="s"]::before {
+      bottom: 4px;
+      top: auto;
+    }
+
+    .item[data-gridiot-handle-hover="e"]::after,
+    .item[data-gridiot-handle-hover="w"]::after {
+      opacity: 1;
+      width: 4px;
+      height: calc(100% - 40px);
+      top: 20px;
+      border-radius: 2px;
+      background: rgba(59, 130, 246, 0.7);
+    }
+
+    .item[data-gridiot-handle-hover="e"]::after {
+      right: 4px;
+      left: auto;
+      bottom: auto;
+    }
+
+    .item[data-gridiot-handle-hover="w"]::after {
+      left: 4px;
+      right: auto;
+      bottom: auto;
+    }
+
     /* Keyboard mode indicator */
     .grid[data-gridiot-keyboard-mode] {
       outline: 2px solid rgba(251, 191, 36, 0.3);
@@ -580,14 +707,15 @@
     <h3>Gridiot Advanced Example</h3>
     <ul>
       <li><b>Mouse:</b> Click to select, drag to move</li>
-      <li><b>Shift+K:</b> Toggle keyboard mode</li>
+      <li><b>Shift+G:</b> Toggle keyboard mode</li>
       <li><b>Arrows/hjkl:</b> Nudge selected item</li>
+      <li><b>Shift+nav:</b> Resize selected item</li>
       <li><b>Ctrl+nav:</b> Jump by item size</li>
       <li><b>Alt+nav:</b> Select adjacent item</li>
       <li><b>Enter/Space:</b> Pick up / drop</li>
       <li><b>Escape:</b> Cancel / deselect</li>
       <li><b>Shift+D:</b> Toggle dev overlay</li>
-      <li><b>Corners:</b> Drag to resize items</li>
+      <li><b>Corners/edges:</b> Hover to see handles, drag to resize</li>
       <li><b>Resize window:</b> Responsive column reflow</li>
     </ul>
   </div>
@@ -729,11 +857,12 @@
       core: grid  // Register camera provider for layout coordination
     });
 
-    // Resize - drag corners to resize items
+    // Resize - drag corners/edges to resize items
     // The push algorithm now handles resize events automatically (resize-start, resize-move, resize-end)
     // so items shift in real-time during resize just like during drag
+    // Handles are now visible via CSS (data-gridiot-handle-hover attribute)
     const resize = attachResize(gridElement, {
-      handles: 'corners',
+      handles: 'all',  // 'corners' | 'edges' | 'all'
       handleSize: 16,
       minSize: { colspan: 1, rowspan: 1 },
       maxSize: { colspan: 6, rowspan: 6 },
