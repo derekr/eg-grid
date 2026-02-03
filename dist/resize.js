@@ -279,6 +279,8 @@ function attachResize(gridElement, options) {
       // Will be set below if enabled
     };
     item.setAttribute("data-gridiot-resizing", "");
+    item.setAttribute("data-gridiot-handle-active", handle);
+    item.removeAttribute("data-gridiot-handle-hover");
     item.setPointerCapture(e.pointerId);
     item.addEventListener("pointermove", onItemPointerMove);
     item.addEventListener("pointerup", onItemPointerUp);
@@ -433,22 +435,34 @@ function attachResize(gridElement, options) {
       item.style.gridColumn = `${currentCell.column} / span ${currentSize.colspan}`;
       item.style.gridRow = `${currentCell.row} / span ${currentSize.rowspan}`;
       item.removeAttribute("data-gridiot-resizing");
+      item.removeAttribute("data-gridiot-handle-active");
     };
     item.style.viewTransitionName = "none";
     applyFinalState();
     requestAnimationFrame(() => {
+      const itemId = item.style.getPropertyValue("--item-id") || item.id || item.dataset.id;
       const animation = animateFLIPWithTracking(item, firstRect, {
         includeScale: true,
         transformOrigin: "top left",
         onFinish: () => {
           item.style.transform = "";
+          item.style.gridColumn = "";
+          item.style.gridRow = "";
+          if (itemId) {
+            item.style.viewTransitionName = itemId;
+          } else {
+            item.style.viewTransitionName = "";
+          }
         }
       });
       if (!animation) {
         item.style.transform = "";
-        const itemId = item.style.getPropertyValue("--item-id") || item.id || item.dataset.id;
+        item.style.gridColumn = "";
+        item.style.gridRow = "";
         if (itemId) {
           item.style.viewTransitionName = itemId;
+        } else {
+          item.style.viewTransitionName = "";
         }
       }
     });
@@ -479,6 +493,7 @@ function attachResize(gridElement, options) {
       item.style.viewTransitionName = "";
     }
     item.removeAttribute("data-gridiot-resizing");
+    item.removeAttribute("data-gridiot-handle-active");
     emit("resize-cancel", {
       item
     });

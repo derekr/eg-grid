@@ -238,10 +238,10 @@ registerPlugin({
 						return;
 					}
 
-					// Exclude item from View Transitions during keyboard resize
-					// This prevents the item from transitioning from wrong origin
+					// Mark item as resizing so CSS can disable its View Transition animation
+					// (matches pointer resize behavior - item snaps, others animate)
 					const originalViewTransitionName = (selectedItem.style as any).viewTransitionName || '';
-					(selectedItem.style as any).viewTransitionName = 'none';
+					(selectedItem.style as any).viewTransitionName = 'resizing';
 
 					// Emit resize events for algorithm and other plugins to handle
 					// Use 'se' handle for increases, appropriate edge for decreases
@@ -260,10 +260,8 @@ registerPlugin({
 					selectedItem.setAttribute('data-gridiot-colspan', String(newColspan));
 					selectedItem.setAttribute('data-gridiot-rowspan', String(newRowspan));
 
-					// Set grid position directly - algorithm will also set CSS rules
-					// but we need inline styles for immediate visual feedback
-					selectedItem.style.gridColumn = `${currentCell.column} / span ${newColspan}`;
-					selectedItem.style.gridRow = `${currentCell.row} / span ${newRowspan}`;
+					// Don't set inline grid styles - let algorithm handle layout via CSS rules
+					// This allows View Transitions to animate other items smoothly
 
 					core.emit('resize-end', {
 						item: selectedItem,
@@ -272,10 +270,11 @@ registerPlugin({
 						rowspan: newRowspan,
 					});
 
-					// Restore viewTransitionName after a frame to allow layout to settle
-					requestAnimationFrame(() => {
+					// Restore viewTransitionName after View Transition completes (200ms)
+					// Using setTimeout since we don't have a handle to the transition
+					setTimeout(() => {
 						(selectedItem.style as any).viewTransitionName = originalViewTransitionName;
-					});
+					}, 250);
 
 					log('resize', { direction, newColspan, newRowspan });
 					return;

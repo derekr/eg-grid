@@ -211,7 +211,10 @@ export function createLayoutModel(
 
 		updateItemSize(itemId: string, size: { width: number; height: number }): void {
 			const existing = items.get(itemId);
-			if (!existing) return;
+			if (!existing) {
+				console.warn(`[layout-model] updateItemSize: item "${itemId}" not found in items Map. Available IDs:`, Array.from(items.keys()));
+				return;
+			}
 
 			// Update the item definition
 			items.set(itemId, {

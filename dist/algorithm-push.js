@@ -1,10 +1,10 @@
-// gridiot/engine.ts
+// engine.ts
 var plugins = /* @__PURE__ */ new Map();
 function registerPlugin(plugin) {
   plugins.set(plugin.name, plugin);
 }
 
-// gridiot/plugins/algorithm-push-core.ts
+// plugins/algorithm-push-core.ts
 function itemsOverlap(a, b) {
   return !(a.column + a.width <= b.column || b.column + b.width <= a.column || a.row + a.height <= b.row || b.row + b.height <= a.row);
 }
@@ -72,15 +72,16 @@ function layoutToCSS(items, options = {}) {
   const rules = [];
   for (const item of items) {
     const width = maxColumns ? Math.min(item.width, maxColumns) : item.width;
+    const column = maxColumns ? Math.max(1, Math.min(item.column, maxColumns - width + 1)) : item.column;
     const selector = `${selectorPrefix}${item.id}${selectorSuffix}${excludeSelector}`;
-    const gridColumn = `${item.column} / span ${width}`;
+    const gridColumn = `${column} / span ${width}`;
     const gridRow = `${item.row} / span ${item.height}`;
     rules.push(`${selector} { grid-column: ${gridColumn}; grid-row: ${gridRow}; }`);
   }
   return rules.join("\n");
 }
 
-// gridiot/plugins/algorithm-push.ts
+// plugins/algorithm-push.ts
 var DEBUG = false;
 function log(...args) {
   if (DEBUG) console.log("[algorithm-push]", ...args);
@@ -140,9 +141,10 @@ function attachPushAlgorithm(gridElement, options = {}) {
     item.style.gridColumn = colValue;
     item.style.gridRow = rowValue;
   }
-  function applyLayout(layout, excludeId, useViewTransition) {
+  function applyLayout(layout, excludeId, useViewTransition, onApplied) {
     const thisVersion = ++layoutVersion;
     currentLayout = layout;
+    const capturedColumnCount = dragStartColumnCount ?? resizeStartColumnCount;
     const applyChanges = () => {
       if (thisVersion !== layoutVersion) {
         return;
@@ -152,14 +154,16 @@ function attachPushAlgorithm(gridElement, options = {}) {
         const css = layoutToCSS(itemsToStyle, {
           selectorPrefix,
           selectorSuffix,
-          maxColumns: dragStartColumnCount ?? void 0
+          maxColumns: capturedColumnCount ?? void 0
         });
+        log("injecting CSS:", css.substring(0, 200) + "...");
         styleElement.textContent = css;
         const elements = gridElement.querySelectorAll("[data-gridiot-item]");
         for (const el of elements) {
           const element = el;
           const id = getItemId(element);
-          if (id !== excludeId) {
+          const vtn = element.style.viewTransitionName;
+          if (id !== excludeId && vtn !== "none") {
             element.style.gridColumn = "";
             element.style.gridRow = "";
           }
@@ -176,15 +180,25 @@ function attachPushAlgorithm(gridElement, options = {}) {
           }
         }
       }
+      if (onApplied) {
+        onApplied();
+      }
     };
     if (useViewTransition && "startViewTransition" in document) {
       log("starting view transition, excludeId:", excludeId);
       if (draggedElement && excludeId) {
         draggedElement.style.viewTransitionName = "dragging";
       }
-      document.startViewTransition(applyChanges);
+      const items = gridElement.querySelectorAll("[data-gridiot-item]");
+      for (const item of items) {
+        const el = item;
+        const vtn = getComputedStyle(el).viewTransitionName;
+        log("item", getItemId(el), "view-transition-name:", vtn);
+      }
+      const transition = document.startViewTransition(applyChanges);
+      transition.finished.then(() => log("view transition finished"));
     } else {
-      log("applying without view transition");
+      log("applying without view transition, useViewTransition:", useViewTransition, "hasAPI:", "startViewTransition" in document);
       applyChanges();
     }
   }
@@ -266,19 +280,22 @@ function attachPushAlgorithm(gridElement, options = {}) {
     }
     const useViewTransition = !isPointerDrag;
     log("drag-end useViewTransition:", useViewTransition);
-    applyLayout(finalLayout, null, useViewTransition);
-    if (layoutModel && dragStartColumnCount) {
-      const positions = /* @__PURE__ */ new Map();
-      for (const item of finalLayout) {
-        positions.set(item.id, { column: item.column, row: item.row });
+    const savedDragStartColumnCount = dragStartColumnCount;
+    const saveToLayoutModel = () => {
+      if (layoutModel && savedDragStartColumnCount) {
+        const positions = /* @__PURE__ */ new Map();
+        for (const item of finalLayout) {
+          positions.set(item.id, { column: item.column, row: item.row });
+        }
+        layoutModel.saveLayout(savedDragStartColumnCount, positions);
+        log("saved layout to model for", savedDragStartColumnCount, "columns");
+        if (styleElement) {
+          styleElement.textContent = "";
+          log("cleared preview styles");
+        }
       }
-      layoutModel.saveLayout(dragStartColumnCount, positions);
-      log("saved layout to model for", dragStartColumnCount, "columns");
-      if (styleElement) {
-        styleElement.textContent = "";
-        log("cleared preview styles");
-      }
-    }
+    };
+    applyLayout(finalLayout, null, useViewTransition, saveToLayoutModel);
     draggedItemId = null;
     draggedElement = null;
     originalPositions = null;
@@ -445,20 +462,28 @@ function attachPushAlgorithm(gridElement, options = {}) {
       "final resize layout",
       finalLayout.map((it) => ({ id: it.id, col: it.column, row: it.row, w: it.width, h: it.height }))
     );
-    applyLayout(finalLayout, null, false);
-    if (layoutModel && resizeStartColumnCount) {
-      const positions = /* @__PURE__ */ new Map();
-      for (const item of finalLayout) {
-        positions.set(item.id, { column: item.column, row: item.row });
+    const isPointerResize = resizedElement?.style.position === "fixed";
+    log("resize-end isPointerResize:", isPointerResize);
+    const useViewTransition = !isPointerResize;
+    log("resize-end: useViewTransition:", useViewTransition);
+    const savedResizedItemId = resizedItemId;
+    const savedResizeStartColumnCount = resizeStartColumnCount;
+    const saveToLayoutModel = () => {
+      if (layoutModel && savedResizeStartColumnCount) {
+        const positions = /* @__PURE__ */ new Map();
+        for (const item of finalLayout) {
+          positions.set(item.id, { column: item.column, row: item.row });
+        }
+        layoutModel.saveLayout(savedResizeStartColumnCount, positions);
+        layoutModel.updateItemSize(savedResizedItemId, { width: detail.colspan, height: detail.rowspan });
+        log("saved resize layout to model for", savedResizeStartColumnCount, "columns");
+        if (styleElement) {
+          styleElement.textContent = "";
+          log("cleared preview styles");
+        }
       }
-      layoutModel.updateItemSize(resizedItemId, { width: detail.colspan, height: detail.rowspan });
-      layoutModel.saveLayout(resizeStartColumnCount, positions);
-      log("saved resize layout to model for", resizeStartColumnCount, "columns");
-      if (styleElement) {
-        styleElement.textContent = "";
-        log("cleared preview styles");
-      }
-    }
+    };
+    applyLayout(finalLayout, null, useViewTransition, saveToLayoutModel);
     resizedItemId = null;
     resizedElement = null;
     resizeOriginalPositions = null;

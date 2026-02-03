@@ -466,7 +466,7 @@ registerPlugin({
             return;
           }
           const originalViewTransitionName = selectedItem.style.viewTransitionName || "";
-          selectedItem.style.viewTransitionName = "none";
+          selectedItem.style.viewTransitionName = "resizing";
           const handle = direction === "right" || direction === "down" ? "se" : direction === "left" ? "w" : "n";
           core.emit("resize-start", {
             item: selectedItem,
@@ -477,17 +477,15 @@ registerPlugin({
           });
           selectedItem.setAttribute("data-gridiot-colspan", String(newColspan));
           selectedItem.setAttribute("data-gridiot-rowspan", String(newRowspan));
-          selectedItem.style.gridColumn = `${currentCell.column} / span ${newColspan}`;
-          selectedItem.style.gridRow = `${currentCell.row} / span ${newRowspan}`;
           core.emit("resize-end", {
             item: selectedItem,
             cell: currentCell,
             colspan: newColspan,
             rowspan: newRowspan
           });
-          requestAnimationFrame(() => {
+          setTimeout(() => {
             selectedItem.style.viewTransitionName = originalViewTransitionName;
-          });
+          }, 250);
           log("resize", { direction, newColspan, newRowspan });
           return;
         }
@@ -1491,18 +1489,29 @@ function attachResize(gridElement, options) {
     item.style.viewTransitionName = "none";
     applyFinalState();
     requestAnimationFrame(() => {
+      const itemId = item.style.getPropertyValue("--item-id") || item.id || item.dataset.id;
       const animation = animateFLIPWithTracking(item, firstRect, {
         includeScale: true,
         transformOrigin: "top left",
         onFinish: () => {
           item.style.transform = "";
+          item.style.gridColumn = "";
+          item.style.gridRow = "";
+          if (itemId) {
+            item.style.viewTransitionName = itemId;
+          } else {
+            item.style.viewTransitionName = "";
+          }
         }
       });
       if (!animation) {
         item.style.transform = "";
-        const itemId = item.style.getPropertyValue("--item-id") || item.id || item.dataset.id;
+        item.style.gridColumn = "";
+        item.style.gridRow = "";
         if (itemId) {
           item.style.viewTransitionName = itemId;
+        } else {
+          item.style.viewTransitionName = "";
         }
       }
     });
@@ -1957,9 +1966,10 @@ function attachPushAlgorithm(gridElement, options = {}) {
     item.style.gridColumn = colValue;
     item.style.gridRow = rowValue;
   }
-  function applyLayout(layout, excludeId, useViewTransition) {
+  function applyLayout(layout, excludeId, useViewTransition, onApplied) {
     const thisVersion = ++layoutVersion;
     currentLayout = layout;
+    const capturedColumnCount = dragStartColumnCount ?? resizeStartColumnCount;
     const applyChanges = () => {
       if (thisVersion !== layoutVersion) {
         return;
@@ -1969,14 +1979,16 @@ function attachPushAlgorithm(gridElement, options = {}) {
         const css = layoutToCSS(itemsToStyle, {
           selectorPrefix,
           selectorSuffix,
-          maxColumns: dragStartColumnCount ?? void 0
+          maxColumns: capturedColumnCount ?? void 0
         });
+        log3("injecting CSS:", css.substring(0, 200) + "...");
         styleElement.textContent = css;
         const elements = gridElement.querySelectorAll("[data-gridiot-item]");
         for (const el of elements) {
           const element = el;
           const id = getItemId(element);
-          if (id !== excludeId) {
+          const vtn = element.style.viewTransitionName;
+          if (id !== excludeId && vtn !== "none") {
             element.style.gridColumn = "";
             element.style.gridRow = "";
           }
@@ -1993,15 +2005,25 @@ function attachPushAlgorithm(gridElement, options = {}) {
           }
         }
       }
+      if (onApplied) {
+        onApplied();
+      }
     };
     if (useViewTransition && "startViewTransition" in document) {
       log3("starting view transition, excludeId:", excludeId);
       if (draggedElement && excludeId) {
         draggedElement.style.viewTransitionName = "dragging";
       }
-      document.startViewTransition(applyChanges);
+      const items = gridElement.querySelectorAll("[data-gridiot-item]");
+      for (const item of items) {
+        const el = item;
+        const vtn = getComputedStyle(el).viewTransitionName;
+        log3("item", getItemId(el), "view-transition-name:", vtn);
+      }
+      const transition = document.startViewTransition(applyChanges);
+      transition.finished.then(() => log3("view transition finished"));
     } else {
-      log3("applying without view transition");
+      log3("applying without view transition, useViewTransition:", useViewTransition, "hasAPI:", "startViewTransition" in document);
       applyChanges();
     }
   }
@@ -2083,19 +2105,22 @@ function attachPushAlgorithm(gridElement, options = {}) {
     }
     const useViewTransition = !isPointerDrag;
     log3("drag-end useViewTransition:", useViewTransition);
-    applyLayout(finalLayout, null, useViewTransition);
-    if (layoutModel && dragStartColumnCount) {
-      const positions = /* @__PURE__ */ new Map();
-      for (const item of finalLayout) {
-        positions.set(item.id, { column: item.column, row: item.row });
+    const savedDragStartColumnCount = dragStartColumnCount;
+    const saveToLayoutModel = () => {
+      if (layoutModel && savedDragStartColumnCount) {
+        const positions = /* @__PURE__ */ new Map();
+        for (const item of finalLayout) {
+          positions.set(item.id, { column: item.column, row: item.row });
+        }
+        layoutModel.saveLayout(savedDragStartColumnCount, positions);
+        log3("saved layout to model for", savedDragStartColumnCount, "columns");
+        if (styleElement) {
+          styleElement.textContent = "";
+          log3("cleared preview styles");
+        }
       }
-      layoutModel.saveLayout(dragStartColumnCount, positions);
-      log3("saved layout to model for", dragStartColumnCount, "columns");
-      if (styleElement) {
-        styleElement.textContent = "";
-        log3("cleared preview styles");
-      }
-    }
+    };
+    applyLayout(finalLayout, null, useViewTransition, saveToLayoutModel);
     draggedItemId = null;
     draggedElement = null;
     originalPositions = null;
@@ -2262,20 +2287,28 @@ function attachPushAlgorithm(gridElement, options = {}) {
       "final resize layout",
       finalLayout.map((it) => ({ id: it.id, col: it.column, row: it.row, w: it.width, h: it.height }))
     );
-    applyLayout(finalLayout, null, false);
-    if (layoutModel && resizeStartColumnCount) {
-      const positions = /* @__PURE__ */ new Map();
-      for (const item of finalLayout) {
-        positions.set(item.id, { column: item.column, row: item.row });
+    const isPointerResize = resizedElement?.style.position === "fixed";
+    log3("resize-end isPointerResize:", isPointerResize);
+    const useViewTransition = !isPointerResize;
+    log3("resize-end: useViewTransition:", useViewTransition);
+    const savedResizedItemId = resizedItemId;
+    const savedResizeStartColumnCount = resizeStartColumnCount;
+    const saveToLayoutModel = () => {
+      if (layoutModel && savedResizeStartColumnCount) {
+        const positions = /* @__PURE__ */ new Map();
+        for (const item of finalLayout) {
+          positions.set(item.id, { column: item.column, row: item.row });
+        }
+        layoutModel.saveLayout(savedResizeStartColumnCount, positions);
+        layoutModel.updateItemSize(savedResizedItemId, { width: detail.colspan, height: detail.rowspan });
+        log3("saved resize layout to model for", savedResizeStartColumnCount, "columns");
+        if (styleElement) {
+          styleElement.textContent = "";
+          log3("cleared preview styles");
+        }
       }
-      layoutModel.updateItemSize(resizedItemId, { width: detail.colspan, height: detail.rowspan });
-      layoutModel.saveLayout(resizeStartColumnCount, positions);
-      log3("saved resize layout to model for", resizeStartColumnCount, "columns");
-      if (styleElement) {
-        styleElement.textContent = "";
-        log3("cleared preview styles");
-      }
-    }
+    };
+    applyLayout(finalLayout, null, useViewTransition, saveToLayoutModel);
     resizedItemId = null;
     resizedElement = null;
     resizeOriginalPositions = null;
@@ -2594,7 +2627,10 @@ function createLayoutModel(options) {
     },
     updateItemSize(itemId, size) {
       const existing = items.get(itemId);
-      if (!existing) return;
+      if (!existing) {
+        console.warn(`[layout-model] updateItemSize: item "${itemId}" not found in items Map. Available IDs:`, Array.from(items.keys()));
+        return;
+      }
       items.set(itemId, {
         id: itemId,
         width: size.width,

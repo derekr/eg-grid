@@ -192,12 +192,17 @@ export function attachPushAlgorithm(
 		layout: ItemRect[],
 		excludeId: string | null,
 		useViewTransition: boolean,
+		onApplied?: () => void,
 	): void {
 		// Increment version to invalidate any pending async transitions
 		const thisVersion = ++layoutVersion;
 
 		// Update current layout for provider access
 		currentLayout = layout;
+
+		// Capture column count NOW, before the async callback runs
+		// (the state variables get cleared after applyLayout returns)
+		const capturedColumnCount = dragStartColumnCount ?? resizeStartColumnCount;
 
 		const applyChanges = () => {
 			// Skip if a newer layout has been applied (stale async view transition)
@@ -211,12 +216,13 @@ export function attachPushAlgorithm(
 				const itemsToStyle = excludeId
 					? layout.filter((item) => item.id !== excludeId)
 					: layout;
-				// Use dragStartColumnCount to clamp widths and prevent implicit column creation
+				// Use the captured column count to clamp widths and prevent implicit column creation
 				const css = layoutToCSS(itemsToStyle, {
 					selectorPrefix,
 					selectorSuffix,
-					maxColumns: dragStartColumnCount ?? undefined,
+					maxColumns: capturedColumnCount ?? undefined,
 				});
+				log('injecting CSS:', css.substring(0, 200) + '...');
 				styleElement.textContent = css;
 
 				// Clear inline grid styles so CSS rules take effect
@@ -225,7 +231,11 @@ export function attachPushAlgorithm(
 				for (const el of elements) {
 					const element = el as HTMLElement;
 					const id = getItemId(element);
-					if (id !== excludeId) {
+					// Don't clear styles for:
+					// 1. The excluded item (being dragged with fixed positioning)
+					// 2. Items with viewTransitionName='none' (being FLIP-animated by resize plugin)
+					const vtn = element.style.viewTransitionName;
+					if (id !== excludeId && vtn !== 'none') {
 						element.style.gridColumn = '';
 						element.style.gridRow = '';
 					}
@@ -244,6 +254,13 @@ export function attachPushAlgorithm(
 					}
 				}
 			}
+
+			// Call onApplied callback after CSS changes are made
+			// This runs inside the View Transition callback, so layoutModel updates
+			// happen after the "new" state is captured
+			if (onApplied) {
+				onApplied();
+			}
 		};
 
 		if (useViewTransition && 'startViewTransition' in document) {
@@ -253,9 +270,17 @@ export function attachPushAlgorithm(
 			if (draggedElement && excludeId) {
 				draggedElement.style.viewTransitionName = 'dragging';
 			}
-			(document as any).startViewTransition(applyChanges);
+			// Log items' view-transition-names before transition
+			const items = gridElement.querySelectorAll('[data-gridiot-item]');
+			for (const item of items) {
+				const el = item as HTMLElement;
+				const vtn = getComputedStyle(el).viewTransitionName;
+				log('item', getItemId(el), 'view-transition-name:', vtn);
+			}
+			const transition = (document as any).startViewTransition(applyChanges);
+			transition.finished.then(() => log('view transition finished'));
 		} else {
-			log('applying without view transition');
+			log('applying without view transition, useViewTransition:', useViewTransition, 'hasAPI:', 'startViewTransition' in document);
 			applyChanges();
 		}
 	}
@@ -360,35 +385,42 @@ export function attachPushAlgorithm(
 		const isPointerDrag = draggedElement?.style.position === 'fixed';
 		log('drag-end isPointerDrag:', isPointerDrag, 'position:', draggedElement?.style.position);
 
-		// Clear the 'dragging' viewTransitionName only if it was set (during pointer drag)
-		// Don't clear for keyboard nudges - they need the CSS view-transition-name to animate
+		// Clear the 'dragging' viewTransitionName so CSS view-transition-name applies
 		if (draggedElement && draggedElement.style.viewTransitionName === 'dragging') {
 			draggedElement.style.viewTransitionName = '';
 		}
 
-		// For pointer drags, apply synchronously (pointer's FLIP animates the dropped item)
-		// For keyboard nudges, use view transitions to animate
+		// For pointer drag: don't use View Transitions - other items are already in position
+		// from drag-move, and FLIP handles the dropped item. Using VT would conflict with FLIP.
+		// For keyboard nudge: use View Transitions to animate all items.
 		const useViewTransition = !isPointerDrag;
 		log('drag-end useViewTransition:', useViewTransition);
-		applyLayout(finalLayout, null, useViewTransition);
 
-		// Save to layout model if provided (triggers CSS regeneration via responsive plugin)
-		if (layoutModel && dragStartColumnCount) {
-			// Use dragStartColumnCount captured at drag start, not getCurrentColumnCount()
-			// getCurrentColumnCount() may be wrong if preview CSS created implicit columns
-			const positions = new Map<string, ItemPosition>();
-			for (const item of finalLayout) {
-				positions.set(item.id, { column: item.column, row: item.row });
-			}
-			layoutModel.saveLayout(dragStartColumnCount, positions);
-			log('saved layout to model for', dragStartColumnCount, 'columns');
+		// Capture values needed for the callback before clearing state
+		const savedDragStartColumnCount = dragStartColumnCount;
 
-			// Clear preview styles so container query CSS takes over
-			if (styleElement) {
-				styleElement.textContent = '';
-				log('cleared preview styles');
+		// Callback to save layout - runs inside View Transition callback so it happens
+		// AFTER the new state is captured (prevents layout-styles from updating too early)
+		const saveToLayoutModel = () => {
+			if (layoutModel && savedDragStartColumnCount) {
+				const positions = new Map<string, ItemPosition>();
+				for (const item of finalLayout) {
+					positions.set(item.id, { column: item.column, row: item.row });
+				}
+				layoutModel.saveLayout(savedDragStartColumnCount, positions);
+				log('saved layout to model for', savedDragStartColumnCount, 'columns');
+
+				// Clear preview styles so container query CSS (layout-styles) takes over.
+				// This is safe because layoutModel now has the correct positions, and
+				// we're inside the View Transition callback so any mismatch gets animated.
+				if (styleElement) {
+					styleElement.textContent = '';
+					log('cleared preview styles');
+				}
 			}
-		}
+		};
+
+		applyLayout(finalLayout, null, useViewTransition, saveToLayoutModel);
 
 		draggedItemId = null;
 		draggedElement = null;
@@ -612,27 +644,46 @@ export function attachPushAlgorithm(
 			finalLayout.map((it) => ({ id: it.id, col: it.column, row: it.row, w: it.width, h: it.height })),
 		);
 
-		// Items are already at their positions from resize-move animations.
-		// Apply final layout without view transition (same as pointer drag-end)
-		applyLayout(finalLayout, null, false);
+		// Check if this is a pointer resize (item is in fixed position) or keyboard resize
+		const isPointerResize = resizedElement?.style.position === 'fixed';
+		log('resize-end isPointerResize:', isPointerResize);
 
-		// Save to layout model if provided
-		if (layoutModel && resizeStartColumnCount) {
-			// Use resizeStartColumnCount captured at resize start, not getCurrentColumnCount()
-			const positions = new Map<string, ItemPosition>();
-			for (const item of finalLayout) {
-				positions.set(item.id, { column: item.column, row: item.row });
-			}
-			layoutModel.updateItemSize(resizedItemId, { width: detail.colspan, height: detail.rowspan });
-			layoutModel.saveLayout(resizeStartColumnCount, positions);
-			log('saved resize layout to model for', resizeStartColumnCount, 'columns');
+		// For pointer resize: don't use View Transitions - other items are already in position
+		// from resize-move, and FLIP handles the resized item. Using VT would conflict with FLIP.
+		// For keyboard resize: use View Transitions to animate all items.
+		const useViewTransition = !isPointerResize;
+		log('resize-end: useViewTransition:', useViewTransition);
 
-			// Clear preview styles so container query CSS takes over
-			if (styleElement) {
-				styleElement.textContent = '';
-				log('cleared preview styles');
+		// Capture values needed for the callback before clearing state
+		const savedResizedItemId = resizedItemId;
+		const savedResizeStartColumnCount = resizeStartColumnCount;
+
+		// Callback to save layout - runs inside View Transition callback so it happens
+		// AFTER the new state is captured (prevents layout-styles from updating too early)
+		const saveToLayoutModel = () => {
+			if (layoutModel && savedResizeStartColumnCount) {
+				const positions = new Map<string, ItemPosition>();
+				for (const item of finalLayout) {
+					positions.set(item.id, { column: item.column, row: item.row });
+				}
+				// Save positions first, then update size. This order ensures the intermediate
+				// CSS state (old size + new positions) is valid, rather than (new size + old positions)
+				// which could cause overlapping items.
+				layoutModel.saveLayout(savedResizeStartColumnCount, positions);
+				layoutModel.updateItemSize(savedResizedItemId!, { width: detail.colspan, height: detail.rowspan });
+				log('saved resize layout to model for', savedResizeStartColumnCount, 'columns');
+
+				// Clear preview styles so container query CSS (layout-styles) takes over.
+				// This is safe because layoutModel now has the correct positions/sizes, and
+				// we're inside the View Transition callback so any mismatch gets animated.
+				if (styleElement) {
+					styleElement.textContent = '';
+					log('cleared preview styles');
+				}
 			}
-		}
+		};
+
+		applyLayout(finalLayout, null, useViewTransition, saveToLayoutModel);
 
 		resizedItemId = null;
 		resizedElement = null;
