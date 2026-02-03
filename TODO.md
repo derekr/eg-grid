@@ -2,6 +2,35 @@
 
 Tasks to achieve feature parity with the grid-layout.html prototype.
 
+## Current State (Feb 2026)
+
+**Core features complete:**
+- ✅ Push-down collision algorithm with compaction
+- ✅ View Transitions for smooth animations
+- ✅ Multi-cell items (colspan/rowspan)
+- ✅ Selection state with visual feedback
+- ✅ Keyboard navigation (Shift+G mode, hjkl/arrows, modifiers)
+- ✅ Resize plugin (corner/edge resize with FLIP)
+- ✅ Camera plugin (auto-scroll, edge detection)
+- ✅ Placeholder plugin (drop target indicator)
+- ✅ Dev overlay (Shift+D debug panel)
+- ✅ Responsive layout model (container queries)
+
+**Recent cleanup (this session):**
+- Removed ~235 lines from resize.ts (debug infra + fallback core)
+- `core` now required in ResizeOptions
+- resize.ts: 793 lines (down from ~1028)
+
+**Remaining work:**
+- 📋 Medium Priority: Styleable resize handles (CSS customization + custom DOM)
+- 📋 Medium Priority: Resize cleanup (unify size calc, extract pure algorithm)
+- 📋 Low Priority: Additional algorithm plugins (swap, insert, reorder, snap)
+- 📋 Low Priority: Physics effects (velocity-based card tilt)
+- 📋 Low Priority: Manual compact action (C key)
+- 📝 Documentation: Responsive usage, algorithm differences
+
+---
+
 ## High Priority
 
 ### Refactor Algorithm Plugins to Be Pure (No DOM)
@@ -45,7 +74,7 @@ The prototype tracks a `selectedItemId` with visual feedback (yellow outline). G
 - [x] Emit select on click (pointer plugin)
 - [x] Emit deselect on Escape or click outside (keyboard plugin)
 - [x] Add `data-gridiot-selected` attribute for CSS styling
-- [ ] Document selection API in README
+- [x] Document selection API in README (events + styling documented)
 
 **Blocked by:** Nothing
 
@@ -106,120 +135,298 @@ The push algorithm now supports configurable options.
 - [x] Update `AttachPushAlgorithmOptions` with `compaction` option
 - [x] Implement `compaction: boolean` option (default: true)
 - [x] `nudgeAmount` already implemented via Ctrl+nav in keyboard plugin
-- [ ] Document options in README
+- [x] Document options in README (compaction option documented in Push Algorithm section)
 
 **Blocked by:** Nothing
 
 ---
 
 ### Additional Layout Algorithms
-**Status:** Files exist but not integrated
+**Status:** Not started
 **Complexity:** Medium per algorithm
 **Files:** `plugins/algorithm-*.ts`
 
 The prototype supports 5 algorithms. Gridiot has:
-- ✅ push-down (implemented)
-- ⬜ reorder (file exists: `algorithm-reorder.ts`)
-- ⬜ swap (file exists: `algorithm-swap.ts`)
-- ⬜ insert (file exists: `algorithm-insert.ts`)
-- ⬜ snap-to-gap (file exists: `algorithm-snap.ts`)
+- ✅ push-down (implemented as `algorithm-push.ts`)
+- ⬜ reorder (not implemented)
+- ⬜ swap (not implemented, but custom example in README)
+- ⬜ insert (not implemented, but custom example in README)
+- ⬜ snap-to-gap (not implemented)
 
 **Tasks:**
-- [ ] Verify reorder algorithm works with current event model
-- [ ] Verify swap algorithm works with current event model
-- [ ] Verify insert algorithm works with current event model
-- [ ] Verify snap-to-gap algorithm works with current event model
+- [ ] Create `algorithm-swap.ts` plugin
+- [ ] Create `algorithm-insert.ts` plugin
+- [ ] Create `algorithm-reorder.ts` plugin
+- [ ] Create `algorithm-snap.ts` plugin
 - [ ] Add algorithm selection example
 - [ ] Document algorithm differences in README
 
-**Blocked by:** Nothing (but keyboard navigation needs algorithm support)
+**Blocked by:** Nothing
 
 ---
 
 ### Item Resize Plugin
-**Status:** Not started
+**Status:** ✅ Completed (needs cleanup)
 **Complexity:** Medium-High
-**Files:** `plugins/resize.ts` (new)
+**Files:** `plugins/resize.ts`
 
-Allow users to resize items by dragging corners/edges. Resizes adjust colspan/rowspan.
+Resize plugin is functional. Users can resize items by dragging corners/edges with smooth visual feedback during drag and snap-to-grid on release.
 
-**Core behavior:**
-- Grab any corner to resize (default: all 4 corners, configurable)
-- Drag to resize - smooth visual expansion during drag
-- Snap to grid units (cells) on release
-- Respects min/max constraints (e.g., min 1x1, max 4x4)
+**Implemented:**
+- [x] Corner/edge detection and resize initiation
+- [x] Smooth visual resize during drag (position: fixed)
+- [x] Snap-to-grid logic on release
+- [x] FLIP animation for transition back to grid
+- [x] Size label during resize ("2×3")
+- [x] Emit resize events (resize-start, resize-move, resize-end, resize-cancel)
+- [x] Integration with push algorithm (collisions handled)
+- [x] External API for programmatic resize (`setSize`)
+- [x] Configurable min/max size constraints
+- [x] Provider registration for inter-plugin state access
+- [x] Works in responsive layouts (multiple viewport sizes)
 
-**UX details (to refine):**
-- During drag: smooth interpolated size (not snapped)
-- Visual feedback: show target size (e.g., "2×3" label or ghost outline)
-- On release: snap to nearest grid unit
-- Consider: magnetic snapping as you approach unit boundaries?
+**Not implemented:**
+- [ ] Aspect ratio presets (`setAspectRatio`)
+- [ ] Styleable resize handles (see dedicated section below)
 
-**Styling (customizable like placeholder):**
-- Resize handles (corner/edge indicators)
-- Resize preview/ghost
-- Active resize state on item
-- CSS classes: `.gridiot-resize-handle`, `[data-gridiot-resizing]`
+**Blocked by:** Nothing
 
-**Events:**
-```typescript
-gridiot:resize-start  { item, originalSize: { colspan, rowspan } }
-gridiot:resize-move   { item, currentSize: { colspan, rowspan }, preview: { width, height } }
-gridiot:resize-end    { item, newSize: { colspan, rowspan } }
-gridiot:resize-cancel { item }
+---
+
+### Styleable Resize Handles
+**Status:** Not started
+**Complexity:** Medium
+**Files:** `plugins/resize.ts`
+
+Currently resize handles are invisible hit zones with cursor changes on hover. Users cannot style or customize the handles visually.
+
+**Goals:**
+1. CSS-first: Users can style handles with pure CSS using data attributes
+2. Flexible: Users can provide custom DOM or render functions for full control
+3. Backward compatible: Hit detection still works, visible handles are opt-in
+
+**Current behavior:**
+```
+┌─────────────────────────────┐
+│  (invisible 12px hit zone)  │
+│  ┌───────────────────────┐  │
+│  │                       │  │
+│  │     Grid Item         │  │
+│  │                       │  │
+│  └───────────────────────┘  │
+│                             │
+└─────────────────────────────┘
+Cursor changes on hover, no visible handles
 ```
 
-**External trigger API:**
+**Proposed API:**
+
 ```typescript
-const resize = attachResize(gridElement, options);
+attachResize(gridElement, {
+  core,
+  handles: 'corners',      // which handles to enable
+  handleSize: 12,          // hit zone size (existing)
 
-// Programmatic resize (e.g., from aspect ratio buttons)
-resize.setSize(item, { colspan: 2, rowspan: 2 });
+  // NEW: Visual handle options
+  showHandles: true,       // inject visible handle elements (default: false)
+  handleClass: 'my-handle', // CSS class for handles (default: 'gridiot-resize-handle')
 
-// Preset aspect ratios
-resize.setAspectRatio(item, '16:9');  // Calculates best fit
-resize.setAspectRatio(item, '1:1');   // Square
+  // OR: Full customization
+  renderHandle: (handle: ResizeHandle, item: HTMLElement) => HTMLElement,
+
+  // OR: Use existing DOM
+  handleSelector: '[data-resize-handle]',  // find handles within items
+});
 ```
 
-**Configuration options:**
-```typescript
-{
-  handles: 'corners' | 'edges' | 'all',     // Which handles to show
-  handleSize: 12,                            // Handle hit area in pixels
-  minSize: { colspan: 1, rowspan: 1 },       // Minimum allowed size
-  maxSize: { colspan: 6, rowspan: 6 },       // Maximum allowed size
-  snapThreshold: 0.3,                        // Fraction of cell to trigger snap preview
-  showSizeLabel: true,                       // Show "2×3" during resize
-  handleClassName: 'gridiot-resize-handle',  // Custom handle styling
-  core: GridiotCore                          // For provider registration
+**Implementation approaches:**
+
+**Option A: Injected handle elements (recommended default)**
+```html
+<!-- Plugin injects these into each grid item -->
+<div class="gridiot-resize-handle" data-handle="se"></div>
+<div class="gridiot-resize-handle" data-handle="sw"></div>
+<!-- etc. -->
+```
+
+```css
+/* User styles with CSS */
+.gridiot-resize-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: transparent;
+}
+.gridiot-resize-handle[data-handle="se"] {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+}
+.gridiot-resize-handle[data-handle="se"]:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+/* Active state during resize */
+[data-gridiot-resizing] .gridiot-resize-handle[data-handle="se"] {
+  background: rgba(59, 130, 246, 0.8);
 }
 ```
 
-**Integration with layout:**
-- On resize-end, update item's `data-gridiot-colspan`/`data-gridiot-rowspan`
-- Trigger layout recalculation (push other items if needed)
-- Save to layoutModel if provided (like drag does)
+**Option B: Data attributes on item (CSS-only, no injected DOM)**
+```html
+<!-- Plugin adds attributes on hover -->
+<div data-gridiot-item data-gridiot-handle-hover="se">
+```
+
+```css
+/* User styles with pseudo-elements */
+[data-gridiot-item]::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+[data-gridiot-item][data-gridiot-handle-hover]::after {
+  opacity: 1;
+  background: url('resize-icon.svg');
+}
+```
+
+**Option C: Custom render function (full control)**
+```typescript
+attachResize(gridElement, {
+  core,
+  renderHandle: (handle, item) => {
+    const el = document.createElement('div');
+    el.className = `custom-handle custom-handle-${handle}`;
+    el.innerHTML = '<svg>...</svg>';
+    return el;
+  },
+});
+```
+
+**Option D: Use existing DOM elements**
+```html
+<!-- User provides handle elements in their HTML -->
+<div data-gridiot-item>
+  <div data-resize-handle="se" class="my-corner"></div>
+  Content...
+</div>
+```
+
+```typescript
+attachResize(gridElement, {
+  core,
+  handleSelector: '[data-resize-handle]',
+  // Plugin reads data-resize-handle value to determine handle type
+});
+```
 
 **Tasks:**
-- [ ] Design resize handle UI (CSS-only? pseudo-elements? injected elements?)
-- [ ] Implement corner detection and resize initiation
-- [ ] Track resize delta and calculate new colspan/rowspan
-- [ ] Smooth visual resize during drag (transform: scale or actual size?)
-- [ ] Snap-to-grid logic on release
-- [ ] Emit resize events
-- [ ] Integrate with push algorithm (resize may cause collisions)
-- [ ] External API for programmatic resize
-- [ ] Aspect ratio presets
-- [ ] Add to example-advanced.html with dev overlay toggle
-- [ ] Handle interaction with drag (don't start drag when clicking handle)
 
-**Decisions:**
-- Use actual grid changes during resize (like drag preview), not CSS transform
-- Persist only on mouseup (same pattern as drag-end)
-- No built-in undo - caller manages persistence via events
+Phase 1 - Data attributes (minimal, CSS-only):
+- [ ] Add `data-gridiot-handle-hover="se"` to item on handle hover
+- [ ] Add `data-gridiot-handle-active="se"` during resize
+- [ ] Document CSS patterns for pseudo-element handles
+- [ ] No DOM injection, backward compatible
 
-**Open question:**
-- How to handle resize that would cause overflow (item pushed off grid)?
+Phase 2 - Injected handles (opt-in):
+- [ ] Add `showHandles: boolean` option (default: false)
+- [ ] Create handle elements for each enabled handle type
+- [ ] Position handles absolutely within items
+- [ ] Add `handleClass` option for custom class name
+- [ ] Clean up handles on destroy
+- [ ] Handle dynamic items (MutationObserver or manual refresh)
+
+Phase 3 - Custom handles (full flexibility):
+- [ ] Add `renderHandle` callback option
+- [ ] Add `handleSelector` option for existing DOM
+- [ ] Support both approaches simultaneously
+- [ ] Document customization patterns in README
+
+**Default CSS (injectable):**
+```typescript
+// Optional: attachResizeStyles() like placeholder plugin
+export function attachResizeStyles() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .gridiot-resize-handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      z-index: 10;
+    }
+    .gridiot-resize-handle[data-handle="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+    .gridiot-resize-handle[data-handle="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
+    .gridiot-resize-handle[data-handle="ne"] { top: 0; right: 0; cursor: nesw-resize; }
+    .gridiot-resize-handle[data-handle="nw"] { top: 0; left: 0; cursor: nwse-resize; }
+    /* Edge handles */
+    .gridiot-resize-handle[data-handle="n"] { top: 0; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
+    .gridiot-resize-handle[data-handle="s"] { bottom: 0; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
+    .gridiot-resize-handle[data-handle="e"] { right: 0; top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }
+    .gridiot-resize-handle[data-handle="w"] { left: 0; top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }
+  `;
+  document.head.appendChild(style);
+}
+```
+
+**Blocked by:** Nothing
+
+---
+
+### Resize Plugin Cleanup
+**Status:** In Progress
+**Complexity:** Medium
+**Files:** `plugins/resize.ts`, `plugins/resize-core.ts` (new)
+
+The resize plugin works but has accumulated complexity from debugging and experimental approaches. These tasks would bring it closer to project principles.
+
+**High Priority:**
+
+- [x] **Strip debug infrastructure** (~100 lines)
+  - Removed `debugResize()` function and all calls
+  - Removed `DEBUG` constant and `log()` function
+
+- [x] **Remove fallback core implementation** (~65 lines)
+  - `core` parameter is now required
+  - Removed mock core fallback (was ~70 lines)
+
+**Medium Priority:**
+
+- [ ] **Unify size calculation**
+  - Currently two parallel systems:
+    1. `calculateNewSize()` (lines 146-246): cell-based from pointer position
+    2. Inline ratio calculation (lines 576-626): pixel-based with threshold snapping
+  - These can produce different results (tracked at line 678)
+  - Pick one approach and remove the other
+
+- [ ] **Extract pure algorithm** (`plugins/resize-core.ts`)
+  - Create pure function with no DOM access
+  - Input: grid dimensions, handle, pointer position, constraints
+  - Output: new cell position and span
+  - Matches `algorithm-push-core.ts` pattern
+  - Enables unit testing without DOM
+
+- [ ] **Simplify threshold logic**
+  - Current: asymmetric thresholds (0.3 grow, 0.7 shrink) with direction-dependent behavior
+  - Simpler: single threshold, snap to nearest cell boundary
+  - Lines 586-626 could be ~10 lines instead of ~40
+
+**Low Priority:**
+
+- [ ] **Consider View Transitions instead of FLIP**
+  - CLAUDE.md: "Always use View Transitions when available"
+  - Currently disabled: `viewTransitionName = 'none'` (line 809)
+  - FLIP works but is more JavaScript, less "Platform First"
+  - May require careful testing to avoid the bugs we just fixed
+
+**Metrics:**
+- Current line count: ~793 (down from ~1028)
+- Target after full cleanup: ~700-750
+- Reference: `algorithm-push-core.ts` for pure algorithm pattern
 
 **Blocked by:** Nothing
 
@@ -575,7 +782,7 @@ The `is-dragging` class is added to `document.body` during drag to allow CSS lik
 **Tasks:**
 - [x] Add `document.body.classList.add('is-dragging')` on drag start
 - [x] Remove class on drag end/cancel
-- [ ] Document CSS class in README
+- [x] Document CSS class in README (Body Class section)
 
 **Blocked by:** Nothing
 
@@ -617,6 +824,7 @@ The prototype has a "Compact Now" button and C key shortcut.
 - [x] Provider registry for inter-plugin communication
 - [x] Predictive placeholder (leads ahead in movement direction)
 - [x] Camera plugin (auto-scroll, edge detection, CSS scroll-margin)
+- [x] Resize plugin (corner/edge resize with FLIP animation)
 
 ---
 
@@ -645,16 +853,17 @@ gridiot:resize-end     { item, newSize: { colspan, rowspan } }
 gridiot:resize-cancel  { item }
 ```
 
-### Architecture Decisions Needed
+### Architecture Decisions (Resolved)
 
-1. **Selection state ownership:** Should selection state live in core or be a plugin?
-   - Pro core: Simpler coordination between plugins
-   - Pro plugin: Keeps core minimal
+1. **Selection state ownership:** ✅ Lives in core
+   - `core.selectedItem`, `core.select()`, `core.deselect()`
+   - Plugins coordinate via events and core API
 
-2. **Responsive layout approach:**
-   - CSS-driven (container queries) vs JS-driven (resize observer)
-   - Where to store layout overrides (memory vs localStorage vs callback)
+2. **Responsive layout approach:** ✅ Container queries + JS model
+   - `layout-model.ts` stores canonical + per-breakpoint overrides
+   - `responsive.ts` uses ResizeObserver to detect column count
+   - CSS generated via container queries
 
-3. **Algorithm plugin interface:**
-   - Should algorithms be swappable at runtime?
-   - How to handle different algorithms for drag vs keyboard?
+3. **Algorithm plugin interface:** ✅ Event-based
+   - Algorithms listen to drag events, no runtime swapping needed
+   - Keyboard/pointer both emit same events, algorithm handles both
