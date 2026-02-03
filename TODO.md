@@ -194,7 +194,7 @@ Resize plugin is functional. Users can resize items by dragging corners/edges wi
 ---
 
 ### Styleable Resize Handles
-**Status:** Not started
+**Status:** Phase 1 Complete (CSS-only via data attributes)
 **Complexity:** Medium
 **Files:** `plugins/resize.ts`
 
@@ -327,11 +327,11 @@ attachResize(gridElement, {
 
 **Tasks:**
 
-Phase 1 - Data attributes (minimal, CSS-only):
-- [ ] Add `data-gridiot-handle-hover="se"` to item on handle hover
-- [ ] Add `data-gridiot-handle-active="se"` during resize
-- [ ] Document CSS patterns for pseudo-element handles
-- [ ] No DOM injection, backward compatible
+Phase 1 - Data attributes (minimal, CSS-only): ✅ Complete
+- [x] Add `data-gridiot-handle-hover="se"` to item on handle hover
+- [x] Add `data-gridiot-handle-active="se"` during resize
+- [x] Document CSS patterns for pseudo-element handles (README updated)
+- [x] No DOM injection, backward compatible
 
 Phase 2 - Injected handles (opt-in):
 - [ ] Add `showHandles: boolean` option (default: false)

@@ -346,6 +346,8 @@ export function attachResize(
 		};
 
 		item.setAttribute('data-gridiot-resizing', '');
+		item.setAttribute('data-gridiot-handle-active', handle);
+		item.removeAttribute('data-gridiot-handle-hover'); // Clear hover state
 		item.setPointerCapture(e.pointerId);
 
 		// Add event listeners to item (pointer capture sends events to this element)
@@ -572,6 +574,7 @@ export function attachResize(
 			item.style.gridRow = `${currentCell.row} / span ${currentSize.rowspan}`;
 
 			item.removeAttribute('data-gridiot-resizing');
+			item.removeAttribute('data-gridiot-handle-active');
 		};
 
 		// Exclude from View Transitions during FLIP animation
@@ -643,6 +646,7 @@ export function attachResize(
 		}
 
 		item.removeAttribute('data-gridiot-resizing');
+		item.removeAttribute('data-gridiot-handle-active');
 
 		emit<ResizeCancelDetail>('resize-cancel', {
 			item,

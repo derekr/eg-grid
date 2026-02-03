@@ -137,7 +137,7 @@ Gridiot maximizes use of modern CSS and browser APIs. JavaScript handles orchest
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  INPUT ORCHESTRATION:                                                        │
 │    • Pointer event capture and normalization                                │
-│    • Keyboard event handling (Shift+K mode, arrows, etc.)                   │
+│    • Keyboard event handling (Shift+G mode, arrows, etc.)                   │
 │    • Cell calculation from pointer coordinates                              │
 │                                                                              │
 │  EVENT EMISSION:                                                             │
@@ -425,6 +425,9 @@ grid.element.addEventListener('gridiot:deselect', (e) => {
 - `data-gridiot-dragging` - Added automatically during pointer drag
 - `data-gridiot-dropping` - Added during FLIP animation after drop
 - `data-gridiot-selected` - Added when item is selected
+- `data-gridiot-resizing` - Added during resize operation
+- `data-gridiot-handle-hover` - Set to handle name (`se`, `nw`, etc.) when hovering a resize handle
+- `data-gridiot-handle-active` - Set to handle name during active resize
 
 ```css
 [data-gridiot-item] {
@@ -443,6 +446,47 @@ grid.element.addEventListener('gridiot:deselect', (e) => {
 }
 ```
 
+### Resize Handle Styling
+
+Use CSS pseudo-elements to create visible resize handles based on the data attributes:
+
+```css
+/* Base handle style - hidden by default */
+[data-gridiot-item]::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+/* Position handle at bottom-right corner */
+[data-gridiot-item]::after {
+  bottom: 4px;
+  right: 4px;
+  background: rgba(59, 130, 246, 0.6);
+  border-radius: 2px;
+}
+
+/* Show handle on hover */
+[data-gridiot-item][data-gridiot-handle-hover="se"]::after,
+[data-gridiot-item][data-gridiot-handle-hover="sw"]::after,
+[data-gridiot-item][data-gridiot-handle-hover="ne"]::after,
+[data-gridiot-item][data-gridiot-handle-hover="nw"]::after {
+  opacity: 1;
+}
+
+/* Highlight during active resize */
+[data-gridiot-item][data-gridiot-handle-active]::after {
+  opacity: 1;
+  background: rgba(59, 130, 246, 0.9);
+}
+```
+
+Handle names: `n`, `s`, `e`, `w` (edges), `nw`, `ne`, `sw`, `se` (corners).
+
 ### Body Class
 
 During pointer drag, `is-dragging` is added to `document.body`. Use this to prevent text selection:
@@ -456,7 +500,7 @@ body.is-dragging {
 
 ### Grid Attributes
 
-- `data-gridiot-keyboard-mode` - Added to grid when keyboard mode is active (Shift+K)
+- `data-gridiot-keyboard-mode` - Added to grid when keyboard mode is active (Shift+G)
 
 ```css
 .grid[data-gridiot-keyboard-mode] {
@@ -505,14 +549,15 @@ When using the full bundle (`gridiot.js`), keyboard navigation is included:
 
 ### Keyboard Mode
 
-Press **Shift+K** to toggle keyboard mode. When active, the grid shows a visual indicator and you can navigate without clicking first.
+Press **Shift+G** to toggle keyboard mode. When active, the grid shows a visual indicator and you can navigate without clicking first.
 
 ### Navigation Keys
 
 | Key | Action |
 |-----|--------|
-| **Shift+K** | Toggle keyboard mode |
+| **Shift+G** | Toggle keyboard mode |
 | **Arrow keys** or **hjkl** | Nudge selected item by 1 cell |
+| **Shift+Arrow** or **Shift+hjkl** | Resize selected item |
 | **Ctrl+Arrow** or **Ctrl+hjkl** | Jump by item size |
 | **Alt+Arrow** or **Alt+hjkl** | Select adjacent item |
 | **Enter** or **Space** | Pick up / drop item |
