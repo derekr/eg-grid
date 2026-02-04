@@ -14,59 +14,59 @@ await Promise.all([
 	// Full bundle
 	esbuild.build({
 		...common,
-		entryPoints: ['gridiot/bundles/index.ts'],
-		outfile: 'gridiot/dist/gridiot.js',
+		entryPoints: ['bundles/index.ts'],
+		outfile: 'dist/gridiot.js',
 	}),
 	// Minimal bundle (pointer only)
 	esbuild.build({
 		...common,
-		entryPoints: ['gridiot/bundles/minimal.ts'],
-		outfile: 'gridiot/dist/gridiot-minimal.js',
+		entryPoints: ['bundles/minimal.ts'],
+		outfile: 'dist/gridiot-minimal.js',
 	}),
 	// Core only (no plugins)
 	esbuild.build({
 		...common,
-		entryPoints: ['gridiot/bundles/core.ts'],
-		outfile: 'gridiot/dist/gridiot-core.js',
+		entryPoints: ['bundles/core.ts'],
+		outfile: 'dist/gridiot-core.js',
 	}),
 	// Algorithm plugins (optional add-ons)
 	esbuild.build({
 		...common,
-		entryPoints: ['gridiot/plugins/algorithm-push.ts'],
-		outfile: 'gridiot/dist/algorithm-push.js',
+		entryPoints: ['plugins/algorithm-push.ts'],
+		outfile: 'dist/algorithm-push.js',
 	}),
 	// Dev overlay plugin
 	esbuild.build({
 		...common,
-		entryPoints: ['gridiot/plugins/dev-overlay.ts'],
-		outfile: 'gridiot/dist/dev-overlay.js',
+		entryPoints: ['plugins/dev-overlay.ts'],
+		outfile: 'dist/dev-overlay.js',
 	}),
 	// Placeholder plugin
 	esbuild.build({
 		...common,
-		entryPoints: ['gridiot/plugins/placeholder.ts'],
-		outfile: 'gridiot/dist/placeholder.js',
+		entryPoints: ['plugins/placeholder.ts'],
+		outfile: 'dist/placeholder.js',
 	}),
 	// Camera plugin
 	esbuild.build({
 		...common,
-		entryPoints: ['gridiot/plugins/camera.ts'],
-		outfile: 'gridiot/dist/camera.js',
+		entryPoints: ['plugins/camera.ts'],
+		outfile: 'dist/camera.js',
 	}),
 	// Resize plugin
 	esbuild.build({
 		...common,
-		entryPoints: ['gridiot/plugins/resize.ts'],
-		outfile: 'gridiot/dist/resize.js',
+		entryPoints: ['plugins/resize.ts'],
+		outfile: 'dist/resize.js',
 	}),
 ]);
 
 console.log('Built gridiot bundles:');
-console.log('  - gridiot/dist/gridiot.js (full)');
-console.log('  - gridiot/dist/gridiot-minimal.js (pointer only)');
-console.log('  - gridiot/dist/gridiot-core.js (no plugins)');
-console.log('  - gridiot/dist/algorithm-push.js (push layout algorithm)');
-console.log('  - gridiot/dist/dev-overlay.js (debug/config overlay)');
-console.log('  - gridiot/dist/placeholder.js (drop placeholder)');
-console.log('  - gridiot/dist/camera.js (viewport auto-scroll)');
-console.log('  - gridiot/dist/resize.js (item resize handles)');
+console.log('  - dist/gridiot.js (full)');
+console.log('  - dist/gridiot-minimal.js (pointer only)');
+console.log('  - dist/gridiot-core.js (no plugins)');
+console.log('  - dist/algorithm-push.js (push layout algorithm)');
+console.log('  - dist/dev-overlay.js (debug/config overlay)');
+console.log('  - dist/placeholder.js (drop placeholder)');
+console.log('  - dist/camera.js (viewport auto-scroll)');
+console.log('  - dist/resize.js (item resize handles)');

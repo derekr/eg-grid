@@ -204,8 +204,10 @@ export function layoutToCSS(
 
 	for (const item of items) {
 		const width = maxColumns ? Math.min(item.width, maxColumns) : item.width;
+		// Clamp column so item fits within maxColumns (prevents implicit column creation)
+		const column = maxColumns ? Math.max(1, Math.min(item.column, maxColumns - width + 1)) : item.column;
 		const selector = `${selectorPrefix}${item.id}${selectorSuffix}${excludeSelector}`;
-		const gridColumn = `${item.column} / span ${width}`;
+		const gridColumn = `${column} / span ${width}`;
 		const gridRow = `${item.row} / span ${item.height}`;
 
 		rules.push(`${selector} { grid-column: ${gridColumn}; grid-row: ${gridRow}; }`);
