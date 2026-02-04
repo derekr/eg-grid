@@ -122,80 +122,6 @@ function getCursor(handle) {
       return "";
   }
 }
-function calculateNewSize(core, handle, startCell, originalSize, pointerX, pointerY, minSize, maxSize) {
-  const gridInfo = core.getGridInfo();
-  const maxColumn = gridInfo.columns.length;
-  const maxRow = gridInfo.rows.length;
-  let pointerCell = core.getCellFromPoint(pointerX, pointerY);
-  if (!pointerCell) {
-    const rect = gridInfo.rect;
-    const cellWidth = gridInfo.cellWidth + gridInfo.gap;
-    const cellHeight = gridInfo.cellHeight + gridInfo.gap;
-    let column;
-    let row;
-    if (pointerX < rect.left) {
-      column = 1;
-    } else if (pointerX > rect.right) {
-      column = maxColumn;
-    } else {
-      column = Math.max(1, Math.min(maxColumn, Math.floor((pointerX - rect.left) / cellWidth) + 1));
-    }
-    if (pointerY < rect.top) {
-      row = 1;
-    } else if (pointerY > rect.bottom) {
-      row = maxRow;
-    } else {
-      row = Math.max(1, Math.min(maxRow, Math.floor((pointerY - rect.top) / cellHeight) + 1));
-    }
-    pointerCell = { column, row };
-  }
-  let newColspan = originalSize.colspan;
-  let newRowspan = originalSize.rowspan;
-  let newColumn = startCell.column;
-  let newRow = startCell.row;
-  if (handle === "e" || handle === "se" || handle === "ne") {
-    newColspan = Math.max(
-      minSize.colspan,
-      Math.min(
-        maxSize.colspan,
-        pointerCell.column - startCell.column + 1,
-        maxColumn - startCell.column + 1
-      )
-    );
-  } else if (handle === "w" || handle === "sw" || handle === "nw") {
-    const rightEdge = startCell.column + originalSize.colspan - 1;
-    const newLeft = Math.max(1, Math.min(pointerCell.column, rightEdge));
-    newColspan = Math.max(
-      minSize.colspan,
-      Math.min(maxSize.colspan, rightEdge - newLeft + 1)
-    );
-    newColumn = rightEdge - newColspan + 1;
-  }
-  if (handle === "s" || handle === "se" || handle === "sw") {
-    newRowspan = Math.max(
-      minSize.rowspan,
-      Math.min(
-        maxSize.rowspan,
-        pointerCell.row - startCell.row + 1,
-        maxRow - startCell.row + 1
-      )
-    );
-  } else if (handle === "n" || handle === "ne" || handle === "nw") {
-    const bottomEdge = startCell.row + originalSize.rowspan - 1;
-    const newTop = Math.max(1, Math.min(pointerCell.row, bottomEdge));
-    newRowspan = Math.max(
-      minSize.rowspan,
-      Math.min(maxSize.rowspan, bottomEdge - newTop + 1)
-    );
-    newRow = bottomEdge - newRowspan + 1;
-  }
-  return {
-    colspan: newColspan,
-    rowspan: newRowspan,
-    column: newColumn,
-    row: newRow
-  };
-}
 function createSizeLabel() {
   const label = document.createElement("div");
   label.className = "gridiot-resize-label";
@@ -377,24 +303,45 @@ function attachResize(gridElement, options) {
     }
     projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, projectedColspan));
     projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, projectedRowspan));
-    const newSize = calculateNewSize(
-      core,
-      handle,
-      startCell,
-      originalSize,
-      e.clientX,
-      e.clientY,
-      minSize,
-      maxSize
-    );
+    let projectedColumn = startCell.column;
+    let projectedRow = startCell.row;
+    if (handle === "w" || handle === "sw" || handle === "nw") {
+      const rightEdge = startCell.column + originalSize.colspan - 1;
+      projectedColumn = rightEdge - projectedColspan + 1;
+    }
+    if (handle === "n" || handle === "ne" || handle === "nw") {
+      const bottomEdge = startCell.row + originalSize.rowspan - 1;
+      projectedRow = bottomEdge - projectedRowspan + 1;
+    }
     activeResize.currentSize = { colspan: projectedColspan, rowspan: projectedRowspan };
-    activeResize.currentCell = { column: newSize.column, row: newSize.row };
+    activeResize.currentCell = { column: projectedColumn, row: projectedRow };
     if (sizeLabel) {
       sizeLabel.textContent = `${projectedColspan}\xD7${projectedRowspan}`;
     }
+    let anchorCell;
+    if (handle === "se" || handle === "s" || handle === "e") {
+      anchorCell = { column: startCell.column, row: startCell.row };
+    } else if (handle === "nw" || handle === "n" || handle === "w") {
+      anchorCell = {
+        column: startCell.column + originalSize.colspan - 1,
+        row: startCell.row + originalSize.rowspan - 1
+      };
+    } else if (handle === "ne") {
+      anchorCell = {
+        column: startCell.column,
+        row: startCell.row + originalSize.rowspan - 1
+      };
+    } else {
+      anchorCell = {
+        column: startCell.column + originalSize.colspan - 1,
+        row: startCell.row
+      };
+    }
     emit("resize-move", {
       item,
-      cell: { column: newSize.column, row: newSize.row },
+      cell: { column: projectedColumn, row: projectedRow },
+      anchorCell,
+      startCell,
       colspan: projectedColspan,
       rowspan: projectedRowspan,
       handle

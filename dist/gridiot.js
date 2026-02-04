@@ -146,6 +146,12 @@ function createStateMachine(initialState) {
     }
   };
 }
+function isInteracting(state) {
+  return state.phase === "interacting" || state.phase === "committing";
+}
+function isDragging(state) {
+  return isInteracting(state) && state.interaction?.type === "drag";
+}
 
 // engine.ts
 var plugins = /* @__PURE__ */ new Map();
@@ -455,24 +461,78 @@ registerPlugin({
   name: "keyboard",
   init(core) {
     const { stateMachine } = core;
-    let heldItem = null;
-    const getDirection = (key) => {
+    let pendingVtnRestore = null;
+    const getColumnCount = () => {
+      return core.getGridInfo().columns.length;
+    };
+    const capturePositions = () => {
+      const positions = /* @__PURE__ */ new Map();
+      const items = core.element.querySelectorAll("[data-gridiot-item]");
+      for (const item of items) {
+        const id = item.id || item.getAttribute("data-gridiot-item") || "";
+        if (id) {
+          const cell = getItemCell(item);
+          positions.set(id, { column: cell.column, row: cell.row });
+        }
+      }
+      return positions;
+    };
+    const captureSizes = () => {
+      const sizes = /* @__PURE__ */ new Map();
+      const items = core.element.querySelectorAll("[data-gridiot-item]");
+      for (const item of items) {
+        const el = item;
+        const id = el.id || el.getAttribute("data-gridiot-item") || "";
+        if (id) {
+          const width = parseInt(el.getAttribute("data-gridiot-colspan") || "1", 10) || 1;
+          const height = parseInt(el.getAttribute("data-gridiot-rowspan") || "1", 10) || 1;
+          sizes.set(id, { width, height });
+        }
+      }
+      return sizes;
+    };
+    const isHoldingItem = () => {
+      const state = stateMachine.getState();
+      return isDragging(state) && state.interaction?.mode === "keyboard";
+    };
+    const getHeldItem = () => {
+      const state = stateMachine.getState();
+      if (isDragging(state) && state.interaction?.mode === "keyboard") {
+        return state.interaction.element;
+      }
+      return null;
+    };
+    const getDirection = (key, code) => {
       switch (key) {
         case "ArrowUp":
+          return "up";
+        case "ArrowDown":
+          return "down";
+        case "ArrowLeft":
+          return "left";
+        case "ArrowRight":
+          return "right";
         case "k":
         case "K":
           return "up";
-        case "ArrowDown":
         case "j":
         case "J":
           return "down";
-        case "ArrowLeft":
         case "h":
         case "H":
           return "left";
-        case "ArrowRight":
         case "l":
         case "L":
+          return "right";
+      }
+      switch (code) {
+        case "KeyK":
+          return "up";
+        case "KeyJ":
+          return "down";
+        case "KeyH":
+          return "left";
+        case "KeyL":
           return "right";
         default:
           return null;
@@ -557,13 +617,14 @@ registerPlugin({
       const keyboardMode = stateMachine.getState().keyboardModeActive;
       if (!keyboardMode && !focusInGrid && !hasSelection) return;
       const selectedItem = core.selectedItem;
-      const direction = getDirection(e.key);
+      const direction = getDirection(e.key, e.code);
       if (e.key === "Escape") {
         e.preventDefault();
+        const heldItem = getHeldItem();
         if (heldItem) {
           heldItem.removeAttribute("data-gridiot-dragging");
           core.emit("drag-cancel", { item: heldItem });
-          heldItem = null;
+          stateMachine.transition({ type: "CANCEL_INTERACTION" });
         } else if (selectedItem) {
           core.deselect();
         }
@@ -576,18 +637,36 @@ registerPlugin({
       if (e.key === "Enter" || e.key === " ") {
         if (!selectedItem) return;
         e.preventDefault();
+        const heldItem = getHeldItem();
         if (heldItem) {
-          const cell = getItemCell(heldItem);
+          const state = stateMachine.getState();
+          const targetCell = state.interaction?.targetCell ?? getItemCell(heldItem);
           const size = getItemSize(heldItem);
           heldItem.removeAttribute("data-gridiot-dragging");
-          core.emit("drag-end", { item: heldItem, cell, colspan: size.colspan, rowspan: size.rowspan });
-          log("drop", { cell });
-          heldItem = null;
+          core.emit("drag-end", { item: heldItem, cell: targetCell, colspan: size.colspan, rowspan: size.rowspan });
+          stateMachine.transition({ type: "COMMIT_INTERACTION" });
+          stateMachine.transition({ type: "FINISH_COMMIT" });
+          log("drop", { cell: targetCell });
         } else {
-          heldItem = selectedItem;
-          const size = getItemSize(heldItem);
-          heldItem.setAttribute("data-gridiot-dragging", "");
-          core.emit("drag-start", { item: heldItem, cell: getItemCell(heldItem), colspan: size.colspan, rowspan: size.rowspan });
+          const itemId = selectedItem.id || selectedItem.getAttribute("data-gridiot-item") || "";
+          const size = getItemSize(selectedItem);
+          const startCell = getItemCell(selectedItem);
+          stateMachine.transition({
+            type: "START_INTERACTION",
+            context: {
+              type: "drag",
+              mode: "keyboard",
+              itemId,
+              element: selectedItem,
+              columnCount: getColumnCount(),
+              originalPositions: capturePositions(),
+              originalSizes: captureSizes(),
+              targetCell: startCell,
+              currentSize: { colspan: size.colspan, rowspan: size.rowspan }
+            }
+          });
+          selectedItem.setAttribute("data-gridiot-dragging", "");
+          core.emit("drag-start", { item: selectedItem, cell: startCell, colspan: size.colspan, rowspan: size.rowspan });
           log("pick up");
         }
         return;
@@ -627,7 +706,26 @@ registerPlugin({
           if (newColspan === itemSize.colspan && newRowspan === itemSize.rowspan) {
             return;
           }
-          const originalViewTransitionName = selectedItem.style.viewTransitionName || "";
+          if (pendingVtnRestore) {
+            clearTimeout(pendingVtnRestore.timeoutId);
+            pendingVtnRestore.item.style.removeProperty("view-transition-name");
+            pendingVtnRestore = null;
+          }
+          const itemId = selectedItem.id || selectedItem.getAttribute("data-gridiot-item") || "";
+          stateMachine.transition({
+            type: "START_INTERACTION",
+            context: {
+              type: "resize",
+              mode: "keyboard",
+              itemId,
+              element: selectedItem,
+              columnCount: getColumnCount(),
+              originalPositions: capturePositions(),
+              originalSizes: captureSizes(),
+              targetCell: currentCell,
+              currentSize: { colspan: newColspan, rowspan: newRowspan }
+            }
+          });
           selectedItem.style.viewTransitionName = "resizing";
           const handle = direction === "right" || direction === "down" ? "se" : direction === "left" ? "w" : "n";
           core.emit("resize-start", {
@@ -645,9 +743,16 @@ registerPlugin({
             colspan: newColspan,
             rowspan: newRowspan
           });
-          setTimeout(() => {
-            selectedItem.style.viewTransitionName = originalViewTransitionName;
+          stateMachine.transition({ type: "COMMIT_INTERACTION" });
+          stateMachine.transition({ type: "FINISH_COMMIT" });
+          const itemToRestore = selectedItem;
+          const timeoutId = window.setTimeout(() => {
+            itemToRestore.style.removeProperty("view-transition-name");
+            if (pendingVtnRestore?.item === itemToRestore) {
+              pendingVtnRestore = null;
+            }
           }, 250);
+          pendingVtnRestore = { item: itemToRestore, timeoutId };
           log("resize", { direction, newColspan, newRowspan });
           return;
         }
@@ -665,7 +770,12 @@ registerPlugin({
         if (targetCell.column === currentCell.column && targetCell.row === currentCell.row) {
           return;
         }
+        const heldItem = getHeldItem();
         if (heldItem) {
+          stateMachine.transition({
+            type: "UPDATE_INTERACTION",
+            targetCell
+          });
           core.emit("drag-move", { item: heldItem, cell: targetCell, x: 0, y: 0, colspan: itemSize.colspan, rowspan: itemSize.rowspan });
           log("move", { direction, amount, targetCell });
         } else {
@@ -1067,7 +1177,7 @@ function attachCamera(gridElement, options = {}) {
   let mode = initialMode;
   let scrollContainer = customContainer ?? findScrollParent(gridElement);
   let animationFrameId = null;
-  let isDragging = false;
+  let isDragging2 = false;
   let sawPointerMove = false;
   let lastPointerX = 0;
   let lastPointerY = 0;
@@ -1141,7 +1251,7 @@ function attachCamera(gridElement, options = {}) {
   }
   let wasScrollingLastFrame = false;
   function scrollLoop() {
-    if (!isDragging || !autoScrollOnDrag || mode === "off") {
+    if (!isDragging2 || !autoScrollOnDrag || mode === "off") {
       animationFrameId = null;
       if (wasScrollingLastFrame) {
         setScrolling(false);
@@ -1183,14 +1293,14 @@ function attachCamera(gridElement, options = {}) {
     setScrolling(false);
   }
   function onPointerMove(e) {
-    if (!isDragging || !autoScrollOnDrag || mode === "off") return;
+    if (!isDragging2 || !autoScrollOnDrag || mode === "off") return;
     sawPointerMove = true;
     lastPointerX = e.clientX;
     lastPointerY = e.clientY;
     startScrollLoop();
   }
   function onDragStart(e) {
-    isDragging = true;
+    isDragging2 = true;
     sawPointerMove = false;
     window.addEventListener("pointermove", onPointerMove);
   }
@@ -1207,7 +1317,7 @@ function attachCamera(gridElement, options = {}) {
   }
   function onDragEnd(e) {
     const wasPointerDrag = sawPointerMove;
-    isDragging = false;
+    isDragging2 = false;
     sawPointerMove = false;
     stopScrollLoop();
     window.removeEventListener("pointermove", onPointerMove);
@@ -1220,13 +1330,13 @@ function attachCamera(gridElement, options = {}) {
     }
   }
   function onDragCancel(e) {
-    isDragging = false;
+    isDragging2 = false;
     stopScrollLoop();
     window.removeEventListener("pointermove", onPointerMove);
   }
   function onSelect(e) {
     if (!scrollOnSelect || mode === "off") return;
-    if (isDragging) return;
+    if (isDragging2) return;
     scrollTo(e.detail.item);
   }
   gridElement.addEventListener(
@@ -1332,80 +1442,6 @@ function getCursor(handle) {
     default:
       return "";
   }
-}
-function calculateNewSize(core, handle, startCell, originalSize, pointerX, pointerY, minSize, maxSize) {
-  const gridInfo = core.getGridInfo();
-  const maxColumn = gridInfo.columns.length;
-  const maxRow = gridInfo.rows.length;
-  let pointerCell = core.getCellFromPoint(pointerX, pointerY);
-  if (!pointerCell) {
-    const rect = gridInfo.rect;
-    const cellWidth = gridInfo.cellWidth + gridInfo.gap;
-    const cellHeight = gridInfo.cellHeight + gridInfo.gap;
-    let column;
-    let row;
-    if (pointerX < rect.left) {
-      column = 1;
-    } else if (pointerX > rect.right) {
-      column = maxColumn;
-    } else {
-      column = Math.max(1, Math.min(maxColumn, Math.floor((pointerX - rect.left) / cellWidth) + 1));
-    }
-    if (pointerY < rect.top) {
-      row = 1;
-    } else if (pointerY > rect.bottom) {
-      row = maxRow;
-    } else {
-      row = Math.max(1, Math.min(maxRow, Math.floor((pointerY - rect.top) / cellHeight) + 1));
-    }
-    pointerCell = { column, row };
-  }
-  let newColspan = originalSize.colspan;
-  let newRowspan = originalSize.rowspan;
-  let newColumn = startCell.column;
-  let newRow = startCell.row;
-  if (handle === "e" || handle === "se" || handle === "ne") {
-    newColspan = Math.max(
-      minSize.colspan,
-      Math.min(
-        maxSize.colspan,
-        pointerCell.column - startCell.column + 1,
-        maxColumn - startCell.column + 1
-      )
-    );
-  } else if (handle === "w" || handle === "sw" || handle === "nw") {
-    const rightEdge = startCell.column + originalSize.colspan - 1;
-    const newLeft = Math.max(1, Math.min(pointerCell.column, rightEdge));
-    newColspan = Math.max(
-      minSize.colspan,
-      Math.min(maxSize.colspan, rightEdge - newLeft + 1)
-    );
-    newColumn = rightEdge - newColspan + 1;
-  }
-  if (handle === "s" || handle === "se" || handle === "sw") {
-    newRowspan = Math.max(
-      minSize.rowspan,
-      Math.min(
-        maxSize.rowspan,
-        pointerCell.row - startCell.row + 1,
-        maxRow - startCell.row + 1
-      )
-    );
-  } else if (handle === "n" || handle === "ne" || handle === "nw") {
-    const bottomEdge = startCell.row + originalSize.rowspan - 1;
-    const newTop = Math.max(1, Math.min(pointerCell.row, bottomEdge));
-    newRowspan = Math.max(
-      minSize.rowspan,
-      Math.min(maxSize.rowspan, bottomEdge - newTop + 1)
-    );
-    newRow = bottomEdge - newRowspan + 1;
-  }
-  return {
-    colspan: newColspan,
-    rowspan: newRowspan,
-    column: newColumn,
-    row: newRow
-  };
 }
 function createSizeLabel() {
   const label = document.createElement("div");
@@ -1588,24 +1624,45 @@ function attachResize(gridElement, options) {
     }
     projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, projectedColspan));
     projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, projectedRowspan));
-    const newSize = calculateNewSize(
-      core,
-      handle,
-      startCell,
-      originalSize,
-      e.clientX,
-      e.clientY,
-      minSize,
-      maxSize
-    );
+    let projectedColumn = startCell.column;
+    let projectedRow = startCell.row;
+    if (handle === "w" || handle === "sw" || handle === "nw") {
+      const rightEdge = startCell.column + originalSize.colspan - 1;
+      projectedColumn = rightEdge - projectedColspan + 1;
+    }
+    if (handle === "n" || handle === "ne" || handle === "nw") {
+      const bottomEdge = startCell.row + originalSize.rowspan - 1;
+      projectedRow = bottomEdge - projectedRowspan + 1;
+    }
     activeResize.currentSize = { colspan: projectedColspan, rowspan: projectedRowspan };
-    activeResize.currentCell = { column: newSize.column, row: newSize.row };
+    activeResize.currentCell = { column: projectedColumn, row: projectedRow };
     if (sizeLabel) {
       sizeLabel.textContent = `${projectedColspan}\xD7${projectedRowspan}`;
     }
+    let anchorCell;
+    if (handle === "se" || handle === "s" || handle === "e") {
+      anchorCell = { column: startCell.column, row: startCell.row };
+    } else if (handle === "nw" || handle === "n" || handle === "w") {
+      anchorCell = {
+        column: startCell.column + originalSize.colspan - 1,
+        row: startCell.row + originalSize.rowspan - 1
+      };
+    } else if (handle === "ne") {
+      anchorCell = {
+        column: startCell.column,
+        row: startCell.row + originalSize.rowspan - 1
+      };
+    } else {
+      anchorCell = {
+        column: startCell.column + originalSize.colspan - 1,
+        row: startCell.row
+      };
+    }
     emit("resize-move", {
       item,
-      cell: { column: newSize.column, row: newSize.row },
+      cell: { column: projectedColumn, row: projectedRow },
+      anchorCell,
+      startCell,
       colspan: projectedColspan,
       rowspan: projectedRowspan,
       handle

@@ -51,6 +51,10 @@ export interface ResizeMoveDetail {
 	item: HTMLElement;
 	/** Projected cell position (may differ from start for NW/NE/SW handles) */
 	cell: GridCell;
+	/** Anchor cell (the corner that stays fixed - opposite of the handle) */
+	anchorCell: GridCell;
+	/** Original cell position at resize start */
+	startCell: GridCell;
 	/** Projected colspan */
 	colspan: number;
 	/** Projected rowspan */

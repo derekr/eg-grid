@@ -490,30 +490,64 @@ export function attachResize(
 		projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, projectedColspan));
 		projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, projectedRowspan));
 
-		// Calculate projected position for NW/NE/SW handles
-		const newSize = calculateNewSize(
-			core,
-			handle,
-			startCell,
-			originalSize,
-			e.clientX,
-			e.clientY,
-			minSize,
-			maxSize,
-		);
+		// Calculate the cell position based on the projected size and anchor corner.
+		// This ensures the anchor corner stays fixed and the cell + size are consistent.
+		// Previously we used calculateNewSize() which computed position from pointer,
+		// but that could mismatch with the visual-based size calculation.
+		let projectedColumn = startCell.column;
+		let projectedRow = startCell.row;
+
+		// For handles that move the left edge, calculate column from the right anchor
+		if (handle === 'w' || handle === 'sw' || handle === 'nw') {
+			const rightEdge = startCell.column + originalSize.colspan - 1;
+			projectedColumn = rightEdge - projectedColspan + 1;
+		}
+
+		// For handles that move the top edge, calculate row from the bottom anchor
+		if (handle === 'n' || handle === 'ne' || handle === 'nw') {
+			const bottomEdge = startCell.row + originalSize.rowspan - 1;
+			projectedRow = bottomEdge - projectedRowspan + 1;
+		}
 
 		// Update tracking
 		activeResize.currentSize = { colspan: projectedColspan, rowspan: projectedRowspan };
-		activeResize.currentCell = { column: newSize.column, row: newSize.row };
+		activeResize.currentCell = { column: projectedColumn, row: projectedRow };
 
 		// Update size label with projected final size
 		if (sizeLabel) {
 			sizeLabel.textContent = `${projectedColspan}×${projectedRowspan}`;
 		}
 
+		// Calculate anchor cell (the corner that stays fixed during resize)
+		let anchorCell: GridCell;
+		if (handle === 'se' || handle === 's' || handle === 'e') {
+			// NW corner is anchor
+			anchorCell = { column: startCell.column, row: startCell.row };
+		} else if (handle === 'nw' || handle === 'n' || handle === 'w') {
+			// SE corner is anchor
+			anchorCell = {
+				column: startCell.column + originalSize.colspan - 1,
+				row: startCell.row + originalSize.rowspan - 1,
+			};
+		} else if (handle === 'ne') {
+			// SW corner is anchor
+			anchorCell = {
+				column: startCell.column,
+				row: startCell.row + originalSize.rowspan - 1,
+			};
+		} else {
+			// SW handle: NE corner is anchor
+			anchorCell = {
+				column: startCell.column + originalSize.colspan - 1,
+				row: startCell.row,
+			};
+		}
+
 		emit<ResizeMoveDetail>('resize-move', {
 			item,
-			cell: { column: newSize.column, row: newSize.row },
+			cell: { column: projectedColumn, row: projectedRow },
+			anchorCell,
+			startCell,
 			colspan: projectedColspan,
 			rowspan: projectedRowspan,
 			handle,

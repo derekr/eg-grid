@@ -1,10 +1,10 @@
-// gridiot/engine.ts
+// engine.ts
 var plugins = /* @__PURE__ */ new Map();
 function registerPlugin(plugin) {
   plugins.set(plugin.name, plugin);
 }
 
-// gridiot/plugins/placeholder.ts
+// plugins/placeholder.ts
 function attachPlaceholder(gridElement, options = {}) {
   const {
     className = "gridiot-placeholder",

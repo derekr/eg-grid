@@ -139,7 +139,10 @@ export function attachPlaceholder(
 		remove();
 	}
 
-	// Resize event handlers (same pattern as drag)
+	// Resize event handlers
+	// The placeholder shows where the item will land after resize. For handles that
+	// change position (NW, NE, SW, N, W), the cell position changes but the anchor
+	// corner stays fixed. This is correct - the placeholder shows the final landing spot.
 	function handleResizeStart(e: CustomEvent<ResizeStartDetail>): void {
 		const { cell, colspan, rowspan } = e.detail;
 		create();
