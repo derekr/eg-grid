@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // Use project root
+  // Use project root so imports resolve correctly
   root: '.',
   // Dev server settings
   server: {
-    open: '/example.html',  // Auto-open on start
+    open: '/examples/',  // Auto-open examples index
   },
 });

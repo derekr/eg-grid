@@ -15,6 +15,27 @@
 				background: #f5f5f5;
 			}
 
+			nav {
+				margin-bottom: 1.5rem;
+				padding-bottom: 1rem;
+				border-bottom: 1px solid #ddd;
+			}
+
+			nav a {
+				margin-right: 1rem;
+				color: #0066ff;
+				text-decoration: none;
+			}
+
+			nav a:hover {
+				text-decoration: underline;
+			}
+
+			nav a.active {
+				font-weight: bold;
+				color: #333;
+			}
+
 			h1 {
 				margin-bottom: 1rem;
 			}
@@ -132,6 +153,11 @@
 		</style>
 	</head>
 	<body>
+		<nav>
+			<a href="index.html" class="active">Basic</a>
+			<a href="advanced.html">Advanced</a>
+		</nav>
+
 		<h1>Gridiot Example</h1>
 		<p>Drag items to reorder. Uses push-down algorithm with View Transitions.</p>
 
@@ -211,10 +237,10 @@
 
 		<script type="module">
 			// Import core gridiot (includes pointer, keyboard, accessibility)
-			import { init } from './bundles/index.ts';
+			import { init } from '../bundles/index.ts';
 
 			// Import push algorithm (algorithms are separate, pluggable)
-			import { attachPushAlgorithm } from './plugins/algorithm-push.ts';
+			import { attachPushAlgorithm } from '../plugins/algorithm-push.ts';
 
 			const grid = init(document.getElementById('grid'));
 

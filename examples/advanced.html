@@ -18,6 +18,27 @@
       padding: 32px;
     }
 
+    nav {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    nav a {
+      margin-right: 1rem;
+      color: #4facfe;
+      text-decoration: none;
+    }
+
+    nav a:hover {
+      text-decoration: underline;
+    }
+
+    nav a.active {
+      font-weight: bold;
+      color: #fff;
+    }
+
     /* Container wrapper for container queries */
     .grid-wrapper {
       container-type: inline-size;
@@ -426,6 +447,11 @@
   </style>
 </head>
 <body>
+  <nav>
+    <a href="index.html">Basic</a>
+    <a href="advanced.html" class="active">Advanced</a>
+  </nav>
+
   <div class="grid-wrapper">
   <div class="grid" id="grid">
     <!-- 2x2 item -->
@@ -695,12 +721,12 @@
   <style id="preview-styles"></style>
 
   <script type="module">
-    import { init, createLayoutModel, attachResponsive } from './bundles/index.ts';
-    import { attachPushAlgorithm, readItemsFromDOM, compactUp, layoutToCSS } from './plugins/algorithm-push.ts';
-    import { attachDevOverlay } from './plugins/dev-overlay.ts';
-    import { attachPlaceholder } from './plugins/placeholder.ts';
-    import { attachCamera } from './plugins/camera.ts';
-    import { attachResize } from './plugins/resize.ts';
+    import { init, createLayoutModel, attachResponsive } from '../bundles/index.ts';
+    import { attachPushAlgorithm, readItemsFromDOM, compactUp, layoutToCSS } from '../plugins/algorithm-push.ts';
+    import { attachDevOverlay } from '../plugins/dev-overlay.ts';
+    import { attachPlaceholder } from '../plugins/placeholder.ts';
+    import { attachCamera } from '../plugins/camera.ts';
+    import { attachResize } from '../plugins/resize.ts';
 
     const gridElement = document.getElementById('grid');
     const layoutStyleElement = document.getElementById('layout-styles');
