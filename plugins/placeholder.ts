@@ -11,6 +11,7 @@ import type {
 	DragMoveDetail,
 	DragEndDetail,
 	DragCancelDetail,
+	DropPreviewDetail,
 	PlaceholderPluginOptions,
 	ResizeStartDetail,
 	ResizeMoveDetail,
@@ -131,6 +132,14 @@ export function attachPlaceholder(
 		update(cell.column, cell.row, colspan, rowspan);
 	}
 
+	// Algorithm plugins (e.g. reorder) emit drop-preview when the actual
+	// landing position differs from the raw pointer cell. Override the
+	// placeholder position so it shows where the item will really land.
+	function handleDropPreview(e: CustomEvent<DropPreviewDetail>): void {
+		const { cell, colspan, rowspan } = e.detail;
+		update(cell.column, cell.row, colspan, rowspan);
+	}
+
 	function handleDragEnd(_e: CustomEvent<DragEndDetail>): void {
 		remove();
 	}
@@ -196,6 +205,11 @@ export function attachPlaceholder(
 		'gridiot:drag-cancel',
 		handleDragCancel as EventListener
 	);
+	// Drop preview (algorithm-computed landing position)
+	gridElement.addEventListener(
+		'gridiot:drop-preview',
+		handleDropPreview as EventListener
+	);
 	// Resize events
 	gridElement.addEventListener(
 		'gridiot:resize-start',
@@ -249,6 +263,11 @@ export function attachPlaceholder(
 			gridElement.removeEventListener(
 				'gridiot:drag-cancel',
 				handleDragCancel as EventListener
+			);
+			// Drop preview
+			gridElement.removeEventListener(
+				'gridiot:drop-preview',
+				handleDropPreview as EventListener
 			);
 			// Resize events
 			gridElement.removeEventListener(

@@ -9,6 +9,7 @@ Welcome to the Gridiot documentation. These guides cover everything from basic s
 ## Core Concepts
 
 - **[Custom Algorithms](./custom-algorithms.md)** - Build your own layout logic (swap, insert, push)
+- **[Persistence](./persistence.md)** - Save and restore layout state (browser or backend)
 - **[View Transitions](./view-transitions.md)** - Smooth animations with the View Transitions API
 - **[Multi-Cell Items](./multi-cell-items.md)** - Items that span multiple columns/rows
 
@@ -27,6 +28,7 @@ Welcome to the Gridiot documentation. These guides cover everything from basic s
 | `gridiot-minimal.js` | Minimal | Pointer only |
 | `gridiot-core.js` | Core | No plugins (BYO) |
 | `algorithm-push.js` | Add-on | Push-down layout algorithm |
+| `algorithm-reorder.js` | Add-on | Reorder/reflow layout algorithm |
 
 ### Events
 

@@ -265,6 +265,15 @@ export interface AlgorithmPushPluginOptions {
 }
 
 /**
+ * Algorithm-reorder plugin options
+ */
+export interface AlgorithmReorderPluginOptions {
+	selectorPrefix?: string;
+	selectorSuffix?: string;
+	layoutModel?: ResponsiveLayoutModel;
+}
+
+/**
  * Plugin-specific options map for init()
  */
 export interface PluginOptions {
@@ -272,6 +281,7 @@ export interface PluginOptions {
 	resize?: ResizePluginOptions;
 	placeholder?: PlaceholderPluginOptions;
 	'algorithm-push'?: AlgorithmPushPluginOptions;
+	'algorithm-reorder'?: AlgorithmReorderPluginOptions;
 	responsive?: ResponsivePluginOptions;
 }
 
@@ -460,6 +470,19 @@ export interface ResponsivePluginOptions {
 	gap?: number;
 }
 
+// ============================================================================
+// Drop Preview Types (emitted by algorithms whose drop position differs from cursor)
+// ============================================================================
+
+export interface DropPreviewDetail {
+	/** Actual cell where the dragged item will land */
+	cell: GridCell;
+	/** Colspan of the item */
+	colspan: number;
+	/** Rowspan of the item */
+	rowspan: number;
+}
+
 // Custom event types for type-safe event listeners
 declare global {
 	interface HTMLElementEventMap {
@@ -474,5 +497,6 @@ declare global {
 		'gridiot:resize-move': CustomEvent<ResizeMoveDetail>;
 		'gridiot:resize-end': CustomEvent<ResizeEndDetail>;
 		'gridiot:resize-cancel': CustomEvent<ResizeCancelDetail>;
+		'gridiot:drop-preview': CustomEvent<DropPreviewDetail>;
 	}
 }

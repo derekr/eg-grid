@@ -547,8 +547,15 @@
         <label class="toggle">
           <input type="checkbox" data-plugin="algorithm-push">
           <div>
-            <div class="toggle-name">Algorithm</div>
-            <div class="toggle-desc">Listens to drag events, calculates push layout, injects CSS</div>
+            <div class="toggle-name">Algorithm (Push)</div>
+            <div class="toggle-desc">Push-down collision resolution, items hold position</div>
+          </div>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" data-plugin="algorithm-reorder">
+          <div>
+            <div class="toggle-name">Algorithm (Reorder)</div>
+            <div class="toggle-desc">Sequence reflow, items reorder like app icons</div>
           </div>
         </label>
         <label class="toggle">
@@ -676,6 +683,7 @@
     // Import full bundle (auto-registers all plugins) + manual attach functions
     import { init, getPlugin } from '../bundles/index.ts';
     import { attachPushAlgorithm } from '../plugins/algorithm-push.ts';
+    import { attachReorderAlgorithm } from '../plugins/algorithm-reorder.ts';
     import { attachPlaceholder } from '../plugins/placeholder.ts';
     import { attachCamera } from '../plugins/camera.ts';
     import { attachResize } from '../plugins/resize.ts';
@@ -722,7 +730,7 @@
       styleElement: gridiotStyleElement,
       disablePlugins: [
         'pointer', 'keyboard', 'accessibility',
-        'algorithm-push', 'placeholder', 'camera', 'resize', 'responsive',
+        'algorithm-push', 'algorithm-reorder', 'placeholder', 'camera', 'resize', 'responsive',
       ],
     });
 
@@ -773,7 +781,21 @@
           break;
         }
         case 'algorithm-push': {
+          // Mutual exclusion: disable reorder if active
+          disablePlugin('algorithm-reorder');
+          const reorderCb = document.querySelector('[data-plugin="algorithm-reorder"]');
+          if (reorderCb) reorderCb.checked = false;
           pluginCleanups[name] = attachPushAlgorithm(gridElement, {
+            core,
+          });
+          break;
+        }
+        case 'algorithm-reorder': {
+          // Mutual exclusion: disable push if active
+          disablePlugin('algorithm-push');
+          const pushCb = document.querySelector('[data-plugin="algorithm-push"]');
+          if (pushCb) pushCb.checked = false;
+          pluginCleanups[name] = attachReorderAlgorithm(gridElement, {
             core,
           });
           break;
@@ -822,7 +844,7 @@
     function disablePlugin(name) {
       if (!pluginCleanups[name]) return;
 
-      if (name === 'algorithm-push') preservePositionsAsInlineStyles();
+      if (name === 'algorithm-push' || name === 'algorithm-reorder') preservePositionsAsInlineStyles();
 
       pluginCleanups[name]();
       delete pluginCleanups[name];

@@ -6,6 +6,7 @@ import '../plugins/camera';
 import '../plugins/resize';
 import '../plugins/placeholder';
 import '../plugins/algorithm-push';
+import '../plugins/algorithm-reorder';
 import '../plugins/responsive';
 
 // Core exports
@@ -30,6 +31,7 @@ export { attachCamera, type CameraInstance, type CameraOptions, type CameraState
 export { attachResize, type ResizeOptions } from '../plugins/resize';
 export { attachPlaceholder, attachPlaceholderStyles, PLACEHOLDER_CSS, type PlaceholderInstance, type PlaceholderOptions } from '../plugins/placeholder';
 export { attachPushAlgorithm, calculateLayout, layoutToCSS, readItemsFromDOM, type AttachPushAlgorithmOptions } from '../plugins/algorithm-push';
+export { attachReorderAlgorithm, calculateReorderLayout, getItemOrder, reflowItems, type AttachReorderAlgorithmOptions } from '../plugins/algorithm-reorder';
 export { attachResponsive, ensureContainerWrapper, type ResponsiveState } from '../plugins/responsive';
 
 // FLIP utility

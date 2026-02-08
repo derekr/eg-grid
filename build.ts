@@ -35,6 +35,11 @@ await Promise.all([
 		entryPoints: ['plugins/algorithm-push.ts'],
 		outfile: 'dist/algorithm-push.js',
 	}),
+	esbuild.build({
+		...common,
+		entryPoints: ['plugins/algorithm-reorder.ts'],
+		outfile: 'dist/algorithm-reorder.js',
+	}),
 	// Dev overlay plugin
 	esbuild.build({
 		...common,
@@ -66,6 +71,7 @@ console.log('  - dist/gridiot.js (full)');
 console.log('  - dist/gridiot-minimal.js (pointer only)');
 console.log('  - dist/gridiot-core.js (no plugins)');
 console.log('  - dist/algorithm-push.js (push layout algorithm)');
+console.log('  - dist/algorithm-reorder.js (reorder layout algorithm)');
 console.log('  - dist/dev-overlay.js (debug/config overlay)');
 console.log('  - dist/placeholder.js (drop placeholder)');
 console.log('  - dist/camera.js (viewport auto-scroll)');
