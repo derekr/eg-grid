@@ -130,111 +130,6 @@ function getCursor(handle: ResizeHandle | null): string {
 }
 
 /**
- * Calculate new size based on pointer position and handle
- */
-function calculateNewSize(
-	core: GridiotCore,
-	handle: ResizeHandle,
-	startCell: GridCell,
-	originalSize: { colspan: number; rowspan: number },
-	pointerX: number,
-	pointerY: number,
-	minSize: { colspan: number; rowspan: number },
-	maxSize: { colspan: number; rowspan: number },
-): { colspan: number; rowspan: number; column: number; row: number } {
-	const gridInfo = core.getGridInfo();
-	const maxColumn = gridInfo.columns.length;
-	const maxRow = gridInfo.rows.length;
-
-	// Get pointer cell, clamping to grid bounds if outside
-	// This allows resizing to continue even when pointer is outside grid
-	let pointerCell = core.getCellFromPoint(pointerX, pointerY);
-	if (!pointerCell) {
-		// Clamp to grid bounds based on pointer position relative to grid
-		const rect = gridInfo.rect;
-		const cellWidth = gridInfo.cellWidth + gridInfo.gap;
-		const cellHeight = gridInfo.cellHeight + gridInfo.gap;
-
-		let column: number;
-		let row: number;
-
-		if (pointerX < rect.left) {
-			column = 1;
-		} else if (pointerX > rect.right) {
-			column = maxColumn;
-		} else {
-			column = Math.max(1, Math.min(maxColumn, Math.floor((pointerX - rect.left) / cellWidth) + 1));
-		}
-
-		if (pointerY < rect.top) {
-			row = 1;
-		} else if (pointerY > rect.bottom) {
-			row = maxRow;
-		} else {
-			row = Math.max(1, Math.min(maxRow, Math.floor((pointerY - rect.top) / cellHeight) + 1));
-		}
-
-		pointerCell = { column, row };
-	}
-
-	let newColspan = originalSize.colspan;
-	let newRowspan = originalSize.rowspan;
-	let newColumn = startCell.column;
-	let newRow = startCell.row;
-
-	// Handle horizontal resizing
-	if (handle === 'e' || handle === 'se' || handle === 'ne') {
-		// Right edge: column stays, span grows right
-		newColspan = Math.max(
-			minSize.colspan,
-			Math.min(
-				maxSize.colspan,
-				pointerCell.column - startCell.column + 1,
-				maxColumn - startCell.column + 1,
-			),
-		);
-	} else if (handle === 'w' || handle === 'sw' || handle === 'nw') {
-		// Left edge: column moves left, right edge stays fixed
-		const rightEdge = startCell.column + originalSize.colspan - 1;
-		const newLeft = Math.max(1, Math.min(pointerCell.column, rightEdge));
-		newColspan = Math.max(
-			minSize.colspan,
-			Math.min(maxSize.colspan, rightEdge - newLeft + 1),
-		);
-		newColumn = rightEdge - newColspan + 1;
-	}
-
-	// Handle vertical resizing
-	if (handle === 's' || handle === 'se' || handle === 'sw') {
-		// Bottom edge: row stays, span grows down
-		newRowspan = Math.max(
-			minSize.rowspan,
-			Math.min(
-				maxSize.rowspan,
-				pointerCell.row - startCell.row + 1,
-				maxRow - startCell.row + 1,
-			),
-		);
-	} else if (handle === 'n' || handle === 'ne' || handle === 'nw') {
-		// Top edge: row moves up, bottom edge stays fixed
-		const bottomEdge = startCell.row + originalSize.rowspan - 1;
-		const newTop = Math.max(1, Math.min(pointerCell.row, bottomEdge));
-		newRowspan = Math.max(
-			minSize.rowspan,
-			Math.min(maxSize.rowspan, bottomEdge - newTop + 1),
-		);
-		newRow = bottomEdge - newRowspan + 1;
-	}
-
-	return {
-		colspan: newColspan,
-		rowspan: newRowspan,
-		column: newColumn,
-		row: newRow,
-	};
-}
-
-/**
  * Create a size label element
  */
 function createSizeLabel(): HTMLElement {
@@ -446,54 +341,16 @@ export function attachResize(
 		const rawColspanRatio = (newWidth + gridInfo.gap) / cellPlusGap;
 		const rawRowspanRatio = (newHeight + gridInfo.gap) / rowPlusGap;
 
-		// Bias calculation for resize direction:
-		// When resizing SE (making bigger), use a lower threshold (0.3 instead of 0.5)
-		// to be more generous about giving the user the larger size
-		const isGrowingWidth = handle === 'e' || handle === 'se' || handle === 'ne';
-		const isGrowingHeight = handle === 's' || handle === 'se' || handle === 'sw';
-
-		// Use floor + threshold approach for more predictable snapping
-		// If we're past 30% into the next cell when growing, give the user that cell
-		const GROW_THRESHOLD = 0.3;
-		const SHRINK_THRESHOLD = 0.7;
-
-		let projectedColspan: number;
-		let projectedRowspan: number;
-
-		if (isGrowingWidth) {
-			// When growing: floor, then add 1 if we're past the threshold
-			projectedColspan = Math.floor(rawColspanRatio);
-			if (rawColspanRatio - projectedColspan >= GROW_THRESHOLD) {
-				projectedColspan += 1;
-			}
-		} else {
-			// When shrinking: ceil, then subtract 1 if we're below the threshold
-			projectedColspan = Math.ceil(rawColspanRatio);
-			if (projectedColspan - rawColspanRatio > (1 - SHRINK_THRESHOLD)) {
-				projectedColspan -= 1;
-			}
-		}
-
-		if (isGrowingHeight) {
-			projectedRowspan = Math.floor(rawRowspanRatio);
-			if (rawRowspanRatio - projectedRowspan >= GROW_THRESHOLD) {
-				projectedRowspan += 1;
-			}
-		} else {
-			projectedRowspan = Math.ceil(rawRowspanRatio);
-			if (projectedRowspan - rawRowspanRatio > (1 - SHRINK_THRESHOLD)) {
-				projectedRowspan -= 1;
-			}
-		}
+		// Snap when 30% into the next cell (works symmetrically for grow and shrink)
+		const RESIZE_SNAP = 0.3;
+		let projectedColspan = Math.floor(rawColspanRatio + (1 - RESIZE_SNAP));
+		let projectedRowspan = Math.floor(rawRowspanRatio + (1 - RESIZE_SNAP));
 
 		// Apply min/max constraints
 		projectedColspan = Math.max(minSize.colspan, Math.min(maxSize.colspan, projectedColspan));
 		projectedRowspan = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, projectedRowspan));
 
-		// Calculate the cell position based on the projected size and anchor corner.
-		// This ensures the anchor corner stays fixed and the cell + size are consistent.
-		// Previously we used calculateNewSize() which computed position from pointer,
-		// but that could mismatch with the visual-based size calculation.
+		// Calculate cell position: anchor corner stays fixed, opposite edge moves
 		let projectedColumn = startCell.column;
 		let projectedRow = startCell.row;
 
