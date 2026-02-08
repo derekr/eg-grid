@@ -478,35 +478,36 @@ export function attachResize(
 		requestAnimationFrame(() => {
 			const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
 
-			const animation = animateFLIPWithTracking(item, firstRect, {
-				includeScale: true,
-				transformOrigin: 'top left',
-				onFinish: () => {
-					// Explicitly clear any transform that might persist
-					item.style.transform = '';
-					// Clear inline grid styles so layout-styles CSS (with container queries) takes over
-					item.style.gridColumn = '';
-					item.style.gridRow = '';
-					// Restore viewTransitionName so future View Transitions work
-					if (itemId) {
-						item.style.viewTransitionName = itemId;
-					} else {
-						item.style.viewTransitionName = '';
-					}
-				},
-			});
-
-			// If no animation was needed, ensure cleanup
-			if (!animation) {
+			const cleanupAfterFlip = () => {
 				item.style.transform = '';
-				// Clear inline grid styles so layout-styles CSS (with container queries) takes over
+				// Only clear inline grid styles if a stylesheet provides positioning
+				// (e.g., responsive container query CSS). Otherwise keep inline styles
+				// so the item doesn't lose its grid cell.
+				const savedCol = item.style.gridColumn;
+				const savedRow = item.style.gridRow;
 				item.style.gridColumn = '';
 				item.style.gridRow = '';
+				if (getComputedStyle(item).gridColumnStart === 'auto') {
+					item.style.gridColumn = savedCol;
+					item.style.gridRow = savedRow;
+				}
+				// Restore viewTransitionName so future View Transitions work
 				if (itemId) {
 					item.style.viewTransitionName = itemId;
 				} else {
 					item.style.viewTransitionName = '';
 				}
+			};
+
+			const animation = animateFLIPWithTracking(item, firstRect, {
+				includeScale: true,
+				transformOrigin: 'top left',
+				onFinish: cleanupAfterFlip,
+			});
+
+			// If no animation was needed, ensure cleanup
+			if (!animation) {
+				cleanupAfterFlip();
 			}
 		});
 
