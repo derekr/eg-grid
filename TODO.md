@@ -518,60 +518,20 @@ Camera plugin that handles viewport scrolling to keep active items visible.
 ---
 
 ### Normalize Pointer/Keyboard Events
-**Status:** Not started
+**Status:** Completed
 **Complexity:** Medium
-**Files:** `plugins/pointer.ts`, `plugins/keyboard.ts`, possibly new event types
+**Files:** `types.ts`, `plugins/pointer.ts`, `plugins/keyboard.ts`, `plugins/camera.ts`, `plugins/algorithm-push.ts`
 
-Currently keyboard navigation emits drag events (`drag-start`, `drag-end`) to reuse layout algorithm integration. This has downsides:
-- Keyboard "nudge" emits drag-start then immediately drag-end (no ongoing drag state)
-- Camera plugin uses `sawPointerMove` flag to distinguish keyboard vs pointer
-- Conceptually, keyboard nav is selection/movement, not "dragging"
-
-**Goals:**
-- Clean separation: drag events for actual dragging, move events for keyboard
-- Algorithm plugins can listen to both event types
-- Camera plugin doesn't need heuristics to detect input type
-
-**Possible approaches:**
-
-1. **Separate event types:**
-   ```typescript
-   // Pointer drag (ongoing)
-   gridiot:drag-start, gridiot:drag-move, gridiot:drag-end
-
-   // Keyboard movement (instant)
-   gridiot:item-move { item, fromCell, toCell, trigger: 'keyboard' | 'pointer' }
-   ```
-
-2. **Unified move event with metadata:**
-   ```typescript
-   gridiot:move {
-     item, fromCell, toCell,
-     source: 'pointer' | 'keyboard',
-     isPreview: boolean  // true during drag, false on final position
-   }
-   ```
-
-3. **Keep current events, add metadata:**
-   ```typescript
-   // Add to existing events
-   drag-start { ..., source: 'pointer' | 'keyboard' }
-   drag-end { ..., source: 'pointer' | 'keyboard' }
-   ```
-
-**Considerations:**
-- Backward compatibility with existing algorithm plugins
-- Don't over-engineer - current approach works, just has mild code smell
-- May not be worth the churn if current workarounds are acceptable
+Added `source: 'pointer' | 'keyboard'` field to all drag event detail types (option 3 — additive, no breaking changes). This replaced fragile heuristics:
+- Camera plugin no longer uses `sawPointerMove` flag — reads `e.detail.source` directly
+- Algorithm-push plugin no longer sniffs `style.position === 'fixed'` — reads stored `source` from drag-start
 
 **Tasks:**
-- [ ] Document current event semantics clearly
-- [ ] Decide if normalization is worth the breaking change
-- [ ] If yes: design new event model
-- [ ] If yes: migrate plugins and examples
-- [ ] If no: document `sawPointerMove` pattern as intentional
-
-**Blocked by:** Nothing (low priority, current approach works)
+- [x] Add `source` to `DragStartDetail`, `DragMoveDetail`, `DragEndDetail`, `DragCancelDetail`
+- [x] Emit `source: 'pointer'` from pointer.ts
+- [x] Emit `source: 'keyboard'` from keyboard.ts
+- [x] Replace `sawPointerMove` heuristic in camera.ts
+- [x] Replace `style.position === 'fixed'` heuristic in algorithm-push.ts
 
 ---
 
@@ -846,7 +806,7 @@ gridiot:camera-settled { }  // Emitted by camera plugin after scroll stops + set
 **Planned additions:**
 ```typescript
 gridiot:compact        { }  // Manual compaction trigger (not yet)
-gridiot:item-move      { item, fromCell, toCell, source: 'pointer' | 'keyboard' }  // Unified move event (proposed)
+// Note: drag events now include `source: 'pointer' | 'keyboard'` field (no separate item-move event needed)
 gridiot:resize-start   { item, originalSize: { colspan, rowspan } }
 gridiot:resize-move    { item, currentSize: { colspan, rowspan }, preview: { width, height } }
 gridiot:resize-end     { item, newSize: { colspan, rowspan } }

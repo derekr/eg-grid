@@ -240,7 +240,7 @@ registerPlugin({
 				const heldItem = getHeldItem();
 				if (heldItem) {
 					heldItem.removeAttribute('data-gridiot-dragging');
-					core.emit('drag-cancel', { item: heldItem });
+					core.emit('drag-cancel', { item: heldItem, source: 'keyboard' as const });
 					stateMachine.transition({ type: 'CANCEL_INTERACTION' });
 				} else if (selectedItem) {
 					core.deselect();
@@ -265,7 +265,7 @@ registerPlugin({
 					const targetCell = state.interaction?.targetCell ?? getItemCell(heldItem);
 					const size = getItemSize(heldItem);
 					heldItem.removeAttribute('data-gridiot-dragging');
-					core.emit('drag-end', { item: heldItem, cell: targetCell, colspan: size.colspan, rowspan: size.rowspan });
+					core.emit('drag-end', { item: heldItem, cell: targetCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
 					stateMachine.transition({ type: 'COMMIT_INTERACTION' });
 					stateMachine.transition({ type: 'FINISH_COMMIT' });
 					log('drop', { cell: targetCell });
@@ -292,7 +292,7 @@ registerPlugin({
 					});
 
 					selectedItem.setAttribute('data-gridiot-dragging', '');
-					core.emit('drag-start', { item: selectedItem, cell: startCell, colspan: size.colspan, rowspan: size.rowspan });
+					core.emit('drag-start', { item: selectedItem, cell: startCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
 					log('pick up');
 				}
 				return;
@@ -452,13 +452,13 @@ registerPlugin({
 						type: 'UPDATE_INTERACTION',
 						targetCell,
 					});
-					core.emit('drag-move', { item: heldItem, cell: targetCell, x: 0, y: 0, colspan: itemSize.colspan, rowspan: itemSize.rowspan });
+					core.emit('drag-move', { item: heldItem, cell: targetCell, x: 0, y: 0, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
 					log('move', { direction, amount, targetCell });
 				} else {
 					// Nudge: Move item directly
 					// Emit drag-start then drag-end (skip drag-move since we don't need preview)
-					core.emit('drag-start', { item: selectedItem, cell: currentCell, colspan: itemSize.colspan, rowspan: itemSize.rowspan });
-					core.emit('drag-end', { item: selectedItem, cell: targetCell, colspan: itemSize.colspan, rowspan: itemSize.rowspan });
+					core.emit('drag-start', { item: selectedItem, cell: currentCell, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
+					core.emit('drag-end', { item: selectedItem, cell: targetCell, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
 					log('nudge', { direction, amount, targetCell });
 				}
 				return;

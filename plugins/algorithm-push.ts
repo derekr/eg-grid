@@ -149,6 +149,7 @@ export function attachPushAlgorithm(
 		null;
 	let draggedItemId: string | null = null;
 	let draggedElement: HTMLElement | null = null;
+	let dragSource: 'pointer' | 'keyboard' | null = null;
 	let layoutVersion = 0; // Prevent stale async view transitions from overwriting newer layouts
 	let currentLayout: ItemRect[] | null = null;
 	let dragStartColumnCount: number | null = null; // Track column count at drag start to avoid implicit columns
@@ -289,6 +290,7 @@ export function attachPushAlgorithm(
 		const detail = (e as CustomEvent<DragStartDetail>).detail;
 		draggedElement = detail.item;
 		draggedItemId = getItemId(detail.item);
+		dragSource = detail.source;
 
 		// Capture column count BEFORE any CSS changes to avoid implicit columns from span values
 		dragStartColumnCount = getCurrentColumnCount();
@@ -381,9 +383,9 @@ export function attachPushAlgorithm(
 			finalLayout.map((it) => ({ id: it.id, col: it.column, row: it.row })),
 		);
 
-		// Check if this is a pointer drag (item is in fixed position) or keyboard nudge
-		const isPointerDrag = draggedElement?.style.position === 'fixed';
-		log('drag-end isPointerDrag:', isPointerDrag, 'position:', draggedElement?.style.position);
+		// Check if this is a pointer drag or keyboard nudge
+		const isPointerDrag = dragSource === 'pointer';
+		log('drag-end isPointerDrag:', isPointerDrag, 'source:', dragSource);
 
 		// Clear the 'dragging' viewTransitionName so CSS view-transition-name applies
 		if (draggedElement && draggedElement.style.viewTransitionName === 'dragging') {
@@ -424,6 +426,7 @@ export function attachPushAlgorithm(
 
 		draggedItemId = null;
 		draggedElement = null;
+		dragSource = null;
 		originalPositions = null;
 		pendingCell = null;
 		dragStartColumnCount = null;
@@ -460,6 +463,7 @@ export function attachPushAlgorithm(
 
 		draggedItemId = null;
 		draggedElement = null;
+		dragSource = null;
 		originalPositions = null;
 		pendingCell = null;
 		dragStartColumnCount = null;

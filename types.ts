@@ -3,11 +3,14 @@ export interface GridCell {
 	row: number;
 }
 
+export type DragSource = 'pointer' | 'keyboard';
+
 export interface DragStartDetail {
 	item: HTMLElement;
 	cell: GridCell;
 	colspan: number;
 	rowspan: number;
+	source: DragSource;
 }
 
 export interface DragMoveDetail {
@@ -17,6 +20,7 @@ export interface DragMoveDetail {
 	y: number;
 	colspan: number;
 	rowspan: number;
+	source: DragSource;
 }
 
 export interface DragEndDetail {
@@ -24,10 +28,12 @@ export interface DragEndDetail {
 	cell: GridCell;
 	colspan: number;
 	rowspan: number;
+	source: DragSource;
 }
 
 export interface DragCancelDetail {
 	item: HTMLElement;
+	source: DragSource;
 }
 
 // ============================================================================

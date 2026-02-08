@@ -183,7 +183,7 @@ export function attachCamera(
 	let scrollContainer = customContainer ?? findScrollParent(gridElement);
 	let animationFrameId: number | null = null;
 	let isDragging = false;
-	let sawPointerMove = false; // Track if we actually saw pointer movement
+	let dragSource: 'pointer' | 'keyboard' | null = null;
 	let lastPointerX = 0;
 	let lastPointerY = 0;
 	let isScrolling = false;
@@ -372,7 +372,6 @@ export function attachCamera(
 	function onPointerMove(e: PointerEvent): void {
 		if (!isDragging || !autoScrollOnDrag || mode === 'off') return;
 
-		sawPointerMove = true;
 		lastPointerX = e.clientX;
 		lastPointerY = e.clientY;
 		startScrollLoop();
@@ -381,20 +380,22 @@ export function attachCamera(
 	// Event handlers
 	function onDragStart(e: CustomEvent<DragStartDetail>): void {
 		isDragging = true;
-		sawPointerMove = false; // Reset - will be set true if pointer actually moves
-		// Start listening for pointer moves on window to track edge proximity
-		window.addEventListener('pointermove', onPointerMove);
+		dragSource = e.detail.source;
+		// Only listen for raw pointer moves during pointer drags (for edge-scroll detection)
+		if (dragSource === 'pointer') {
+			window.addEventListener('pointermove', onPointerMove);
+		}
 	}
 
 	function onDragMove(e: CustomEvent<DragMoveDetail>): void {
 		if (mode === 'off') return;
 
-		// For pointer drag: update position for edge detection
-		if (e.detail.x !== 0 || e.detail.y !== 0) {
+		if (e.detail.source === 'pointer') {
+			// Pointer drag: update position for edge detection
 			lastPointerX = e.detail.x;
 			lastPointerY = e.detail.y;
 		} else {
-			// Keyboard drag (x/y are 0) - scroll to keep item visible
+			// Keyboard drag - scroll to keep item visible
 			// Use requestAnimationFrame to let the DOM update first
 			requestAnimationFrame(() => {
 				scrollTo(e.detail.item, 'smooth');
@@ -403,11 +404,13 @@ export function attachCamera(
 	}
 
 	function onDragEnd(e: CustomEvent<DragEndDetail>): void {
-		const wasPointerDrag = sawPointerMove; // Only true if pointer actually moved
+		const wasPointerDrag = dragSource === 'pointer';
 		isDragging = false;
-		sawPointerMove = false;
+		dragSource = null;
 		stopScrollLoop();
-		window.removeEventListener('pointermove', onPointerMove);
+		if (wasPointerDrag) {
+			window.removeEventListener('pointermove', onPointerMove);
+		}
 
 		// For keyboard moves (nudge), scroll to keep item visible after it moves
 		// Pointer drags handle their own scrolling via edge detection
@@ -423,9 +426,13 @@ export function attachCamera(
 	}
 
 	function onDragCancel(e: CustomEvent<DragCancelDetail>): void {
+		const wasPointerDrag = dragSource === 'pointer';
 		isDragging = false;
+		dragSource = null;
 		stopScrollLoop();
-		window.removeEventListener('pointermove', onPointerMove);
+		if (wasPointerDrag) {
+			window.removeEventListener('pointermove', onPointerMove);
+		}
 	}
 
 	function onSelect(e: CustomEvent<SelectDetail>): void {

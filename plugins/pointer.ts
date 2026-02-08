@@ -86,7 +86,7 @@ registerPlugin({
 
 			log('drag-start', { startCell, rect: { left: rect.left, top: rect.top } });
 			// Emit drag-start BEFORE changing grid styles so originalPositions captures correct layout
-			core.emit('drag-start', { item, cell: startCell, colspan, rowspan });
+			core.emit('drag-start', { item, cell: startCell, colspan, rowspan, source: 'pointer' as const });
 
 			// Switch to fixed positioning - CSS Grid ignores fixed positioned children
 			// No need to move item out of grid container
@@ -240,7 +240,7 @@ registerPlugin({
 					log('drag-move', { cell, distX: distX.toFixed(2), distY: distY.toFixed(2) });
 					dragState.lastCell = cell;
 					dragState.lastTargetChangeTime = now;
-					core.emit('drag-move', { item, cell, x: e.clientX, y: e.clientY, colspan, rowspan });
+					core.emit('drag-move', { item, cell, x: e.clientX, y: e.clientY, colspan, rowspan, source: 'pointer' as const });
 				}
 			}
 		};
@@ -297,10 +297,10 @@ registerPlugin({
 				};
 
 				log('drag-end', { cell });
-				core.emit('drag-end', { item, cell, colspan, rowspan });
+				core.emit('drag-end', { item, cell, colspan, rowspan, source: 'pointer' as const });
 			} else {
 				log('drag-end', { cell: lastCell, note: 'using lastCell (pointer outside grid)' });
-				core.emit('drag-end', { item, cell: lastCell, colspan, rowspan });
+				core.emit('drag-end', { item, cell: lastCell, colspan, rowspan, source: 'pointer' as const });
 			}
 
 			cleanup();
@@ -317,7 +317,7 @@ registerPlugin({
 			if (!item) return;
 
 			if (dragState) {
-				core.emit('drag-cancel', { item });
+				core.emit('drag-cancel', { item, source: 'pointer' as const });
 			}
 			cleanup();
 		};
