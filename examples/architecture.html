@@ -116,6 +116,24 @@
     .item[data-gridiot-handle-active="e"]::after { width: 3px; right: 4px; top: 16px; bottom: 16px; left: auto; height: auto; }
     .item[data-gridiot-handle-active="w"]::after { width: 3px; left: 4px; top: 16px; bottom: 16px; right: auto; height: auto; }
 
+    /* Resize handle flash on plugin enable */
+    @keyframes handle-flash {
+      0% { opacity: 0; transform: scale(0.5); }
+      25% { opacity: 1; transform: scale(1.2); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+    .item.resize-flash::after {
+      opacity: 1 !important;
+      width: 12px !important;
+      height: 12px !important;
+      bottom: 4px !important;
+      right: 4px !important;
+      top: auto !important;
+      left: auto !important;
+      background: rgba(59, 130, 246, 0.7) !important;
+      animation: handle-flash 600ms ease-out forwards !important;
+    }
+
     /* Placeholder */
     .drop-placeholder {
       background: rgba(255,255,255,0.06);
@@ -800,6 +818,7 @@
       if (name === 'pointer') gridElement.setAttribute('data-pointer-active', '');
       if (name === 'accessibility') showAnnouncementsLog?.();
       if (name === 'responsive') updateColumnBadge();
+      if (name === 'resize') flashResizeHandles();
       scheduleProviderUpdate();
     }
 
@@ -820,6 +839,14 @@
         updateColumnBadge();
       }
       scheduleProviderUpdate();
+    }
+
+    function flashResizeHandles() {
+      const items = gridElement.querySelectorAll('[data-gridiot-item]');
+      for (const item of items) item.classList.add('resize-flash');
+      setTimeout(() => {
+        for (const item of items) item.classList.remove('resize-flash');
+      }, 600);
     }
 
     // Wire up checkboxes
