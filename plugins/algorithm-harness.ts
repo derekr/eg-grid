@@ -8,6 +8,7 @@
  * Individual algorithms implement AlgorithmStrategy and call attachAlgorithm().
  */
 
+import { listenEvents } from '../engine';
 import type {
 	DragCancelDetail,
 	DragEndDetail,
@@ -221,6 +222,22 @@ export function attachAlgorithm(
 		return element.dataset.id || element.dataset.gridiotItem || '';
 	}
 
+	function saveAndClearPreview(layout: ItemRect[], columnCount: number, afterSave?: () => void): void {
+		if (!layoutModel || !columnCount) return;
+		const positions = new Map<string, ItemPosition>();
+		for (const item of layout) {
+			positions.set(item.id, { column: item.column, row: item.row });
+		}
+		layoutModel.saveLayout(columnCount, positions);
+		if (afterSave) afterSave();
+		log('saved layout to model for', columnCount, 'columns');
+		if (styles) {
+			styles.clear('preview');
+			styles.commit();
+			log('cleared preview styles');
+		}
+	}
+
 	function applyLayout(
 		layout: ItemRect[],
 		excludeId: string | null,
@@ -378,24 +395,9 @@ export function attachAlgorithm(
 		const useViewTransition = !isPointerDrag;
 		const savedDragStartColumnCount = dragStartColumnCount;
 
-		const saveToLayoutModel = () => {
-			if (layoutModel && savedDragStartColumnCount) {
-				const positions = new Map<string, ItemPosition>();
-				for (const item of finalLayout) {
-					positions.set(item.id, { column: item.column, row: item.row });
-				}
-				layoutModel.saveLayout(savedDragStartColumnCount, positions);
-				log('saved layout to model for', savedDragStartColumnCount, 'columns');
-
-				if (styles) {
-					styles.clear('preview');
-					styles.commit();
-					log('cleared preview styles');
-				}
-			}
-		};
-
-		applyLayout(finalLayout, null, useViewTransition, saveToLayoutModel);
+		applyLayout(finalLayout, null, useViewTransition, () =>
+			saveAndClearPreview(finalLayout, savedDragStartColumnCount!),
+		);
 
 		draggedItemId = null;
 		draggedElement = null;
@@ -592,25 +594,11 @@ export function attachAlgorithm(
 		const savedResizedItemId = resizedItemId;
 		const savedResizeStartColumnCount = resizeStartColumnCount;
 
-		const saveToLayoutModel = () => {
-			if (layoutModel && savedResizeStartColumnCount) {
-				const positions = new Map<string, ItemPosition>();
-				for (const item of finalLayout) {
-					positions.set(item.id, { column: item.column, row: item.row });
-				}
-				layoutModel.saveLayout(savedResizeStartColumnCount, positions);
-				layoutModel.updateItemSize(savedResizedItemId!, { width: detail.colspan, height: detail.rowspan });
-				log('saved resize layout to model for', savedResizeStartColumnCount, 'columns');
-
-				if (styles) {
-					styles.clear('preview');
-					styles.commit();
-					log('cleared preview styles');
-				}
-			}
-		};
-
-		applyLayout(finalLayout, null, useViewTransition, saveToLayoutModel);
+		applyLayout(finalLayout, null, useViewTransition, () =>
+			saveAndClearPreview(finalLayout, savedResizeStartColumnCount!, () => {
+				layoutModel!.updateItemSize(savedResizedItemId!, { width: detail.colspan, height: detail.rowspan });
+			}),
+		);
 
 		resizedItemId = null;
 		resizedElement = null;
@@ -657,25 +645,15 @@ export function attachAlgorithm(
 	// Event listener registration
 	// =========================================================================
 
-	gridElement.addEventListener('gridiot:drag-start', onDragStart);
-	gridElement.addEventListener('gridiot:drag-move', onDragMove);
-	gridElement.addEventListener('gridiot:drag-end', onDragEnd);
-	gridElement.addEventListener('gridiot:drag-cancel', onDragCancel);
-	gridElement.addEventListener('gridiot:camera-settled', onCameraSettled);
-	gridElement.addEventListener('gridiot:resize-start', onResizeStart);
-	gridElement.addEventListener('gridiot:resize-move', onResizeMove);
-	gridElement.addEventListener('gridiot:resize-end', onResizeEnd);
-	gridElement.addEventListener('gridiot:resize-cancel', onResizeCancel);
-
-	return () => {
-		gridElement.removeEventListener('gridiot:drag-start', onDragStart);
-		gridElement.removeEventListener('gridiot:drag-move', onDragMove);
-		gridElement.removeEventListener('gridiot:drag-end', onDragEnd);
-		gridElement.removeEventListener('gridiot:drag-cancel', onDragCancel);
-		gridElement.removeEventListener('gridiot:camera-settled', onCameraSettled);
-		gridElement.removeEventListener('gridiot:resize-start', onResizeStart);
-		gridElement.removeEventListener('gridiot:resize-move', onResizeMove);
-		gridElement.removeEventListener('gridiot:resize-end', onResizeEnd);
-		gridElement.removeEventListener('gridiot:resize-cancel', onResizeCancel);
-	};
+	return listenEvents(gridElement, {
+		'gridiot:drag-start': onDragStart,
+		'gridiot:drag-move': onDragMove,
+		'gridiot:drag-end': onDragEnd,
+		'gridiot:drag-cancel': onDragCancel,
+		'gridiot:camera-settled': onCameraSettled,
+		'gridiot:resize-start': onResizeStart,
+		'gridiot:resize-move': onResizeMove,
+		'gridiot:resize-end': onResizeEnd,
+		'gridiot:resize-cancel': onResizeCancel,
+	});
 }

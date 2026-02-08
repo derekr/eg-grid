@@ -1,4 +1,4 @@
-import { registerPlugin } from '../engine';
+import { listenEvents, registerPlugin } from '../engine';
 import type {
 	DragCancelDetail,
 	DragEndDetail,
@@ -56,6 +56,19 @@ registerPlugin({
 			return `row ${cell.row}, column ${cell.column}`;
 		}
 
+		function resolveTemplate(
+			item: HTMLElement,
+			event: string,
+			vars: Record<string, string>,
+			fallback: string,
+		): string {
+			const template =
+				item.getAttribute(`data-gridiot-announce-${event}`) ||
+				core.element.getAttribute(`data-gridiot-announce-${event}`);
+			if (!template) return fallback;
+			return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '');
+		}
+
 		function getAnnouncement(
 			item: HTMLElement,
 			event: 'grab' | 'move' | 'drop' | 'cancel',
@@ -63,42 +76,15 @@ registerPlugin({
 		): string {
 			const label = getLabel(item);
 			const pos = cell ? formatPosition(cell) : '';
+			const vars = { label, row: String(cell?.row ?? ''), column: String(cell?.column ?? '') };
 
-			// Check for custom template on the item
-			const itemTemplate = item.getAttribute(`data-gridiot-announce-${event}`);
-			if (itemTemplate) {
-				return itemTemplate
-					.replace('{label}', label)
-					.replace('{row}', String(cell?.row ?? ''))
-					.replace('{column}', String(cell?.column ?? ''));
-			}
-
-			// Check for custom template on the grid container
-			const gridTemplate = core.element.getAttribute(
-				`data-gridiot-announce-${event}`,
-			);
-			if (gridTemplate) {
-				return gridTemplate
-					.replace('{label}', label)
-					.replace('{row}', String(cell?.row ?? ''))
-					.replace('{column}', String(cell?.column ?? ''));
-			}
-
-			// Default announcements
-			switch (event) {
-				case 'grab':
-					return `${label} grabbed. Position ${pos}. Use arrow keys to move, Enter to drop, Escape to cancel.`;
-				case 'move':
-					return `Moved to ${pos}.`;
-				case 'drop':
-					return `${label} dropped at ${pos}.`;
-				case 'cancel':
-					return `${label} drag cancelled.`;
-			}
-		}
-
-		function formatSize(colspan: number, rowspan: number): string {
-			return `${colspan} columns by ${rowspan} rows`;
+			const defaults: Record<string, string> = {
+				grab: `${label} grabbed. Position ${pos}. Use arrow keys to move, Enter to drop, Escape to cancel.`,
+				move: `Moved to ${pos}.`,
+				drop: `${label} dropped at ${pos}.`,
+				cancel: `${label} drag cancelled.`,
+			};
+			return resolveTemplate(item, event, vars, defaults[event]);
 		}
 
 		function getResizeAnnouncement(
@@ -108,43 +94,24 @@ registerPlugin({
 		): string {
 			const label = getLabel(item);
 			const size = opts?.colspan != null && opts?.rowspan != null
-				? formatSize(opts.colspan, opts.rowspan)
+				? `${opts.colspan} columns by ${opts.rowspan} rows`
 				: '';
 			const pos = opts?.cell ? formatPosition(opts.cell) : '';
+			const vars = {
+				label,
+				colspan: String(opts?.colspan ?? ''),
+				rowspan: String(opts?.rowspan ?? ''),
+				row: String(opts?.cell?.row ?? ''),
+				column: String(opts?.cell?.column ?? ''),
+			};
 
-			// Check for custom template on the item
-			const itemTemplate = item.getAttribute(`data-gridiot-announce-${event}`);
-			if (itemTemplate) {
-				return itemTemplate
-					.replace('{label}', label)
-					.replace('{colspan}', String(opts?.colspan ?? ''))
-					.replace('{rowspan}', String(opts?.rowspan ?? ''))
-					.replace('{row}', String(opts?.cell?.row ?? ''))
-					.replace('{column}', String(opts?.cell?.column ?? ''));
-			}
-
-			// Check for custom template on the grid container
-			const gridTemplate = core.element.getAttribute(`data-gridiot-announce-${event}`);
-			if (gridTemplate) {
-				return gridTemplate
-					.replace('{label}', label)
-					.replace('{colspan}', String(opts?.colspan ?? ''))
-					.replace('{rowspan}', String(opts?.rowspan ?? ''))
-					.replace('{row}', String(opts?.cell?.row ?? ''))
-					.replace('{column}', String(opts?.cell?.column ?? ''));
-			}
-
-			// Default announcements
-			switch (event) {
-				case 'resize-start':
-					return `${label} resize started. Size ${size}. Use pointer to resize, Escape to cancel.`;
-				case 'resize-move':
-					return `Resized to ${size}.`;
-				case 'resize-end':
-					return `${label} resized to ${size} at ${pos}.`;
-				case 'resize-cancel':
-					return `${label} resize cancelled.`;
-			}
+			const defaults: Record<string, string> = {
+				'resize-start': `${label} resize started. Size ${size}. Use pointer to resize, Escape to cancel.`,
+				'resize-move': `Resized to ${size}.`,
+				'resize-end': `${label} resized to ${size} at ${pos}.`,
+				'resize-cancel': `${label} resize cancelled.`,
+			};
+			return resolveTemplate(item, event, vars, defaults[event]);
 		}
 
 		const onDragStart = (e: CustomEvent<DragStartDetail>) => {
@@ -207,72 +174,19 @@ registerPlugin({
 			announce(getResizeAnnouncement(e.detail.item, 'resize-cancel'));
 		};
 
-		core.element.addEventListener(
-			'gridiot:drag-start',
-			onDragStart as EventListener,
-		);
-		core.element.addEventListener(
-			'gridiot:drag-move',
-			onDragMove as EventListener,
-		);
-		core.element.addEventListener(
-			'gridiot:drag-end',
-			onDragEnd as EventListener,
-		);
-		core.element.addEventListener(
-			'gridiot:drag-cancel',
-			onDragCancel as EventListener,
-		);
-		core.element.addEventListener(
-			'gridiot:resize-start',
-			onResizeStart as EventListener,
-		);
-		core.element.addEventListener(
-			'gridiot:resize-move',
-			onResizeMove as EventListener,
-		);
-		core.element.addEventListener(
-			'gridiot:resize-end',
-			onResizeEnd as EventListener,
-		);
-		core.element.addEventListener(
-			'gridiot:resize-cancel',
-			onResizeCancel as EventListener,
-		);
+		const unlisten = listenEvents(core.element, {
+			'gridiot:drag-start': onDragStart as EventListener,
+			'gridiot:drag-move': onDragMove as EventListener,
+			'gridiot:drag-end': onDragEnd as EventListener,
+			'gridiot:drag-cancel': onDragCancel as EventListener,
+			'gridiot:resize-start': onResizeStart as EventListener,
+			'gridiot:resize-move': onResizeMove as EventListener,
+			'gridiot:resize-end': onResizeEnd as EventListener,
+			'gridiot:resize-cancel': onResizeCancel as EventListener,
+		});
 
 		return () => {
-			core.element.removeEventListener(
-				'gridiot:drag-start',
-				onDragStart as EventListener,
-			);
-			core.element.removeEventListener(
-				'gridiot:drag-move',
-				onDragMove as EventListener,
-			);
-			core.element.removeEventListener(
-				'gridiot:drag-end',
-				onDragEnd as EventListener,
-			);
-			core.element.removeEventListener(
-				'gridiot:drag-cancel',
-				onDragCancel as EventListener,
-			);
-			core.element.removeEventListener(
-				'gridiot:resize-start',
-				onResizeStart as EventListener,
-			);
-			core.element.removeEventListener(
-				'gridiot:resize-move',
-				onResizeMove as EventListener,
-			);
-			core.element.removeEventListener(
-				'gridiot:resize-end',
-				onResizeEnd as EventListener,
-			);
-			core.element.removeEventListener(
-				'gridiot:resize-cancel',
-				onResizeCancel as EventListener,
-			);
+			unlisten();
 			liveRegion.remove();
 		};
 	},

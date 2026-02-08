@@ -1,4 +1,4 @@
-import { getItemCell, registerPlugin } from '../engine';
+import { getItemCell, getItemSize, registerPlugin } from '../engine';
 import type { DragState as ExposedDragState, GridCell } from '../types';
 import { animateFLIPWithTracking } from '../utils/flip';
 
@@ -114,10 +114,7 @@ registerPlugin({
 
 			const rect = item.getBoundingClientRect();
 			const startCell = getItemCell(item);
-			const colspan =
-				parseInt(item.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
-			const rowspan =
-				parseInt(item.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
+			const { colspan, rowspan } = getItemSize(item);
 
 			// Store pending drag state - don't start drag until movement
 			pendingDrag = {

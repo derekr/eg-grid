@@ -1,4 +1,4 @@
-import { getItemCell, registerPlugin } from '../engine';
+import { getItemCell, getItemSize, registerPlugin } from '../engine';
 import type { GridCell, ItemPosition } from '../types';
 import { isDragging, isResizing } from '../state-machine';
 
@@ -80,46 +80,15 @@ registerPlugin({
 		 * Get direction from key, supporting both arrows and vim-style hjkl.
 		 * Uses both e.key and e.code to handle Alt+hjkl on Mac (Alt produces special chars).
 		 */
-		const getDirection = (
-			key: string,
-			code: string,
-		): 'up' | 'down' | 'left' | 'right' | null => {
-			switch (key) {
-				case 'ArrowUp':
-					return 'up';
-				case 'ArrowDown':
-					return 'down';
-				case 'ArrowLeft':
-					return 'left';
-				case 'ArrowRight':
-					return 'right';
-				case 'k':
-				case 'K':
-					return 'up';
-				case 'j':
-				case 'J':
-					return 'down';
-				case 'h':
-				case 'H':
-					return 'left';
-				case 'l':
-				case 'L':
-					return 'right';
-			}
-			// Fallback to code for Alt+hjkl on Mac (Alt produces special characters)
-			switch (code) {
-				case 'KeyK':
-					return 'up';
-				case 'KeyJ':
-					return 'down';
-				case 'KeyH':
-					return 'left';
-				case 'KeyL':
-					return 'right';
-				default:
-					return null;
-			}
+		const KEY_DIR: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+			ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+			k: 'up', K: 'up', j: 'down', J: 'down', h: 'left', H: 'left', l: 'right', L: 'right',
 		};
+		// Fallback to code for Alt+hjkl on Mac (Alt produces special characters)
+		const CODE_DIR: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+			KeyK: 'up', KeyJ: 'down', KeyH: 'left', KeyL: 'right',
+		};
+		const getDirection = (key: string, code: string) => KEY_DIR[key] ?? CODE_DIR[code] ?? null;
 
 		/**
 		 * Get adjacent cell in a direction
@@ -189,16 +158,6 @@ registerPlugin({
 			}
 
 			return bestItem;
-		};
-
-		/**
-		 * Get the size of an item for jump calculations
-		 */
-		const getItemSize = (item: HTMLElement): { colspan: number; rowspan: number } => {
-			return {
-				colspan: parseInt(item.getAttribute('data-gridiot-colspan') || '1', 10) || 1,
-				rowspan: parseInt(item.getAttribute('data-gridiot-rowspan') || '1', 10) || 1,
-			};
 		};
 
 		const onKeyDown = (e: KeyboardEvent) => {

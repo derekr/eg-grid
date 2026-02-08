@@ -17,7 +17,7 @@
  *   });
  */
 
-import { registerPlugin } from '../engine';
+import { getItemSize, registerPlugin } from '../engine';
 import type {
 	GridCell,
 	GridiotCore,
@@ -64,8 +64,6 @@ interface ActiveResize {
 	/** Pointer position at start */
 	startPointerX: number;
 	startPointerY: number;
-	/** Placeholder element (currently unused but kept for API compatibility) */
-	placeholder: HTMLElement | null;
 }
 
 
@@ -201,10 +199,7 @@ export function attachResize(
 	}
 
 	function startResize(item: HTMLElement, handle: ResizeHandle, e: PointerEvent) {
-		const colspan =
-			parseInt(item.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
-		const rowspan =
-			parseInt(item.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
+		const { colspan, rowspan } = getItemSize(item);
 
 		const style = getComputedStyle(item);
 		const column = parseInt(style.gridColumnStart, 10) || 1;
@@ -234,7 +229,6 @@ export function attachResize(
 			initialRect,
 			startPointerX: e.clientX,
 			startPointerY: e.clientY,
-			placeholder: null, // Will be set below if enabled
 		};
 
 		item.setAttribute('data-gridiot-resizing', '');
@@ -256,8 +250,6 @@ export function attachResize(
 			handle,
 			source: 'pointer',
 		});
-
-		activeResize.placeholder = null;
 
 		// Switch to fixed positioning - item follows cursor in viewport coordinates
 		// CSS Grid ignores fixed positioned children, allowing the grid to reflow
@@ -420,12 +412,7 @@ export function attachResize(
 	function finishResize() {
 		if (!activeResize) return;
 
-		const { item, pointerId, currentSize, currentCell, sizeLabel, placeholder } = activeResize;
-
-		// Remove placeholder if it exists
-		if (placeholder) {
-			placeholder.remove();
-		}
+		const { item, pointerId, currentSize, currentCell, sizeLabel } = activeResize;
 
 		// Clean up item event listeners
 		cleanupResizeListeners(item, pointerId);
@@ -471,15 +458,10 @@ export function attachResize(
 	function cancelResize() {
 		if (!activeResize) return;
 
-		const { item, pointerId, sizeLabel, placeholder } = activeResize;
+		const { item, pointerId, sizeLabel } = activeResize;
 
 		// Clean up item event listeners
 		cleanupResizeListeners(item, pointerId);
-
-		// Remove placeholder if it exists
-		if (placeholder) {
-			placeholder.remove();
-		}
 
 		// Remove size label
 		if (sizeLabel) {

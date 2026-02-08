@@ -298,11 +298,38 @@ export function getItemCell(item: HTMLElement): GridCell {
 }
 
 /**
+ * Get the size of an item from its data attributes
+ */
+export function getItemSize(item: HTMLElement): { colspan: number; rowspan: number } {
+	return {
+		colspan: parseInt(item.getAttribute('data-gridiot-colspan') || '1', 10) || 1,
+		rowspan: parseInt(item.getAttribute('data-gridiot-rowspan') || '1', 10) || 1,
+	};
+}
+
+/**
  * Set an item's grid position
  */
 export function setItemCell(item: HTMLElement, cell: GridCell): void {
 	item.style.gridColumn = String(cell.column);
 	item.style.gridRow = String(cell.row);
+}
+
+/**
+ * Attach multiple event listeners and return a cleanup function to remove them all
+ */
+export function listenEvents(
+	element: HTMLElement,
+	events: Record<string, EventListenerOrEventListenerObject>,
+): () => void {
+	for (const [name, handler] of Object.entries(events)) {
+		element.addEventListener(name, handler);
+	}
+	return () => {
+		for (const [name, handler] of Object.entries(events)) {
+			element.removeEventListener(name, handler);
+		}
+	};
 }
 
 /**
