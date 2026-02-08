@@ -20,6 +20,7 @@ import type {
 	GridiotCore,
 	ResponsiveLayoutModel,
 	ResponsivePluginOptions,
+	StyleManager,
 } from '../types';
 
 const DEBUG = false;
@@ -50,7 +51,8 @@ export function attachResponsive(
 	options: ResponsivePluginOptions,
 	core?: GridiotCore,
 ): () => void {
-	const { layoutModel, styleElement } = options;
+	const { layoutModel } = options;
+	const styles: StyleManager | null = core?.styles ?? null;
 
 	// Infer cell size and gap from CSS if not provided
 	let cellSize = options.cellSize;
@@ -93,6 +95,8 @@ export function attachResponsive(
 	 * Inject CSS for all breakpoints
 	 */
 	function injectCSS(): void {
+		if (!styles) return;
+
 		inferGridMetrics();
 
 		// Use the grid element's class or ID as the selector
@@ -108,7 +112,8 @@ export function attachResponsive(
 			gridSelector,
 		});
 
-		styleElement.textContent = css;
+		styles.set('base', css);
+		styles.commit();
 		log('Injected CSS for all breakpoints');
 	}
 
@@ -124,9 +129,9 @@ export function attachResponsive(
 
 	// Track if server-rendered CSS was detected
 	// When true, we only inject CSS for explicit user overrides, not derived layouts
-	const hasServerRenderedCSS = !!styleElement.textContent?.trim();
+	const hasServerRenderedCSS = !!(styles?.get('base')?.trim());
 
-	// Only inject CSS if style element is empty (not server-rendered)
+	// Only inject CSS if base layer is empty (not server-rendered)
 	// This prevents flash when server has already provided initial CSS
 	if (!hasServerRenderedCSS) {
 		injectCSS();
@@ -232,12 +237,11 @@ registerPlugin({
 		options?: ResponsivePluginOptions & {
 			core?: GridiotCore;
 			layoutModel?: ResponsiveLayoutModel;
-			styleElement?: HTMLStyleElement;
 		},
 	) {
-		// Responsive requires both layoutModel and styleElement
-		if (!options?.layoutModel || !options?.styleElement) {
-			// Skip silently - responsive is optional and requires these resources
+		// Responsive requires layoutModel
+		if (!options?.layoutModel) {
+			// Skip silently - responsive is optional and requires layoutModel
 			return;
 		}
 
@@ -245,7 +249,6 @@ registerPlugin({
 			core.element,
 			{
 				layoutModel: options.layoutModel,
-				styleElement: options.styleElement,
 				cellSize: options.cellSize,
 				gap: options.gap,
 			},

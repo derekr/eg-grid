@@ -718,8 +718,7 @@
     </ul>
   </div>
 
-  <!-- Preview CSS during drag - higher specificity than layout-styles -->
-  <style id="preview-styles"></style>
+  <!-- Removed: preview-styles merged into layout-styles via core.styles -->
 
   <script type="module">
     import { init, createLayoutModel, attachResponsive } from '../bundles/index.ts';
@@ -731,7 +730,6 @@
 
     const gridElement = document.getElementById('grid');
     const layoutStyleElement = document.getElementById('layout-styles');
-    const previewStyleElement = document.getElementById('preview-styles');
 
     // Read initial items from DOM to build layout model
     // Uses data attributes for initial positions (data-column, data-row)
@@ -776,23 +774,22 @@
     // Initialize Gridiot
     // Disable plugins that will be manually attached with custom options
     const grid = init(gridElement, {
+      styleElement: layoutStyleElement,
       disablePlugins: ['algorithm-push', 'placeholder', 'camera', 'resize'],
     });
 
     // Attach responsive plugin - handles CSS for all breakpoints
     const detachResponsive = attachResponsive(gridElement, {
       layoutModel,
-      styleElement: layoutStyleElement,
       cellSize: 184,
       gap: 16,
     }, grid);
 
     // Track algorithm options for runtime changes
     let algorithmOptions = {
-      styleElement: previewStyleElement,  // Preview CSS during drag
       layoutModel,  // Save to layout model on drag-end
       compaction: true,
-      core: grid  // Pass core for provider registration
+      core: grid  // Pass core for provider registration and style injection
     };
     let detachAlgorithm = null;
 

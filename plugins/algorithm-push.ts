@@ -8,7 +8,8 @@
  * Usage (pure functions):
  *   import { calculateLayout, layoutToCSS } from 'gridiot/algorithm-push';
  *   const newLayout = calculateLayout(items, movedId, targetCell);
- *   styleElement.textContent = layoutToCSS(newLayout);
+ *   core.styles.set('preview', layoutToCSS(newLayout));
+ *   core.styles.commit();
  *
  * Usage (DOM integration):
  *   import { init } from 'gridiot';
@@ -40,6 +41,7 @@ import type {
 	DragEndDetail,
 	DragMoveDetail,
 	DragStartDetail,
+	DragSource,
 	GridCell,
 	GridiotCore,
 	ItemPosition,
@@ -49,6 +51,7 @@ import type {
 	ResizeMoveDetail,
 	ResizeStartDetail,
 	ResponsiveLayoutModel,
+	StyleManager,
 } from '../types';
 
 import type { CameraState } from './camera';
@@ -89,14 +92,6 @@ export function readItemsFromDOM(container: HTMLElement): ItemRect[] {
  */
 export interface AttachPushAlgorithmOptions {
 	/**
-	 * Style element to inject layout CSS into.
-	 * If not provided, positions are applied directly to element.style.
-	 *
-	 * When using with a layoutModel, this becomes the "preview" style element
-	 * used during drag. The responsive plugin manages the main layout CSS.
-	 */
-	styleElement?: HTMLStyleElement;
-	/**
 	 * CSS selector options for layoutToCSS
 	 */
 	selectorPrefix?: string;
@@ -107,8 +102,8 @@ export interface AttachPushAlgorithmOptions {
 	 */
 	compaction?: boolean;
 	/**
-	 * GridiotCore instance for provider registration.
-	 * If provided, registers a 'layout' provider that exposes current layout state.
+	 * GridiotCore instance for provider registration and style injection.
+	 * When provided, uses core.styles for CSS injection (the 'preview' layer).
 	 */
 	core?: GridiotCore;
 	/**
@@ -134,7 +129,8 @@ export function attachPushAlgorithm(
 	gridElement: HTMLElement,
 	options: AttachPushAlgorithmOptions = {},
 ): () => void {
-	const { styleElement, selectorPrefix = '#', selectorSuffix = '', compaction = true, core, layoutModel } = options;
+	const { selectorPrefix = '#', selectorSuffix = '', compaction = true, core, layoutModel } = options;
+	const styles: StyleManager | null = core?.styles ?? null;
 
 	/**
 	 * Get current column count from computed grid style
@@ -211,7 +207,7 @@ export function attachPushAlgorithm(
 				return;
 			}
 
-			if (styleElement) {
+			if (styles) {
 				// CSS injection mode - preferred
 				// Filter out the excluded item (being dragged) from CSS generation
 				const itemsToStyle = excludeId
@@ -224,7 +220,8 @@ export function attachPushAlgorithm(
 					maxColumns: capturedColumnCount ?? undefined,
 				});
 				log('injecting CSS:', css.substring(0, 200) + '...');
-				styleElement.textContent = css;
+				styles.set('preview', css);
+				styles.commit();
 
 				// Clear inline grid styles so CSS rules take effect
 				// (inline styles have higher specificity than stylesheet rules)
@@ -303,7 +300,7 @@ export function attachPushAlgorithm(
 		}
 
 		// In CSS injection mode, clear inline styles so CSS rules take effect
-		if (styleElement) {
+		if (styles) {
 			const elements = gridElement.querySelectorAll('[data-gridiot-item]');
 			for (const el of elements) {
 				const element = el as HTMLElement;
@@ -314,7 +311,8 @@ export function attachPushAlgorithm(
 			}
 			// Generate initial CSS for current positions, clamping to current column count
 			const css = layoutToCSS(items, { selectorPrefix, selectorSuffix, maxColumns: dragStartColumnCount });
-			styleElement.textContent = css;
+			styles.set('preview', css);
+			styles.commit();
 		}
 
 		log('drag-start', {
@@ -412,11 +410,12 @@ export function attachPushAlgorithm(
 				layoutModel.saveLayout(savedDragStartColumnCount, positions);
 				log('saved layout to model for', savedDragStartColumnCount, 'columns');
 
-				// Clear preview styles so container query CSS (layout-styles) takes over.
+				// Clear preview styles so container query CSS (base layer) takes over.
 				// This is safe because layoutModel now has the correct positions, and
 				// we're inside the View Transition callback so any mismatch gets animated.
-				if (styleElement) {
-					styleElement.textContent = '';
+				if (styles) {
+					styles.clear('preview');
+					styles.commit();
 					log('cleared preview styles');
 				}
 			}
@@ -509,6 +508,7 @@ export function attachPushAlgorithm(
 
 	let resizedItemId: string | null = null;
 	let resizedElement: HTMLElement | null = null;
+	let resizeSource: DragSource | null = null;
 	let resizeOriginalPositions: Map<string, { column: number; row: number; width: number; height: number }> | null = null;
 	let lastResizeLayout: { cell: GridCell; colspan: number; rowspan: number } | null = null;
 	let resizeStartColumnCount: number | null = null; // Track column count at resize start
@@ -517,6 +517,7 @@ export function attachPushAlgorithm(
 		const detail = (e as CustomEvent<ResizeStartDetail>).detail;
 		resizedElement = detail.item;
 		resizedItemId = getItemId(detail.item);
+		resizeSource = detail.source;
 
 		// Capture column count BEFORE any CSS changes to avoid implicit columns
 		resizeStartColumnCount = getCurrentColumnCount();
@@ -534,7 +535,7 @@ export function attachPushAlgorithm(
 		}
 
 		// In CSS injection mode, set up preview styles for animations during resize
-		if (styleElement) {
+		if (styles) {
 			const elements = gridElement.querySelectorAll('[data-gridiot-item]');
 			for (const el of elements) {
 				const element = el as HTMLElement;
@@ -545,7 +546,8 @@ export function attachPushAlgorithm(
 			}
 			// Generate initial CSS for current positions, clamping to current column count
 			const css = layoutToCSS(items, { selectorPrefix, selectorSuffix, maxColumns: resizeStartColumnCount });
-			styleElement.textContent = css;
+			styles.set('preview', css);
+			styles.commit();
 		}
 
 		// Clear last resize layout to ensure first resize-move triggers an update
@@ -609,9 +611,10 @@ export function attachPushAlgorithm(
 			newLayout.map((it) => ({ id: it.id, col: it.column, row: it.row, w: it.width, h: it.height })),
 		);
 
-		// Apply layout WITHOUT view transitions during resize-move to avoid visual glitches
-		// View transitions during rapid updates can cause items to appear to shrink/jitter
-		applyLayout(newLayout, resizedItemId, false);
+		// Apply layout WITH view transitions so other items animate smoothly during resize.
+		// The resized item itself has viewTransitionName='resizing' which suppresses its animation.
+		// The lastResizeLayout deduplication above prevents rapid-fire VT updates.
+		applyLayout(newLayout, resizedItemId, true);
 	};
 
 	const onResizeEnd = (e: Event) => {
@@ -648,9 +651,9 @@ export function attachPushAlgorithm(
 			finalLayout.map((it) => ({ id: it.id, col: it.column, row: it.row, w: it.width, h: it.height })),
 		);
 
-		// Check if this is a pointer resize (item is in fixed position) or keyboard resize
-		const isPointerResize = resizedElement?.style.position === 'fixed';
-		log('resize-end isPointerResize:', isPointerResize);
+		// Check if this is a pointer resize or keyboard resize using event source
+		const isPointerResize = resizeSource === 'pointer';
+		log('resize-end isPointerResize:', isPointerResize, 'source:', resizeSource);
 
 		// For pointer resize: don't use View Transitions - other items are already in position
 		// from resize-move, and FLIP handles the resized item. Using VT would conflict with FLIP.
@@ -677,11 +680,12 @@ export function attachPushAlgorithm(
 				layoutModel.updateItemSize(savedResizedItemId!, { width: detail.colspan, height: detail.rowspan });
 				log('saved resize layout to model for', savedResizeStartColumnCount, 'columns');
 
-				// Clear preview styles so container query CSS (layout-styles) takes over.
+				// Clear preview styles so container query CSS (base layer) takes over.
 				// This is safe because layoutModel now has the correct positions/sizes, and
 				// we're inside the View Transition callback so any mismatch gets animated.
-				if (styleElement) {
-					styleElement.textContent = '';
+				if (styles) {
+					styles.clear('preview');
+					styles.commit();
 					log('cleared preview styles');
 				}
 			}
@@ -691,6 +695,7 @@ export function attachPushAlgorithm(
 
 		resizedItemId = null;
 		resizedElement = null;
+		resizeSource = null;
 		resizeOriginalPositions = null;
 		lastResizeLayout = null;
 		resizeStartColumnCount = null;
@@ -728,6 +733,7 @@ export function attachPushAlgorithm(
 
 		resizedItemId = null;
 		resizedElement = null;
+		resizeSource = null;
 		resizeOriginalPositions = null;
 		lastResizeLayout = null;
 		resizeStartColumnCount = null;
@@ -764,7 +770,6 @@ registerPlugin({
 		options?: AlgorithmPushPluginOptions & {
 			core?: GridiotCore;
 			layoutModel?: ResponsiveLayoutModel;
-			styleElement?: HTMLStyleElement;
 		},
 	) {
 		return attachPushAlgorithm(core.element, {

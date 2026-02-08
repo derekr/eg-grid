@@ -1,4 +1,4 @@
-import type { GridCell, GridiotCore, InitOptions, Plugin, PluginOptions, ProviderRegistry } from './types';
+import type { GridCell, GridiotCore, InitOptions, Plugin, PluginOptions, ProviderRegistry, StyleManager } from './types';
 import { createStateMachine, type GridiotStateMachine } from './state-machine';
 
 // Global plugin registry
@@ -56,10 +56,50 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 		},
 	};
 
+	// StyleManager: single style element, multiple named layers
+	const styleLayers = new Map<string, string>(); // layer name → CSS
+	const layerOrder: string[] = []; // insertion order
+	const managedStyleElement = styleElement ?? document.createElement('style');
+	if (!styleElement) {
+		document.head.appendChild(managedStyleElement);
+		cleanups.push(() => managedStyleElement.remove());
+	}
+
+	// Pre-populate 'base' layer with any existing content (e.g. server-rendered CSS)
+	const existingCSS = managedStyleElement.textContent?.trim();
+	if (existingCSS) {
+		styleLayers.set('base', existingCSS);
+		layerOrder.push('base');
+	}
+
+	const styles: StyleManager = {
+		set(layer: string, css: string): void {
+			if (!styleLayers.has(layer)) {
+				layerOrder.push(layer);
+			}
+			styleLayers.set(layer, css);
+		},
+		get(layer: string): string {
+			return styleLayers.get(layer) ?? '';
+		},
+		clear(layer: string): void {
+			styleLayers.set(layer, '');
+		},
+		commit(): void {
+			const parts: string[] = [];
+			for (const layer of layerOrder) {
+				const css = styleLayers.get(layer);
+				if (css) parts.push(css);
+			}
+			managedStyleElement.textContent = parts.join('\n\n');
+		},
+	};
+
 	const core: GridiotCore = {
 		element,
 		providers,
 		stateMachine,
+		styles,
 
 		// Selection state (backed by state machine)
 		get selectedItem() {
@@ -201,7 +241,6 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 			...pluginSpecificOptions,
 			// Pass shared resources to all plugins that might need them
 			layoutModel,
-			styleElement,
 			core,
 		};
 

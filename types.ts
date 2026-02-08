@@ -51,6 +51,7 @@ export interface ResizeStartDetail {
 	/** Original rowspan before resize */
 	rowspan: number;
 	handle: ResizeHandle;
+	source: DragSource;
 }
 
 export interface ResizeMoveDetail {
@@ -66,6 +67,7 @@ export interface ResizeMoveDetail {
 	/** Projected rowspan */
 	rowspan: number;
 	handle: ResizeHandle;
+	source: DragSource;
 }
 
 export interface ResizeEndDetail {
@@ -76,10 +78,12 @@ export interface ResizeEndDetail {
 	colspan: number;
 	/** Final rowspan */
 	rowspan: number;
+	source: DragSource;
 }
 
 export interface ResizeCancelDetail {
 	item: HTMLElement;
+	source: DragSource;
 }
 
 /**
@@ -165,6 +169,25 @@ export interface LayoutState {
 import type { GridiotStateMachine, GridiotState, StateTransition } from './state-machine';
 export type { GridiotStateMachine, GridiotState, StateTransition };
 
+/**
+ * Centralized CSS injection manager.
+ *
+ * Plugins register named layers (e.g. 'base', 'preview') and the manager
+ * concatenates them in registration order into a single <style> element.
+ * This ensures correct cascade: base (responsive/container queries) first,
+ * preview (algorithm) second — later rules override same-specificity earlier ones.
+ */
+export interface StyleManager {
+	/** Set CSS for a named layer. First call for a layer establishes its order. */
+	set(layer: string, css: string): void;
+	/** Get current CSS for a layer. Returns empty string if not set. */
+	get(layer: string): string;
+	/** Clear CSS for a layer. */
+	clear(layer: string): void;
+	/** Flush all layers to the DOM style element. */
+	commit(): void;
+}
+
 export interface GridiotCore {
 	element: HTMLElement;
 	getCellFromPoint(x: number, y: number): GridCell | null;
@@ -182,6 +205,9 @@ export interface GridiotCore {
 
 	// Centralized state machine for interaction management
 	stateMachine: GridiotStateMachine;
+
+	// Centralized CSS injection
+	styles: StyleManager;
 }
 
 export interface Plugin<T = unknown> {
@@ -212,9 +238,6 @@ export interface CameraPluginOptions {
  * Resize plugin options
  */
 export interface ResizePluginOptions {
-	styleElement?: HTMLStyleElement;
-	selectorPrefix?: string;
-	selectorSuffix?: string;
 	handles?: 'corners' | 'edges' | 'all';
 	handleSize?: number;
 	minSize?: { colspan: number; rowspan: number };
@@ -235,7 +258,6 @@ export interface PlaceholderPluginOptions {
  * Algorithm-push plugin options
  */
 export interface AlgorithmPushPluginOptions {
-	styleElement?: HTMLStyleElement;
 	selectorPrefix?: string;
 	selectorSuffix?: string;
 	compaction?: boolean;
@@ -264,8 +286,8 @@ export interface InitOptions {
 	layoutModel?: ResponsiveLayoutModel;
 
 	/**
-	 * Style element for CSS injection.
-	 * Passed to responsive and algorithm-push plugins automatically.
+	 * Style element for centralized CSS injection (core.styles).
+	 * If not provided, one is created automatically and appended to <head>.
 	 */
 	styleElement?: HTMLStyleElement;
 
@@ -432,8 +454,6 @@ export interface CreateLayoutModelOptions {
 export interface ResponsivePluginOptions {
 	/** The layout model to use */
 	layoutModel: ResponsiveLayoutModel;
-	/** Style element for CSS injection */
-	styleElement: HTMLStyleElement;
 	/** Cell size in pixels (for breakpoint calculation, or infer from CSS) */
 	cellSize?: number;
 	/** Gap size in pixels (for breakpoint calculation, or infer from CSS) */

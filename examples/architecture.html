@@ -669,12 +669,8 @@
     </div>
   </div>
 
-  <!-- Algorithm injects CSS here during drag -->
-  <style id="preview-styles"></style>
-  <!-- Responsive plugin injects container query CSS here -->
-  <style id="responsive-styles"></style>
-  <!-- Resize plugin injects CSS here after resize -->
-  <style id="resize-styles"></style>
+  <!-- Single style element: core.styles manages layers (base + preview) -->
+  <style id="gridiot-styles"></style>
 
   <script type="module">
     // Import full bundle (auto-registers all plugins) + manual attach functions
@@ -688,9 +684,7 @@
 
     const gridElement = document.getElementById('grid');
     const gridContainer = document.getElementById('grid-container');
-    const previewStyleElement = document.getElementById('preview-styles');
-    const responsiveStyleElement = document.getElementById('responsive-styles');
-    const resizeStyleElement = document.getElementById('resize-styles');
+    const gridiotStyleElement = document.getElementById('gridiot-styles');
 
     // =========================================================================
     // Layout Model (for responsive plugin)
@@ -725,6 +719,7 @@
     // Plugins are imported (auto-registered) but not initialized.
     // We'll manually attach/detach them via toggles.
     const core = init(gridElement, {
+      styleElement: gridiotStyleElement,
       disablePlugins: [
         'pointer', 'keyboard', 'accessibility',
         'algorithm-push', 'placeholder', 'camera', 'resize', 'responsive',
@@ -759,7 +754,8 @@
         item.style.gridColumn = colspan > 1 ? `${colStart} / span ${colspan}` : `${colStart}`;
         item.style.gridRow = rowspan > 1 ? `${rowStart} / span ${rowspan}` : `${rowStart}`;
       }
-      previewStyleElement.textContent = '';
+      core.styles.clear('preview');
+      core.styles.commit();
     }
 
     function enablePlugin(name) {
@@ -778,7 +774,6 @@
         }
         case 'algorithm-push': {
           pluginCleanups[name] = attachPushAlgorithm(gridElement, {
-            styleElement: previewStyleElement,
             core,
           });
           break;
@@ -795,7 +790,6 @@
             minSize: { colspan: 1, rowspan: 1 },
             maxSize: { colspan: 4, rowspan: 4 },
             showSizeLabel: true,
-            styleElement: resizeStyleElement,
             core,
           });
           pluginCleanups[name] = () => inst.destroy();
@@ -811,7 +805,6 @@
           clearInlineGridStyles();
           pluginCleanups[name] = attachResponsive(gridElement, {
             layoutModel,
-            styleElement: responsiveStyleElement,
             cellSize: 120,
             gap: 8,
           }, core);
@@ -837,7 +830,8 @@
       if (name === 'pointer') gridElement.removeAttribute('data-pointer-active');
       if (name === 'accessibility') hideAnnouncementsLog?.();
       if (name === 'responsive') {
-        responsiveStyleElement.textContent = '';
+        core.styles.clear('base');
+        core.styles.commit();
         // Restore inline styles so items don't lose position without stylesheet rules
         preservePositionsAsInlineStyles();
         updateColumnBadge();
@@ -965,31 +959,23 @@
     const cssOutput = document.getElementById('css-output');
 
     function updateCSSOutput() {
-      const algoCss = previewStyleElement.textContent?.trim();
-      const respCss = responsiveStyleElement.textContent?.trim();
-      const resizeCss = resizeStyleElement.textContent?.trim();
-      const parts = [];
-      if (algoCss) parts.push('/* Algorithm */\n' + algoCss);
-      if (respCss) parts.push('/* Responsive */\n' + respCss);
-      if (resizeCss) parts.push('/* Resize */\n' + resizeCss);
+      const css = gridiotStyleElement.textContent?.trim();
 
-      if (parts.length) {
-        cssOutput.textContent = parts.join('\n\n');
+      if (css) {
+        cssOutput.textContent = css;
         cssOutput.classList.remove('empty');
       } else {
-        cssOutput.textContent = '(enable Algorithm, Responsive, or Resize to see CSS injection)';
+        cssOutput.textContent = '(enable Algorithm or Responsive to see CSS injection)';
         cssOutput.classList.add('empty');
       }
     }
 
     const cssObserver = new MutationObserver(updateCSSOutput);
-    for (const el of [previewStyleElement, resizeStyleElement]) {
-      cssObserver.observe(el, {
-        childList: true,
-        characterData: true,
-        subtree: true,
-      });
-    }
+    cssObserver.observe(gridiotStyleElement, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
     updateCSSOutput();
 
     // =========================================================================
@@ -1063,17 +1049,6 @@
       }
     });
     a11yObserver.observe(gridElement, {
-      childList: true,
-      characterData: true,
-      subtree: true,
-    });
-
-    // =========================================================================
-    // Also watch responsive style element for CSS output display
-    // =========================================================================
-
-    const responsiveCssObserver = new MutationObserver(updateCSSOutput);
-    responsiveCssObserver.observe(responsiveStyleElement, {
       childList: true,
       characterData: true,
       subtree: true,
