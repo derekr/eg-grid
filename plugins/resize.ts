@@ -28,7 +28,7 @@ import type {
 	ResizeStartDetail,
 	ResizeState,
 } from '../types';
-import { animateFLIPWithTracking } from '../utils/flip';
+
 
 export interface ResizeOptions {
 	/** GridiotCore instance (required) */
@@ -471,14 +471,11 @@ export function attachResize(
 		// Clean up item event listeners
 		cleanupResizeListeners(item, pointerId);
 
-		// FLIP: Capture current visual position (First)
-		const firstRect = item.getBoundingClientRect();
-
 		// Update data attributes to reflect new size
 		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
 		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
 
-		// Remove size label before animations
+		// Remove size label
 		if (sizeLabel) {
 			sizeLabel.remove();
 		}
@@ -501,43 +498,17 @@ export function attachResize(
 			applyResizeStyles();
 		}
 
-		// Clear fixed positioning and inline grid styles so injected CSS takes effect
+		// Snap to grid: clear fixed positioning and inline grid styles
 		item.style.position = '';
 		item.style.left = '';
 		item.style.top = '';
 		item.style.width = '';
 		item.style.height = '';
 		item.style.zIndex = '';
+		item.style.viewTransitionName = '';
 		clearInlineGridStyles(item);
 		item.removeAttribute('data-gridiot-resizing');
 		item.removeAttribute('data-gridiot-handle-active');
-
-		// Exclude from View Transitions during FLIP animation
-		item.style.viewTransitionName = 'none';
-
-		// FLIP: Animate from captured visual position to new grid position
-		requestAnimationFrame(() => {
-			const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
-
-			const cleanupAfterFlip = () => {
-				item.style.transform = '';
-				if (itemId) {
-					item.style.viewTransitionName = itemId;
-				} else {
-					item.style.viewTransitionName = '';
-				}
-			};
-
-			const animation = animateFLIPWithTracking(item, firstRect, {
-				includeScale: true,
-				transformOrigin: 'top left',
-				onFinish: cleanupAfterFlip,
-			});
-
-			if (!animation) {
-				cleanupAfterFlip();
-			}
-		});
 
 		activeResize = null;
 	}
