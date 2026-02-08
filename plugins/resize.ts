@@ -33,6 +33,12 @@ import { animateFLIPWithTracking } from '../utils/flip';
 export interface ResizeOptions {
 	/** GridiotCore instance (required) */
 	core: GridiotCore;
+	/** Style element for injecting resize CSS. If omitted, one is created and appended to <head>. */
+	styleElement?: HTMLStyleElement;
+	/** CSS selector prefix for item rules (default: '#') */
+	selectorPrefix?: string;
+	/** CSS selector suffix for item rules (default: '') */
+	selectorSuffix?: string;
 	/** Which handles to show: 'corners' | 'edges' | 'all' (default: 'corners') */
 	handles?: 'corners' | 'edges' | 'all';
 	/** Size of the hit zone for handles in pixels (default: 12) */
@@ -57,8 +63,6 @@ interface ActiveResize {
 	currentCell: GridCell;
 	/** Current size during resize */
 	currentSize: { colspan: number; rowspan: number };
-	originalGridColumn: string;
-	originalGridRow: string;
 	sizeLabel: HTMLElement | null;
 	/** Initial bounding rect for smooth resize */
 	initialRect: DOMRect;
@@ -175,7 +179,44 @@ export function attachResize(
 		minSize = { colspan: 1, rowspan: 1 },
 		maxSize = { colspan: 6, rowspan: 6 },
 		showSizeLabel = true,
+		selectorPrefix = '#',
+		selectorSuffix = '',
 	} = options;
+
+	// Style element for injecting resize CSS (create if not provided)
+	const ownStyleElement = !options.styleElement;
+	const styleElement = options.styleElement ?? (() => {
+		const el = document.createElement('style');
+		el.id = 'gridiot-resize-styles';
+		document.head.appendChild(el);
+		return el;
+	})();
+
+	// Track resized item positions — the single source of truth for resize layout
+	const resizedItems = new Map<string, { column: number; row: number; colspan: number; rowspan: number }>();
+
+	function getItemId(item: HTMLElement): string {
+		return item.dataset.id || item.id || '';
+	}
+
+	function generateResizeCSS(): string {
+		if (resizedItems.size === 0) return '';
+		const rules: string[] = [];
+		for (const [id, pos] of resizedItems) {
+			rules.push(`${selectorPrefix}${id}${selectorSuffix} { grid-column: ${pos.column} / span ${pos.colspan}; grid-row: ${pos.row} / span ${pos.rowspan}; }`);
+		}
+		return rules.join('\n');
+	}
+
+	function applyResizeStyles(): void {
+		styleElement.textContent = generateResizeCSS();
+	}
+
+	/** Clear an item's inline grid styles so injected CSS takes effect */
+	function clearInlineGridStyles(item: HTMLElement): void {
+		item.style.removeProperty('grid-column');
+		item.style.removeProperty('grid-row');
+	}
 
 	let activeResize: ActiveResize | null = null;
 	let hoveredItem: HTMLElement | null = null;
@@ -231,8 +272,6 @@ export function attachResize(
 			originalSize,
 			currentCell: { ...startCell },
 			currentSize: { ...originalSize },
-			originalGridColumn: item.style.gridColumn,
-			originalGridRow: item.style.gridRow,
 			sizeLabel,
 			initialRect,
 			startPointerX: e.clientX,
@@ -421,7 +460,8 @@ export function attachResize(
 	function finishResize() {
 		if (!activeResize) return;
 
-		const { item, pointerId, currentSize, currentCell, originalSize, sizeLabel, initialRect, placeholder } = activeResize;
+		const { item, pointerId, currentSize, currentCell, sizeLabel, placeholder } = activeResize;
+		const id = getItemId(item);
 
 		// Remove placeholder if it exists
 		if (placeholder) {
@@ -450,29 +490,30 @@ export function attachResize(
 			rowspan: currentSize.rowspan,
 		});
 
-		// Helper to apply final grid state
-		const applyFinalState = () => {
-			// Clear fixed/absolute positioning
-			item.style.position = '';
-			item.style.left = '';
-			item.style.top = '';
-			item.style.width = '';
-			item.style.height = '';
-			item.style.zIndex = '';
+		// Update resize styles map and inject CSS atomically
+		if (id) {
+			resizedItems.set(id, {
+				column: currentCell.column,
+				row: currentCell.row,
+				colspan: currentSize.colspan,
+				rowspan: currentSize.rowspan,
+			});
+			applyResizeStyles();
+		}
 
-			// Set final grid position
-			item.style.gridColumn = `${currentCell.column} / span ${currentSize.colspan}`;
-			item.style.gridRow = `${currentCell.row} / span ${currentSize.rowspan}`;
-
-			item.removeAttribute('data-gridiot-resizing');
-			item.removeAttribute('data-gridiot-handle-active');
-		};
+		// Clear fixed positioning and inline grid styles so injected CSS takes effect
+		item.style.position = '';
+		item.style.left = '';
+		item.style.top = '';
+		item.style.width = '';
+		item.style.height = '';
+		item.style.zIndex = '';
+		clearInlineGridStyles(item);
+		item.removeAttribute('data-gridiot-resizing');
+		item.removeAttribute('data-gridiot-handle-active');
 
 		// Exclude from View Transitions during FLIP animation
 		item.style.viewTransitionName = 'none';
-
-		// Apply final state immediately (return to grid flow)
-		applyFinalState();
 
 		// FLIP: Animate from captured visual position to new grid position
 		requestAnimationFrame(() => {
@@ -480,18 +521,6 @@ export function attachResize(
 
 			const cleanupAfterFlip = () => {
 				item.style.transform = '';
-				// Only clear inline grid styles if a stylesheet provides positioning
-				// (e.g., responsive container query CSS). Otherwise keep inline styles
-				// so the item doesn't lose its grid cell.
-				const savedCol = item.style.gridColumn;
-				const savedRow = item.style.gridRow;
-				item.style.gridColumn = '';
-				item.style.gridRow = '';
-				if (getComputedStyle(item).gridColumnStart === 'auto') {
-					item.style.gridColumn = savedCol;
-					item.style.gridRow = savedRow;
-				}
-				// Restore viewTransitionName so future View Transitions work
 				if (itemId) {
 					item.style.viewTransitionName = itemId;
 				} else {
@@ -505,7 +534,6 @@ export function attachResize(
 				onFinish: cleanupAfterFlip,
 			});
 
-			// If no animation was needed, ensure cleanup
 			if (!animation) {
 				cleanupAfterFlip();
 			}
@@ -517,7 +545,7 @@ export function attachResize(
 	function cancelResize() {
 		if (!activeResize) return;
 
-		const { item, pointerId, originalGridColumn, originalGridRow, sizeLabel, placeholder } = activeResize;
+		const { item, pointerId, sizeLabel, placeholder } = activeResize;
 
 		// Clean up item event listeners
 		cleanupResizeListeners(item, pointerId);
@@ -532,17 +560,14 @@ export function attachResize(
 			sizeLabel.remove();
 		}
 
-		// Clear fixed positioning
+		// Clear fixed positioning — item returns to grid flow at its previous position
+		// (the resizedItems map was not updated, so injected CSS is unchanged)
 		item.style.position = '';
 		item.style.left = '';
 		item.style.top = '';
 		item.style.width = '';
 		item.style.height = '';
 		item.style.zIndex = '';
-
-		// Restore original grid position
-		item.style.gridColumn = originalGridColumn;
-		item.style.gridRow = originalGridRow;
 
 		// Restore view transition name
 		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
@@ -669,14 +694,19 @@ export function attachResize(
 			Math.min(maxSize.rowspan, size.rowspan),
 		);
 
-		const style = getComputedStyle(item);
-		const column = parseInt(style.gridColumnStart, 10) || 1;
-		const row = parseInt(style.gridRowStart, 10) || 1;
+		const computed = getComputedStyle(item);
+		const column = parseInt(computed.gridColumnStart, 10) || 1;
+		const row = parseInt(computed.gridRowStart, 10) || 1;
+		const id = getItemId(item);
 
 		item.setAttribute('data-gridiot-colspan', String(clampedColspan));
 		item.setAttribute('data-gridiot-rowspan', String(clampedRowspan));
-		item.style.gridColumn = `${column} / span ${clampedColspan}`;
-		item.style.gridRow = `${row} / span ${clampedRowspan}`;
+
+		if (id) {
+			resizedItems.set(id, { column, row, colspan: clampedColspan, rowspan: clampedRowspan });
+			applyResizeStyles();
+			clearInlineGridStyles(item);
+		}
 
 		emit<ResizeEndDetail>('resize-end', {
 			item,
@@ -695,6 +725,14 @@ export function attachResize(
 
 		if (activeResize) {
 			cancelResize();
+		}
+
+		// Clean up style element
+		resizedItems.clear();
+		if (ownStyleElement) {
+			styleElement.remove();
+		} else {
+			styleElement.textContent = '';
 		}
 	}
 

@@ -673,6 +673,8 @@
   <style id="preview-styles"></style>
   <!-- Responsive plugin injects container query CSS here -->
   <style id="responsive-styles"></style>
+  <!-- Resize plugin injects CSS here after resize -->
+  <style id="resize-styles"></style>
 
   <script type="module">
     // Import full bundle (auto-registers all plugins) + manual attach functions
@@ -688,6 +690,7 @@
     const gridContainer = document.getElementById('grid-container');
     const previewStyleElement = document.getElementById('preview-styles');
     const responsiveStyleElement = document.getElementById('responsive-styles');
+    const resizeStyleElement = document.getElementById('resize-styles');
 
     // =========================================================================
     // Layout Model (for responsive plugin)
@@ -792,6 +795,7 @@
             minSize: { colspan: 1, rowspan: 1 },
             maxSize: { colspan: 4, rowspan: 4 },
             showSizeLabel: true,
+            styleElement: resizeStyleElement,
             core,
           });
           pluginCleanups[name] = () => inst.destroy();
@@ -963,25 +967,29 @@
     function updateCSSOutput() {
       const algoCss = previewStyleElement.textContent?.trim();
       const respCss = responsiveStyleElement.textContent?.trim();
+      const resizeCss = resizeStyleElement.textContent?.trim();
       const parts = [];
       if (algoCss) parts.push('/* Algorithm */\n' + algoCss);
       if (respCss) parts.push('/* Responsive */\n' + respCss);
+      if (resizeCss) parts.push('/* Resize */\n' + resizeCss);
 
       if (parts.length) {
         cssOutput.textContent = parts.join('\n\n');
         cssOutput.classList.remove('empty');
       } else {
-        cssOutput.textContent = '(enable Algorithm or Responsive to see CSS injection)';
+        cssOutput.textContent = '(enable Algorithm, Responsive, or Resize to see CSS injection)';
         cssOutput.classList.add('empty');
       }
     }
 
     const cssObserver = new MutationObserver(updateCSSOutput);
-    cssObserver.observe(previewStyleElement, {
-      childList: true,
-      characterData: true,
-      subtree: true,
-    });
+    for (const el of [previewStyleElement, resizeStyleElement]) {
+      cssObserver.observe(el, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    }
     updateCSSOutput();
 
     // =========================================================================

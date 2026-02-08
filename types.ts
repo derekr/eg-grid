@@ -212,6 +212,9 @@ export interface CameraPluginOptions {
  * Resize plugin options
  */
 export interface ResizePluginOptions {
+	styleElement?: HTMLStyleElement;
+	selectorPrefix?: string;
+	selectorSuffix?: string;
 	handles?: 'corners' | 'edges' | 'all';
 	handleSize?: number;
 	minSize?: { colspan: number; rowspan: number };
