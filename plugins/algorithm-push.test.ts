@@ -1,6 +1,6 @@
 /**
  * Property-based tests for push-down algorithm
- * Run with: npx tsx --test plugins/algorithm-push-core.test.ts
+ * Run with: npx tsx --test plugins/algorithm-push.test.ts
  */
 
 import { test } from 'node:test';
@@ -14,7 +14,7 @@ import {
 	calculateLayout,
 	layoutToCSS,
 	type ItemRect,
-} from './algorithm-push-core';
+} from './algorithm-push';
 
 // ============================================================================
 // Random generators for property-based testing

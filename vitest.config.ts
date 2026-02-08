@@ -7,7 +7,7 @@ export default defineConfig({
 		// Include test files
 		include: ['**/*.test.ts'],
 		// Exclude node_modules and node:test based tests
-		exclude: ['node_modules', 'plugins/algorithm-push-core.test.ts'],
+		exclude: ['node_modules', 'plugins/algorithm-push.test.ts'],
 		// Global test utilities
 		globals: true,
 	},
