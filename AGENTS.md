@@ -2,6 +2,8 @@
 
 Guidelines for AI agents working on this codebase.
 
+**IMPORTANT**: before you do anything else, run the `beans prime` command and heed its output.
+
 ## CSS Spec Documentation
 
 **Read these docs when working on core CSS features:**
