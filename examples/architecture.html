@@ -349,6 +349,113 @@
       outline: 2px solid rgba(251, 191, 36, 0.3);
       outline-offset: 4px;
     }
+
+    /* Resizable container for responsive demo */
+    .grid-container {
+      container-type: inline-size;
+      resize: horizontal;
+      overflow: hidden;
+      position: relative;
+      /* 4 cols * 120px + 3 gaps * 8px + 2 padding * 8px = 520px */
+      width: 520px;
+      min-width: 148px;
+      max-width: 100%;
+      padding-bottom: 4px; /* space for resize handle */
+      border-radius: 14px;
+    }
+
+    /* Custom resize handle indicator */
+    .grid-container::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 20px;
+      height: 20px;
+      cursor: ew-resize;
+      background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.12) 50%);
+      border-radius: 0 0 14px 0;
+      pointer-events: none;
+    }
+
+    /* Column count badge */
+    .column-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      background: rgba(255,255,255,0.05);
+      color: #555;
+      transition: color 0.15s, background 0.15s;
+    }
+    .column-badge.active {
+      color: #43e97b;
+      background: rgba(67, 233, 123, 0.1);
+    }
+
+    /* Grid overlay */
+    .grid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 50;
+      display: none;
+    }
+    .grid-overlay.visible { display: block; }
+
+    .grid-overlay-col {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: rgba(79, 172, 254, 0.06);
+      border-left: 1px dashed rgba(79, 172, 254, 0.25);
+      border-right: 1px dashed rgba(79, 172, 254, 0.25);
+    }
+    .grid-overlay-col:first-child { border-left: 1px dashed rgba(79, 172, 254, 0.25); }
+
+    .grid-overlay-label {
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.55rem;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: rgba(79, 172, 254, 0.6);
+      white-space: nowrap;
+    }
+
+    /* Grid overlay toggle */
+    .overlay-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      background: rgba(255,255,255,0.05);
+      color: #555;
+      border: none;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+    .overlay-toggle:hover { background: rgba(255,255,255,0.08); color: #777; }
+    .overlay-toggle.active { color: #4facfe; background: rgba(79, 172, 254, 0.1); }
+
+    .grid-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Responsive event badge */
+    .event-badge.responsive[data-active] { background: rgba(67, 233, 123, 0.2); color: #43e97b; }
   </style>
 </head>
 <body>
@@ -365,27 +472,35 @@
   <div class="layout">
     <!-- Left: Interactive Grid -->
     <div class="grid-area">
-      <div class="grid" id="grid">
-        <div id="item-a" class="item" data-gridiot-item data-gridiot-label="Item A" data-id="item-a" data-gridiot-colspan="2" data-color="1"
-          style="grid-column: 1 / span 2; grid-row: 1; --item-id: item-a" tabindex="0">A (2&times;1)</div>
-        <div id="item-b" class="item" data-gridiot-item data-gridiot-label="Item B" data-id="item-b" data-color="2"
-          style="grid-column: 3; grid-row: 1; --item-id: item-b" tabindex="0">B</div>
-        <div id="item-c" class="item" data-gridiot-item data-gridiot-label="Item C" data-id="item-c" data-color="3"
-          style="grid-column: 4; grid-row: 1; --item-id: item-c" tabindex="0">C</div>
-        <div id="item-d" class="item" data-gridiot-item data-gridiot-label="Item D" data-id="item-d" data-gridiot-rowspan="2" data-color="4"
-          style="grid-column: 1; grid-row: 2 / span 2; --item-id: item-d" tabindex="0">D (1&times;2)</div>
-        <div id="item-e" class="item" data-gridiot-item data-gridiot-label="Item E" data-id="item-e" data-gridiot-colspan="2" data-color="5"
-          style="grid-column: 2 / span 2; grid-row: 2; --item-id: item-e" tabindex="0">E (2&times;1)</div>
-        <div id="item-f" class="item" data-gridiot-item data-gridiot-label="Item F" data-id="item-f" data-color="6"
-          style="grid-column: 4; grid-row: 2; --item-id: item-f" tabindex="0">F</div>
-        <div id="item-g" class="item" data-gridiot-item data-gridiot-label="Item G" data-id="item-g" data-color="1"
-          style="grid-column: 2; grid-row: 3; --item-id: item-g" tabindex="0">G</div>
-        <div id="item-h" class="item" data-gridiot-item data-gridiot-label="Item H" data-id="item-h" data-gridiot-colspan="2" data-color="2"
-          style="grid-column: 3 / span 2; grid-row: 3; --item-id: item-h" tabindex="0">H (2&times;1)</div>
+      <div class="grid-container" id="grid-container">
+        <div class="grid" id="grid">
+          <div id="item-a" class="item" data-gridiot-item data-gridiot-label="Item A" data-id="item-a" data-gridiot-colspan="2" data-color="1"
+            style="grid-column: 1 / span 2; grid-row: 1; --item-id: item-a" tabindex="0">A (2&times;1)</div>
+          <div id="item-b" class="item" data-gridiot-item data-gridiot-label="Item B" data-id="item-b" data-color="2"
+            style="grid-column: 3; grid-row: 1; --item-id: item-b" tabindex="0">B</div>
+          <div id="item-c" class="item" data-gridiot-item data-gridiot-label="Item C" data-id="item-c" data-color="3"
+            style="grid-column: 4; grid-row: 1; --item-id: item-c" tabindex="0">C</div>
+          <div id="item-d" class="item" data-gridiot-item data-gridiot-label="Item D" data-id="item-d" data-gridiot-rowspan="2" data-color="4"
+            style="grid-column: 1; grid-row: 2 / span 2; --item-id: item-d" tabindex="0">D (1&times;2)</div>
+          <div id="item-e" class="item" data-gridiot-item data-gridiot-label="Item E" data-id="item-e" data-gridiot-colspan="2" data-color="5"
+            style="grid-column: 2 / span 2; grid-row: 2; --item-id: item-e" tabindex="0">E (2&times;1)</div>
+          <div id="item-f" class="item" data-gridiot-item data-gridiot-label="Item F" data-id="item-f" data-color="6"
+            style="grid-column: 4; grid-row: 2; --item-id: item-f" tabindex="0">F</div>
+          <div id="item-g" class="item" data-gridiot-item data-gridiot-label="Item G" data-id="item-g" data-color="1"
+            style="grid-column: 2; grid-row: 3; --item-id: item-g" tabindex="0">G</div>
+          <div id="item-h" class="item" data-gridiot-item data-gridiot-label="Item H" data-id="item-h" data-gridiot-colspan="2" data-color="2"
+            style="grid-column: 3 / span 2; grid-row: 3; --item-id: item-h" tabindex="0">H (2&times;1)</div>
+        </div>
+        <div class="grid-overlay" id="grid-overlay"></div>
+      </div>
+      <div class="grid-toolbar">
+        <span class="column-badge" id="column-badge">cols: 4</span>
+        <button class="overlay-toggle" id="overlay-toggle">grid</button>
       </div>
       <div class="hint">
         Enable <b>Pointer</b> to drag items (they snap back without an algorithm).
         Then enable <b>Algorithm</b> to see items push each other.
+        Enable <b>Responsive</b> and resize the container to see columns reflow.
       </div>
     </div>
 
@@ -446,6 +561,13 @@
             <div class="toggle-desc">Announces actions via ARIA live region</div>
           </div>
         </label>
+        <label class="toggle">
+          <input type="checkbox" data-plugin="responsive">
+          <div>
+            <div class="toggle-name">Responsive</div>
+            <div class="toggle-desc">Injects container query CSS, reflows layout on resize</div>
+          </div>
+        </label>
       </section>
 
       <!-- State Machine -->
@@ -494,6 +616,12 @@
             <div class="event-badge resize" data-event="resize-cancel">cancel <span class="count"></span></div>
           </div>
         </div>
+        <div class="event-group">
+          <div class="event-group-label">Responsive</div>
+          <div class="event-badges">
+            <div class="event-badge responsive" data-event="column-count-change">col-change <span class="count"></span></div>
+          </div>
+        </div>
       </section>
 
       <!-- ARIA Announcements -->
@@ -525,6 +653,8 @@
 
   <!-- Algorithm injects CSS here during drag -->
   <style id="preview-styles"></style>
+  <!-- Responsive plugin injects container query CSS here -->
+  <style id="responsive-styles"></style>
 
   <script type="module">
     // Import full bundle (auto-registers all plugins) + manual attach functions
@@ -533,9 +663,42 @@
     import { attachPlaceholder } from '../plugins/placeholder.ts';
     import { attachCamera } from '../plugins/camera.ts';
     import { attachResize } from '../plugins/resize.ts';
+    import { attachResponsive } from '../plugins/responsive.ts';
+    import { createLayoutModel } from '../layout-model.ts';
 
     const gridElement = document.getElementById('grid');
+    const gridContainer = document.getElementById('grid-container');
     const previewStyleElement = document.getElementById('preview-styles');
+    const responsiveStyleElement = document.getElementById('responsive-styles');
+
+    // =========================================================================
+    // Layout Model (for responsive plugin)
+    // =========================================================================
+
+    const layoutModel = createLayoutModel({
+      maxColumns: 4,
+      minColumns: 1,
+      items: [
+        { id: 'item-a', width: 2, height: 1 },
+        { id: 'item-b', width: 1, height: 1 },
+        { id: 'item-c', width: 1, height: 1 },
+        { id: 'item-d', width: 1, height: 2 },
+        { id: 'item-e', width: 2, height: 1 },
+        { id: 'item-f', width: 1, height: 1 },
+        { id: 'item-g', width: 1, height: 1 },
+        { id: 'item-h', width: 2, height: 1 },
+      ],
+      canonicalPositions: new Map([
+        ['item-a', { column: 1, row: 1 }],
+        ['item-b', { column: 3, row: 1 }],
+        ['item-c', { column: 4, row: 1 }],
+        ['item-d', { column: 1, row: 2 }],
+        ['item-e', { column: 2, row: 2 }],
+        ['item-f', { column: 4, row: 2 }],
+        ['item-g', { column: 2, row: 3 }],
+        ['item-h', { column: 3, row: 3 }],
+      ]),
+    });
 
     // Initialize core with ALL plugins disabled.
     // Plugins are imported (auto-registered) but not initialized.
@@ -552,6 +715,15 @@
     // =========================================================================
 
     const pluginCleanups = {};
+
+    // Clear inline grid-column/grid-row from items so stylesheet rules can take effect
+    function clearInlineGridStyles() {
+      const items = gridElement.querySelectorAll('[data-gridiot-item]');
+      for (const item of items) {
+        item.style.removeProperty('grid-column');
+        item.style.removeProperty('grid-row');
+      }
+    }
 
     // When detaching algorithm, preserve item positions as inline styles
     // so items don't lose their positions when CSS injection stops.
@@ -612,10 +784,22 @@
           pluginCleanups[name] = () => inst.destroy();
           break;
         }
+        case 'responsive': {
+          // Clear inline grid styles — responsive CSS needs to win via container queries
+          clearInlineGridStyles();
+          pluginCleanups[name] = attachResponsive(gridElement, {
+            layoutModel,
+            styleElement: responsiveStyleElement,
+            cellSize: 120,
+            gap: 8,
+          }, core);
+          break;
+        }
       }
 
       if (name === 'pointer') gridElement.setAttribute('data-pointer-active', '');
       if (name === 'accessibility') showAnnouncementsLog?.();
+      if (name === 'responsive') updateColumnBadge();
       scheduleProviderUpdate();
     }
 
@@ -629,6 +813,12 @@
 
       if (name === 'pointer') gridElement.removeAttribute('data-pointer-active');
       if (name === 'accessibility') hideAnnouncementsLog?.();
+      if (name === 'responsive') {
+        responsiveStyleElement.textContent = '';
+        // Restore inline styles so items don't lose position without stylesheet rules
+        preservePositionsAsInlineStyles();
+        updateColumnBadge();
+      }
       scheduleProviderUpdate();
     }
 
@@ -675,6 +865,7 @@
       'select', 'deselect',
       'drag-start', 'drag-move', 'drag-end', 'drag-cancel',
       'resize-start', 'resize-move', 'resize-end', 'resize-cancel',
+      'column-count-change',
     ];
 
     EVENT_NAMES.forEach(name => {
@@ -708,6 +899,7 @@
       { name: 'resize', fmt: v => v ? `{ item: "${v.item?.dataset?.id}", handle: "${v.handle}" }` : 'null' },
       { name: 'layout', fmt: v => v ? `{ items: ${v.items?.length}, cols: ${v.columns} }` : 'null' },
       { name: 'camera', fmt: v => v ? `{ scrolling: ${v.isScrolling} }` : 'null' },
+      { name: 'responsive', fmt: v => v ? `{ cols: ${v.columnCount}, range: ${v.minColumns}-${v.maxColumns} }` : 'null' },
     ];
 
     function updateProviders() {
@@ -742,12 +934,17 @@
     const cssOutput = document.getElementById('css-output');
 
     function updateCSSOutput() {
-      const css = previewStyleElement.textContent?.trim();
-      if (css) {
-        cssOutput.textContent = css;
+      const algoCss = previewStyleElement.textContent?.trim();
+      const respCss = responsiveStyleElement.textContent?.trim();
+      const parts = [];
+      if (algoCss) parts.push('/* Algorithm */\n' + algoCss);
+      if (respCss) parts.push('/* Responsive */\n' + respCss);
+
+      if (parts.length) {
+        cssOutput.textContent = parts.join('\n\n');
         cssOutput.classList.remove('empty');
       } else {
-        cssOutput.textContent = '(enable Algorithm to see CSS injection)';
+        cssOutput.textContent = '(enable Algorithm or Responsive to see CSS injection)';
         cssOutput.classList.add('empty');
       }
     }
@@ -835,6 +1032,91 @@
       characterData: true,
       subtree: true,
     });
+
+    // =========================================================================
+    // Also watch responsive style element for CSS output display
+    // =========================================================================
+
+    const responsiveCssObserver = new MutationObserver(updateCSSOutput);
+    responsiveCssObserver.observe(responsiveStyleElement, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+
+    // =========================================================================
+    // Column Count Badge + Column-Count-Change Event Handler
+    // =========================================================================
+
+    const columnBadge = document.getElementById('column-badge');
+
+    function getColumnCount() {
+      const style = getComputedStyle(gridElement);
+      const cols = style.gridTemplateColumns.split(' ').filter(Boolean);
+      return cols.length;
+    }
+
+    function updateColumnBadge() {
+      const cols = getColumnCount();
+      columnBadge.textContent = `cols: ${cols}`;
+      const isResponsiveActive = !!pluginCleanups['responsive'];
+      columnBadge.classList.toggle('active', isResponsiveActive);
+      updateGridOverlay();
+    }
+
+    // Update badge when column count changes
+    gridElement.addEventListener('gridiot:column-count-change', () => {
+      updateColumnBadge();
+    });
+
+    // Also watch container resizes to update badge even without responsive plugin
+    const containerResizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(updateColumnBadge);
+    });
+    containerResizeObserver.observe(gridElement);
+
+    // =========================================================================
+    // Grid Overlay
+    // =========================================================================
+
+    const gridOverlay = document.getElementById('grid-overlay');
+    const overlayToggle = document.getElementById('overlay-toggle');
+    let overlayVisible = false;
+
+    overlayToggle.addEventListener('click', () => {
+      overlayVisible = !overlayVisible;
+      overlayToggle.classList.toggle('active', overlayVisible);
+      gridOverlay.classList.toggle('visible', overlayVisible);
+      if (overlayVisible) updateGridOverlay();
+    });
+
+    function updateGridOverlay() {
+      if (!overlayVisible) return;
+
+      const style = getComputedStyle(gridElement);
+      const trackSizes = style.gridTemplateColumns.split(' ').filter(Boolean);
+      const gap = parseFloat(style.columnGap) || parseFloat(style.gap) || 0;
+      const padding = parseFloat(style.paddingLeft) || 0;
+      const gridRect = gridElement.getBoundingClientRect();
+      const containerRect = gridContainer.getBoundingClientRect();
+
+      // Offset of grid within container
+      const offsetLeft = gridRect.left - containerRect.left;
+      const offsetTop = gridRect.top - containerRect.top;
+
+      let html = '';
+      let x = offsetLeft + padding;
+
+      for (let i = 0; i < trackSizes.length; i++) {
+        const w = parseFloat(trackSizes[i]);
+        html += `<div class="grid-overlay-col" style="left:${x}px;width:${w}px">`;
+        html += `<span class="grid-overlay-label">${i + 1}</span>`;
+        html += `</div>`;
+        x += w + gap;
+      }
+
+      gridOverlay.innerHTML = html;
+    }
 
   </script>
 </body>
