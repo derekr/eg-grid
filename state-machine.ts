@@ -74,32 +74,12 @@ export type StateTransition =
 	| { type: 'FINISH_COMMIT' }
 	| { type: 'TOGGLE_KEYBOARD_MODE' };
 
-export type StateListener = (state: GridiotState, transition: StateTransition) => void;
-
 export interface GridiotStateMachine {
 	getState(): GridiotState;
 	transition(action: StateTransition): GridiotState;
-	subscribe(listener: StateListener): () => void;
-	/** Check if a transition is valid from current state */
-	canTransition(action: StateTransition): boolean;
 }
 
-/**
- * Create the initial state
- */
-export function createInitialState(): GridiotState {
-	return {
-		phase: 'idle',
-		selectedItemId: null,
-		interaction: null,
-		keyboardModeActive: false,
-	};
-}
-
-/**
- * Pure state reducer - computes next state from current state and action
- */
-export function reducer(state: GridiotState, action: StateTransition): GridiotState {
+function reducer(state: GridiotState, action: StateTransition): GridiotState {
 	switch (action.type) {
 		case 'SELECT': {
 			// Can select from idle or selected (changes selection)
@@ -206,37 +186,15 @@ export function reducer(state: GridiotState, action: StateTransition): GridiotSt
 }
 
 /**
- * Check if a transition is valid from the current state
- */
-export function canTransition(state: GridiotState, action: StateTransition): boolean {
-	switch (action.type) {
-		case 'SELECT':
-			return state.phase === 'idle' || state.phase === 'selected';
-		case 'DESELECT':
-			return state.phase === 'selected';
-		case 'START_INTERACTION':
-			return state.phase === 'selected';
-		case 'UPDATE_INTERACTION':
-			return state.phase === 'interacting' && state.interaction !== null;
-		case 'COMMIT_INTERACTION':
-			return state.phase === 'interacting';
-		case 'CANCEL_INTERACTION':
-			return state.phase === 'interacting';
-		case 'FINISH_COMMIT':
-			return state.phase === 'committing';
-		case 'TOGGLE_KEYBOARD_MODE':
-			return true; // Always allowed
-		default:
-			return false;
-	}
-}
-
-/**
  * Create a state machine instance
  */
-export function createStateMachine(initialState?: GridiotState): GridiotStateMachine {
-	let state = initialState ?? createInitialState();
-	const listeners = new Set<StateListener>();
+export function createStateMachine(): GridiotStateMachine {
+	let state: GridiotState = {
+		phase: 'idle',
+		selectedItemId: null,
+		interaction: null,
+		keyboardModeActive: false,
+	};
 
 	return {
 		getState() {
@@ -247,73 +205,12 @@ export function createStateMachine(initialState?: GridiotState): GridiotStateMac
 			const nextState = reducer(state, action);
 			if (nextState !== state) {
 				state = nextState;
-				for (const listener of listeners) {
-					listener(state, action);
-				}
 			}
 			return state;
-		},
-
-		subscribe(listener: StateListener) {
-			listeners.add(listener);
-			return () => listeners.delete(listener);
-		},
-
-		canTransition(action: StateTransition) {
-			return canTransition(state, action);
 		},
 	};
 }
 
-// ============================================================================
-// Derived State Helpers
-// ============================================================================
-
-/**
- * Check if currently in an active interaction
- */
-export function isInteracting(state: GridiotState): boolean {
-	return state.phase === 'interacting' || state.phase === 'committing';
-}
-
-/**
- * Check if currently dragging (not resizing)
- */
 export function isDragging(state: GridiotState): boolean {
-	return isInteracting(state) && state.interaction?.type === 'drag';
-}
-
-/**
- * Check if currently resizing (not dragging)
- */
-export function isResizing(state: GridiotState): boolean {
-	return isInteracting(state) && state.interaction?.type === 'resize';
-}
-
-/**
- * Get the interaction mode if active
- */
-export function getInteractionMode(state: GridiotState): InteractionMode | null {
-	return state.interaction?.mode ?? null;
-}
-
-/**
- * Check if View Transitions should be used for current interaction
- */
-export function shouldUseViewTransition(state: GridiotState): boolean {
-	return state.interaction?.useViewTransition ?? false;
-}
-
-/**
- * Check if FLIP animation should be used for current interaction
- */
-export function shouldUseFlip(state: GridiotState): boolean {
-	return state.interaction?.useFlip ?? false;
-}
-
-/**
- * Get the captured column count for current interaction
- */
-export function getInteractionColumnCount(state: GridiotState): number | null {
-	return state.interaction?.columnCount ?? null;
+	return (state.phase === 'interacting' || state.phase === 'committing') && state.interaction?.type === 'drag';
 }

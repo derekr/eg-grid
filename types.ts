@@ -273,6 +273,7 @@ export interface AlgorithmReorderPluginOptions {
 	layoutModel?: ResponsiveLayoutModel;
 }
 
+
 /**
  * Plugin-specific options map for init()
  */

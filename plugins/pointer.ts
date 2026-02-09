@@ -13,11 +13,6 @@ const PREDICTION_THRESHOLD = 30;
 // Fraction of cell to lead ahead when prediction is active (0.5 = half a cell)
 const PREDICTION_LEAD = 0.5;
 
-const DEBUG = false;
-function log(...args: unknown[]) {
-	if (DEBUG) console.log('[pointer]', ...args);
-}
-
 interface PendingDrag {
 	item: HTMLElement;
 	pointerId: number;
@@ -84,7 +79,6 @@ registerPlugin({
 			item.setAttribute('data-gridiot-dragging', '');
 			document.body.classList.add('is-dragging');
 
-			log('drag-start', { startCell, rect: { left: rect.left, top: rect.top } });
 			// Emit drag-start BEFORE changing grid styles so originalPositions captures correct layout
 			core.emit('drag-start', { item, cell: startCell, colspan, rowspan, source: 'pointer' as const });
 
@@ -234,7 +228,6 @@ registerPlugin({
 						return; // Stay in current cell
 					}
 
-					log('drag-move', { cell, distX: distX.toFixed(2), distY: distY.toFixed(2) });
 					dragState.lastCell = cell;
 					dragState.lastTargetChangeTime = now;
 					core.emit('drag-move', { item, cell, x: e.clientX, y: e.clientY, colspan, rowspan, source: 'pointer' as const });
@@ -248,7 +241,6 @@ registerPlugin({
 
 			// If drag never started, this was just a click - nothing more to do
 			if (pendingDrag && !dragState) {
-				log('click (no drag)');
 				cleanupListeners(item, pendingDrag.pointerId);
 				pendingDrag = null;
 				return;
@@ -293,10 +285,8 @@ registerPlugin({
 					row: Math.max(1, Math.min(maxRow, rawCell.row)),
 				};
 
-				log('drag-end', { cell });
 				core.emit('drag-end', { item, cell, colspan, rowspan, source: 'pointer' as const });
 			} else {
-				log('drag-end', { cell: lastCell, note: 'using lastCell (pointer outside grid)' });
 				core.emit('drag-end', { item, cell: lastCell, colspan, rowspan, source: 'pointer' as const });
 			}
 
@@ -304,7 +294,6 @@ registerPlugin({
 
 			// FLIP: Animate from visual position to final grid position
 			requestAnimationFrame(() => {
-				log('FLIP', { firstRect: { left: firstRect.left.toFixed(0), top: firstRect.top.toFixed(0) } });
 				animateFLIPWithTracking(item, firstRect);
 			});
 		};

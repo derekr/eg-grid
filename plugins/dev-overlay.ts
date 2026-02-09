@@ -8,8 +8,8 @@
  * Toggle with Shift+D (or programmatically)
  */
 
-import { getGridInfo, getItemCell } from '../engine';
-import type { DragState, GridiotCore, LayoutState } from '../types';
+import { getItemCell } from '../engine';
+import type { DragState, GridInfo, GridiotCore, LayoutState } from '../types';
 
 export interface DevOverlayOptions {
 	/** Initial tab to show ('debug' | 'config') */
@@ -320,7 +320,7 @@ export function attachDevOverlay(
 	}
 
 	function render() {
-		const gridInfo = getGridInfo(gridElement);
+		const gridInfo = core?.getGridInfo();
 		const items = Array.from(gridElement.querySelectorAll('[data-gridiot-item]')) as HTMLElement[];
 
 		overlay.innerHTML = `
@@ -382,7 +382,8 @@ export function attachDevOverlay(
 		});
 	}
 
-	function renderDebugTab(gridInfo: ReturnType<typeof getGridInfo>, items: HTMLElement[]): string {
+	function renderDebugTab(gridInfo: GridInfo | undefined, items: HTMLElement[]): string {
+		if (!gridInfo) return '<div class="gridiot-dev-section">No core available</div>';
 		// Query providers for live state
 		const dragState = core?.providers.get<DragState>('drag');
 		const layoutState = core?.providers.get<LayoutState>('layout');

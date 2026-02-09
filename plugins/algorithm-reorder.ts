@@ -255,7 +255,7 @@ export function attachReorderAlgorithm(
 		},
 	};
 
-	return attachAlgorithm(gridElement, strategy, options, 'algorithm-reorder');
+	return attachAlgorithm(gridElement, strategy, options);
 }
 
 // Register as a plugin for auto-initialization via init()

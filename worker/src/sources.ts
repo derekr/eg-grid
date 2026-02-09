@@ -40,21 +40,12 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 	const providerMap = new Map<string, () => unknown>();
 	const providers: ProviderRegistry = {
 		register<T>(capability: string, provider: () => T): void {
-			if (providerMap.has(capability)) {
-				console.warn(
-					\`Gridiot: Provider for "\${capability}" already registered, overwriting\`,
-				);
-			}
 			providerMap.set(capability, provider);
 		},
 
 		get<T>(capability: string): T | undefined {
 			const provider = providerMap.get(capability);
 			return provider ? (provider() as T) : undefined;
-		},
-
-		has(capability: string): boolean {
-			return providerMap.has(capability);
 		},
 	};
 
@@ -190,42 +181,9 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 		},
 
 		destroy(): void {
-			observer.disconnect();
 			cleanups.forEach((cleanup) => cleanup());
 		},
 	};
-
-	// Observe position changes and animate with View Transitions
-	const observer = new MutationObserver((mutations) => {
-		// Collect items that changed position
-		const changedItems = new Set<HTMLElement>();
-
-		for (const mutation of mutations) {
-			if (
-				mutation.type === 'attributes' &&
-				mutation.target instanceof HTMLElement
-			) {
-				const item = mutation.target.closest(
-					'[data-gridiot-item]',
-				) as HTMLElement | null;
-				if (item && element.contains(item)) {
-					changedItems.add(item);
-				}
-			}
-		}
-
-		// Animate changes with View Transitions if available
-		if (changedItems.size > 0 && 'startViewTransition' in document) {
-			// Items already moved - View Transitions will handle animation
-			// The browser captures before/after states automatically
-		}
-	});
-
-	observer.observe(element, {
-		subtree: true,
-		attributes: true,
-		attributeFilter: ['style', 'class'],
-	});
 
 	// Register state machine provider for plugin access
 	providers.register('state', () => stateMachine.getState());
@@ -310,18 +268,10 @@ export function getItemSize(item: HTMLElement): { colspan: number; rowspan: numb
 }
 
 /**
- * Set an item's grid position
- */
-export function setItemCell(item: HTMLElement, cell: GridCell): void {
-	item.style.gridColumn = String(cell.column);
-	item.style.gridRow = String(cell.row);
-}
-
-/**
  * Attach multiple event listeners and return a cleanup function to remove them all
  */
 export function listenEvents(
-	element: HTMLElement,
+	element: EventTarget,
 	events: Record<string, EventListenerOrEventListenerObject>,
 ): () => void {
 	for (const [name, handler] of Object.entries(events)) {
@@ -334,26 +284,6 @@ export function listenEvents(
 	};
 }
 
-/**
- * Get grid info for a grid element
- */
-export function getGridInfo(element: HTMLElement) {
-	const rect = element.getBoundingClientRect();
-	const style = getComputedStyle(element);
-	const columns = parseGridTemplate(style.gridTemplateColumns);
-	const rows = parseGridTemplate(style.gridTemplateRows);
-	const columnGap = parseFloat(style.columnGap) || 0;
-	const rowGap = parseFloat(style.rowGap) || 0;
-
-	return {
-		rect,
-		columns,
-		rows,
-		gap: columnGap, // Assume uniform gap for simplicity
-		cellWidth: columns[0] || 0,
-		cellHeight: rows[0] || 0,
-	};
-}
 `,
 	"types.ts": `export interface GridCell {
 	column: number;
@@ -935,32 +865,12 @@ export type StateTransition =
 	| { type: 'FINISH_COMMIT' }
 	| { type: 'TOGGLE_KEYBOARD_MODE' };
 
-export type StateListener = (state: GridiotState, transition: StateTransition) => void;
-
 export interface GridiotStateMachine {
 	getState(): GridiotState;
 	transition(action: StateTransition): GridiotState;
-	subscribe(listener: StateListener): () => void;
-	/** Check if a transition is valid from current state */
-	canTransition(action: StateTransition): boolean;
 }
 
-/**
- * Create the initial state
- */
-export function createInitialState(): GridiotState {
-	return {
-		phase: 'idle',
-		selectedItemId: null,
-		interaction: null,
-		keyboardModeActive: false,
-	};
-}
-
-/**
- * Pure state reducer - computes next state from current state and action
- */
-export function reducer(state: GridiotState, action: StateTransition): GridiotState {
+function reducer(state: GridiotState, action: StateTransition): GridiotState {
 	switch (action.type) {
 		case 'SELECT': {
 			// Can select from idle or selected (changes selection)
@@ -1067,37 +977,15 @@ export function reducer(state: GridiotState, action: StateTransition): GridiotSt
 }
 
 /**
- * Check if a transition is valid from the current state
- */
-export function canTransition(state: GridiotState, action: StateTransition): boolean {
-	switch (action.type) {
-		case 'SELECT':
-			return state.phase === 'idle' || state.phase === 'selected';
-		case 'DESELECT':
-			return state.phase === 'selected';
-		case 'START_INTERACTION':
-			return state.phase === 'selected';
-		case 'UPDATE_INTERACTION':
-			return state.phase === 'interacting' && state.interaction !== null;
-		case 'COMMIT_INTERACTION':
-			return state.phase === 'interacting';
-		case 'CANCEL_INTERACTION':
-			return state.phase === 'interacting';
-		case 'FINISH_COMMIT':
-			return state.phase === 'committing';
-		case 'TOGGLE_KEYBOARD_MODE':
-			return true; // Always allowed
-		default:
-			return false;
-	}
-}
-
-/**
  * Create a state machine instance
  */
-export function createStateMachine(initialState?: GridiotState): GridiotStateMachine {
-	let state = initialState ?? createInitialState();
-	const listeners = new Set<StateListener>();
+export function createStateMachine(): GridiotStateMachine {
+	let state: GridiotState = {
+		phase: 'idle',
+		selectedItemId: null,
+		interaction: null,
+		keyboardModeActive: false,
+	};
 
 	return {
 		getState() {
@@ -1108,75 +996,14 @@ export function createStateMachine(initialState?: GridiotState): GridiotStateMac
 			const nextState = reducer(state, action);
 			if (nextState !== state) {
 				state = nextState;
-				for (const listener of listeners) {
-					listener(state, action);
-				}
 			}
 			return state;
-		},
-
-		subscribe(listener: StateListener) {
-			listeners.add(listener);
-			return () => listeners.delete(listener);
-		},
-
-		canTransition(action: StateTransition) {
-			return canTransition(state, action);
 		},
 	};
 }
 
-// ============================================================================
-// Derived State Helpers
-// ============================================================================
-
-/**
- * Check if currently in an active interaction
- */
-export function isInteracting(state: GridiotState): boolean {
-	return state.phase === 'interacting' || state.phase === 'committing';
-}
-
-/**
- * Check if currently dragging (not resizing)
- */
 export function isDragging(state: GridiotState): boolean {
-	return isInteracting(state) && state.interaction?.type === 'drag';
-}
-
-/**
- * Check if currently resizing (not dragging)
- */
-export function isResizing(state: GridiotState): boolean {
-	return isInteracting(state) && state.interaction?.type === 'resize';
-}
-
-/**
- * Get the interaction mode if active
- */
-export function getInteractionMode(state: GridiotState): InteractionMode | null {
-	return state.interaction?.mode ?? null;
-}
-
-/**
- * Check if View Transitions should be used for current interaction
- */
-export function shouldUseViewTransition(state: GridiotState): boolean {
-	return state.interaction?.useViewTransition ?? false;
-}
-
-/**
- * Check if FLIP animation should be used for current interaction
- */
-export function shouldUseFlip(state: GridiotState): boolean {
-	return state.interaction?.useFlip ?? false;
-}
-
-/**
- * Get the captured column count for current interaction
- */
-export function getInteractionColumnCount(state: GridiotState): number | null {
-	return state.interaction?.columnCount ?? null;
+	return (state.phase === 'interacting' || state.phase === 'committing') && state.interaction?.type === 'drag';
 }
 `,
 	"layout-model.ts": `/**
@@ -1504,46 +1331,6 @@ export function createLayoutModel(
 	return model;
 }
 
-/**
- * Build LayoutItem array from positions and definitions
- * Useful for algorithm plugins that need the full item data
- */
-export function buildLayoutItems(
-	itemDefs: ReadonlyMap<string, ItemDefinition>,
-	positions: Map<string, ItemPosition>,
-	columnCount: number,
-): LayoutItem[] {
-	const result: LayoutItem[] = [];
-
-	for (const [id, def] of Array.from(itemDefs)) {
-		const pos = positions.get(id);
-		if (pos) {
-			result.push({
-				id: def.id,
-				// Clamp width to current column count
-				width: Math.min(def.width, columnCount),
-				height: def.height,
-				column: pos.column,
-				row: pos.row,
-			});
-		}
-	}
-
-	return result;
-}
-
-/**
- * Convert LayoutItem array back to positions map
- */
-export function layoutItemsToPositions(
-	items: LayoutItem[],
-): Map<string, ItemPosition> {
-	const positions = new Map<string, ItemPosition>();
-	for (const item of items) {
-		positions.set(item.id, { column: item.column, row: item.row });
-	}
-	return positions;
-}
 `,
 	"plugins/accessibility.ts": `import { listenEvents, registerPlugin } from '../engine';
 import type {
@@ -1901,22 +1688,15 @@ export interface AlgorithmHarnessOptions {
  * @param gridElement - The grid container element
  * @param strategy - Algorithm-specific layout functions
  * @param options - Configuration options
- * @param debugLabel - Label for debug logging (e.g. 'algorithm-push')
  * @returns Cleanup function to detach the algorithm
  */
 export function attachAlgorithm(
 	gridElement: HTMLElement,
 	strategy: AlgorithmStrategy,
 	options: AlgorithmHarnessOptions = {},
-	debugLabel = 'algorithm',
 ): () => void {
 	const { selectorPrefix = '#', selectorSuffix = '', core, layoutModel } = options;
 	const styles: StyleManager | null = core?.styles ?? null;
-
-	const DEBUG = false;
-	function log(...args: unknown[]) {
-		if (DEBUG) console.log(\`[\${debugLabel}]\`, ...args);
-	}
 
 	function getCurrentColumnCount(): number {
 		const style = getComputedStyle(gridElement);
@@ -1963,6 +1743,36 @@ export function attachAlgorithm(
 		return element.dataset.id || element.dataset.gridiotItem || '';
 	}
 
+	/** Read items from DOM with original positions restored (except the actively dragged item) */
+	function getItemsWithOriginals(excludeId: string | null, originals: Map<string, { column: number; row: number }>): ItemRect[] {
+		return readItemsFromDOM(gridElement).map((item) => {
+			const original = originals.get(item.id);
+			if (original && item.id !== excludeId) {
+				return { ...item, column: original.column, row: original.row };
+			}
+			return item;
+		});
+	}
+
+	/** Build resize items from original positions, with resized item updated */
+	function getResizeItems(
+		originals: Map<string, { column: number; row: number; width: number; height: number }>,
+		resizedId: string,
+		cell: GridCell,
+		colspan: number,
+		rowspan: number,
+	): ItemRect[] {
+		const items: ItemRect[] = [];
+		for (const [id, original] of originals) {
+			if (id === resizedId) {
+				items.push({ id, column: cell.column, row: cell.row, width: colspan, height: rowspan });
+			} else {
+				items.push({ id, column: original.column, row: original.row, width: original.width, height: original.height });
+			}
+		}
+		return items;
+	}
+
 	function saveAndClearPreview(layout: ItemRect[], columnCount: number, afterSave?: () => void): void {
 		if (!layoutModel || !columnCount) return;
 		const positions = new Map<string, ItemPosition>();
@@ -1971,11 +1781,9 @@ export function attachAlgorithm(
 		}
 		layoutModel.saveLayout(columnCount, positions);
 		if (afterSave) afterSave();
-		log('saved layout to model for', columnCount, 'columns');
 		if (styles) {
 			styles.clear('preview');
 			styles.commit();
-			log('cleared preview styles');
 		}
 	}
 
@@ -2001,7 +1809,6 @@ export function attachAlgorithm(
 					selectorSuffix,
 					maxColumns: capturedColumnCount ?? undefined,
 				});
-				log('injecting CSS:', css.substring(0, 200) + '...');
 				styles.set('preview', css);
 				styles.commit();
 
@@ -2038,8 +1845,7 @@ export function attachAlgorithm(
 			if (draggedElement && excludeId) {
 				draggedElement.style.viewTransitionName = 'dragging';
 			}
-			const transition = (document as any).startViewTransition(applyChanges);
-			transition.finished.then(() => log('view transition finished'));
+			(document as any).startViewTransition(applyChanges);
 		} else {
 			applyChanges();
 		}
@@ -2076,7 +1882,6 @@ export function attachAlgorithm(
 			styles.commit();
 		}
 
-		log('drag-start', { item: draggedItemId });
 	};
 
 	let pendingCell: GridCell | null = null;
@@ -2089,23 +1894,14 @@ export function attachAlgorithm(
 			const cameraState = core.providers.get<CameraState>('camera');
 			if (cameraState?.isScrolling) {
 				pendingCell = detail.cell;
-				log('drag-move deferred (camera scrolling)', pendingCell);
 				return;
 			}
 		}
 		pendingCell = null;
 
-		const items: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = originalPositions!.get(item.id);
-			if (original && item.id !== draggedItemId) {
-				return { ...item, column: original.column, row: original.row };
-			}
-			return item;
-		});
-
+		const items = getItemsWithOriginals(draggedItemId, originalPositions!);
 		const columns = dragStartColumnCount ?? getCurrentColumnCount();
 		const newLayout = strategy.calculateDragLayout(items, draggedItemId, detail.cell, columns);
-		log('drag-move', { targetCell: detail.cell });
 		applyLayout(newLayout, draggedItemId, true);
 
 		if (strategy.afterDragMove) {
@@ -2116,14 +1912,7 @@ export function attachAlgorithm(
 	const onDragEnd = (e: Event) => {
 		if (!draggedItemId || !originalPositions) return;
 		const detail = (e as CustomEvent<DragEndDetail>).detail;
-
-		const items: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = originalPositions!.get(item.id);
-			if (original && item.id !== draggedItemId) {
-				return { ...item, column: original.column, row: original.row };
-			}
-			return item;
-		});
+		const items = getItemsWithOriginals(draggedItemId, originalPositions!);
 
 		const columns = dragStartColumnCount ?? getCurrentColumnCount();
 		const finalLayout = strategy.calculateDragLayout(items, draggedItemId, detail.cell, columns);
@@ -2155,14 +1944,7 @@ export function attachAlgorithm(
 			draggedElement.style.viewTransitionName = '';
 		}
 
-		const restoreLayout: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = originalPositions!.get(item.id);
-			if (original) {
-				return { ...item, column: original.column, row: original.row };
-			}
-			return item;
-		});
-
+		const restoreLayout = getItemsWithOriginals(null, originalPositions!);
 		const restore = () => applyLayout(restoreLayout, null, false);
 
 		if ('startViewTransition' in document) {
@@ -2190,22 +1972,10 @@ export function attachAlgorithm(
 			cell = core?.getCellFromPoint(centerX, centerY) ?? null;
 		}
 
-		if (!cell) {
-			log('camera-settled, no cell to update to');
-			return;
-		}
-
-		log('camera-settled, updating to cell', cell);
+		if (!cell) return;
 		pendingCell = null;
 
-		const items: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = originalPositions!.get(item.id);
-			if (original && item.id !== draggedItemId) {
-				return { ...item, column: original.column, row: original.row };
-			}
-			return item;
-		});
-
+		const items = getItemsWithOriginals(draggedItemId, originalPositions!);
 		const columns = dragStartColumnCount ?? getCurrentColumnCount();
 		const newLayout = strategy.calculateDragLayout(items, draggedItemId!, cell, columns);
 		applyLayout(newLayout, draggedItemId, true);
@@ -2253,7 +2023,6 @@ export function attachAlgorithm(
 		}
 
 		lastResizeLayout = null;
-		log('resize-start', { item: resizedItemId });
 	};
 
 	const onResizeMove = (e: Event) => {
@@ -2274,30 +2043,9 @@ export function attachAlgorithm(
 			rowspan: detail.rowspan,
 		};
 
-		const items: ItemRect[] = [];
-		for (const [id, original] of resizeOriginalPositions) {
-			if (id === resizedItemId) {
-				items.push({
-					id,
-					column: detail.cell.column,
-					row: detail.cell.row,
-					width: detail.colspan,
-					height: detail.rowspan,
-				});
-			} else {
-				items.push({
-					id,
-					column: original.column,
-					row: original.row,
-					width: original.width,
-					height: original.height,
-				});
-			}
-		}
-
+		const items = getResizeItems(resizeOriginalPositions, resizedItemId, detail.cell, detail.colspan, detail.rowspan);
 		const columns = resizeStartColumnCount ?? getCurrentColumnCount();
 		const newLayout = strategy.calculateResizeLayout(items, resizedItemId, detail.cell, detail.colspan, detail.rowspan, columns);
-		log('resize-move', { size: { colspan: detail.colspan, rowspan: detail.rowspan } });
 		applyLayout(newLayout, resizedItemId, true);
 	};
 
@@ -2305,27 +2053,7 @@ export function attachAlgorithm(
 		if (!strategy.calculateResizeLayout) return;
 		if (!resizedItemId || !resizeOriginalPositions) return;
 		const detail = (e as CustomEvent<ResizeEndDetail>).detail;
-
-		const items: ItemRect[] = [];
-		for (const [id, original] of resizeOriginalPositions) {
-			if (id === resizedItemId) {
-				items.push({
-					id,
-					column: detail.cell.column,
-					row: detail.cell.row,
-					width: detail.colspan,
-					height: detail.rowspan,
-				});
-			} else {
-				items.push({
-					id,
-					column: original.column,
-					row: original.row,
-					width: original.width,
-					height: original.height,
-				});
-			}
-		}
+		const items = getResizeItems(resizeOriginalPositions, resizedItemId, detail.cell, detail.colspan, detail.rowspan);
 
 		const columns = resizeStartColumnCount ?? getCurrentColumnCount();
 		const finalLayout = strategy.calculateResizeLayout(items, resizedItemId, detail.cell, detail.colspan, detail.rowspan, columns);
@@ -2352,20 +2080,9 @@ export function attachAlgorithm(
 	const onResizeCancel = () => {
 		if (!resizedItemId || !resizeOriginalPositions) return;
 
-		const restoreLayout: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = resizeOriginalPositions!.get(item.id);
-			if (original) {
-				return {
-					...item,
-					column: original.column,
-					row: original.row,
-					width: original.width,
-					height: original.height,
-				};
-			}
-			return item;
-		});
-
+		const restoreLayout = Array.from(resizeOriginalPositions, ([id, o]) => ({
+			id, column: o.column, row: o.row, width: o.width, height: o.height,
+		}));
 		const restore = () => applyLayout(restoreLayout, null, false);
 
 		if ('startViewTransition' in document) {
@@ -2617,7 +2334,7 @@ export function attachPushAlgorithm(
 		},
 	};
 
-	return attachAlgorithm(gridElement, strategy, harnessOptions, 'algorithm-push');
+	return attachAlgorithm(gridElement, strategy, harnessOptions);
 }
 
 // Register as a plugin for auto-initialization via init()
@@ -2894,7 +2611,7 @@ export function attachReorderAlgorithm(
 		},
 	};
 
-	return attachAlgorithm(gridElement, strategy, options, 'algorithm-reorder');
+	return attachAlgorithm(gridElement, strategy, options);
 }
 
 // Register as a plugin for auto-initialization via init()
@@ -2924,7 +2641,7 @@ registerPlugin({
  * The "active item" is: the dragged item during drag, or the selected item otherwise.
  */
 
-import { registerPlugin } from '../engine';
+import { listenEvents, registerPlugin } from '../engine';
 import type {
 	DragStartDetail,
 	DragMoveDetail,
@@ -3360,44 +3077,17 @@ export function attachCamera(
 		scrollTo(e.detail.item);
 	}
 
-	// Attach event listeners
-	gridElement.addEventListener(
-		'gridiot:drag-start',
-		onDragStart as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:drag-move',
-		onDragMove as EventListener
-	);
-	gridElement.addEventListener('gridiot:drag-end', onDragEnd as EventListener);
-	gridElement.addEventListener(
-		'gridiot:drag-cancel',
-		onDragCancel as EventListener
-	);
-	gridElement.addEventListener('gridiot:select', onSelect as EventListener);
+	const removeListeners = listenEvents(gridElement, {
+		'gridiot:drag-start': onDragStart as EventListener,
+		'gridiot:drag-move': onDragMove as EventListener,
+		'gridiot:drag-end': onDragEnd as EventListener,
+		'gridiot:drag-cancel': onDragCancel as EventListener,
+		'gridiot:select': onSelect as EventListener,
+	});
 
 	function destroy(): void {
 		stopScrollLoop();
-		gridElement.removeEventListener(
-			'gridiot:drag-start',
-			onDragStart as EventListener
-		);
-		gridElement.removeEventListener(
-			'gridiot:drag-move',
-			onDragMove as EventListener
-		);
-		gridElement.removeEventListener(
-			'gridiot:drag-end',
-			onDragEnd as EventListener
-		);
-		gridElement.removeEventListener(
-			'gridiot:drag-cancel',
-			onDragCancel as EventListener
-		);
-		gridElement.removeEventListener(
-			'gridiot:select',
-			onSelect as EventListener
-		);
+		removeListeners();
 	}
 
 	return {
@@ -3438,8 +3128,8 @@ registerPlugin({
  * Toggle with Shift+D (or programmatically)
  */
 
-import { getGridInfo, getItemCell } from '../engine';
-import type { DragState, GridiotCore, LayoutState } from '../types';
+import { getItemCell } from '../engine';
+import type { DragState, GridInfo, GridiotCore, LayoutState } from '../types';
 
 export interface DevOverlayOptions {
 	/** Initial tab to show ('debug' | 'config') */
@@ -3750,7 +3440,7 @@ export function attachDevOverlay(
 	}
 
 	function render() {
-		const gridInfo = getGridInfo(gridElement);
+		const gridInfo = core?.getGridInfo();
 		const items = Array.from(gridElement.querySelectorAll('[data-gridiot-item]')) as HTMLElement[];
 
 		overlay.innerHTML = \`
@@ -3812,7 +3502,8 @@ export function attachDevOverlay(
 		});
 	}
 
-	function renderDebugTab(gridInfo: ReturnType<typeof getGridInfo>, items: HTMLElement[]): string {
+	function renderDebugTab(gridInfo: GridInfo | undefined, items: HTMLElement[]): string {
+		if (!gridInfo) return '<div class="gridiot-dev-section">No core available</div>';
 		// Query providers for live state
 		const dragState = core?.providers.get<DragState>('drag');
 		const layoutState = core?.providers.get<LayoutState>('layout');
@@ -4051,12 +3742,7 @@ export function attachDevOverlay(
 `,
 	"plugins/keyboard.ts": `import { getItemCell, getItemSize, registerPlugin } from '../engine';
 import type { GridCell, ItemPosition } from '../types';
-import { isDragging, isResizing } from '../state-machine';
-
-const DEBUG = false;
-function log(...args: unknown[]) {
-	if (DEBUG) console.log('[keyboard]', ...args);
-}
+import { isDragging } from '../state-machine';
 
 registerPlugin({
 	name: 'keyboard',
@@ -4075,37 +3761,22 @@ registerPlugin({
 		};
 
 		/**
-		 * Helper to capture all item positions from DOM
+		 * Capture all item positions and sizes in a single DOM walk
 		 */
-		const capturePositions = (): Map<string, ItemPosition> => {
+		const captureItemState = (): { positions: Map<string, ItemPosition>; sizes: Map<string, { width: number; height: number }> } => {
 			const positions = new Map<string, ItemPosition>();
-			const items = core.element.querySelectorAll('[data-gridiot-item]');
-			for (const item of items) {
-				const id = item.id || (item as HTMLElement).getAttribute('data-gridiot-item') || '';
-				if (id) {
-					const cell = getItemCell(item as HTMLElement);
-					positions.set(id, { column: cell.column, row: cell.row });
-				}
-			}
-			return positions;
-		};
-
-		/**
-		 * Helper to capture all item sizes from DOM
-		 */
-		const captureSizes = (): Map<string, { width: number; height: number }> => {
 			const sizes = new Map<string, { width: number; height: number }>();
-			const items = core.element.querySelectorAll('[data-gridiot-item]');
-			for (const item of items) {
+			for (const item of core.element.querySelectorAll('[data-gridiot-item]')) {
 				const el = item as HTMLElement;
 				const id = el.id || el.getAttribute('data-gridiot-item') || '';
 				if (id) {
-					const width = parseInt(el.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
-					const height = parseInt(el.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
-					sizes.set(id, { width, height });
+					const cell = getItemCell(el);
+					positions.set(id, { column: cell.column, row: cell.row });
+					const { colspan, rowspan } = getItemSize(el);
+					sizes.set(id, { width: colspan, height: rowspan });
 				}
 			}
-			return sizes;
+			return { positions, sizes };
 		};
 
 		/**
@@ -4217,8 +3888,6 @@ registerPlugin({
 				e.preventDefault();
 				stateMachine.transition({ type: 'TOGGLE_KEYBOARD_MODE' });
 				const keyboardMode = stateMachine.getState().keyboardModeActive;
-				log('keyboard mode:', keyboardMode);
-
 				if (keyboardMode) {
 					core.element.setAttribute('data-gridiot-keyboard-mode', '');
 					// If no item is selected, select the first one
@@ -4278,12 +3947,12 @@ registerPlugin({
 					core.emit('drag-end', { item: heldItem, cell: targetCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
 					stateMachine.transition({ type: 'COMMIT_INTERACTION' });
 					stateMachine.transition({ type: 'FINISH_COMMIT' });
-					log('drop', { cell: targetCell });
 				} else {
 					// Pick up the selected item
 					const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
 					const size = getItemSize(selectedItem);
 					const startCell = getItemCell(selectedItem);
+					const { positions, sizes } = captureItemState();
 
 					// Start interaction via state machine
 					stateMachine.transition({
@@ -4294,8 +3963,8 @@ registerPlugin({
 							itemId,
 							element: selectedItem,
 							columnCount: getColumnCount(),
-							originalPositions: capturePositions(),
-							originalSizes: captureSizes(),
+							originalPositions: positions,
+							originalSizes: sizes,
 							targetCell: startCell,
 							currentSize: { colspan: size.colspan, rowspan: size.rowspan },
 						},
@@ -4303,7 +3972,6 @@ registerPlugin({
 
 					selectedItem.setAttribute('data-gridiot-dragging', '');
 					core.emit('drag-start', { item: selectedItem, cell: startCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
-					log('pick up');
 				}
 				return;
 			}
@@ -4318,7 +3986,6 @@ registerPlugin({
 					const adjacentItem = findItemInDirection(fromCell, direction, selectedItem);
 					if (adjacentItem) {
 						core.select(adjacentItem);
-						log('select adjacent', direction);
 					}
 					return;
 				}
@@ -4364,6 +4031,7 @@ registerPlugin({
 					}
 
 					const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
+					const { positions: rPositions, sizes: rSizes } = captureItemState();
 
 					// Start resize interaction via state machine
 					stateMachine.transition({
@@ -4374,8 +4042,8 @@ registerPlugin({
 							itemId,
 							element: selectedItem,
 							columnCount: getColumnCount(),
-							originalPositions: capturePositions(),
-							originalSizes: captureSizes(),
+							originalPositions: rPositions,
+							originalSizes: rSizes,
 							targetCell: currentCell,
 							currentSize: { colspan: newColspan, rowspan: newRowspan },
 						},
@@ -4426,8 +4094,6 @@ registerPlugin({
 						}
 					}, 250);
 					pendingVtnRestore = { item: itemToRestore, timeoutId };
-
-					log('resize', { direction, newColspan, newRowspan });
 					return;
 				}
 
@@ -4463,13 +4129,11 @@ registerPlugin({
 						targetCell,
 					});
 					core.emit('drag-move', { item: heldItem, cell: targetCell, x: 0, y: 0, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
-					log('move', { direction, amount, targetCell });
 				} else {
 					// Nudge: Move item directly
 					// Emit drag-start then drag-end (skip drag-move since we don't need preview)
 					core.emit('drag-start', { item: selectedItem, cell: currentCell, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
 					core.emit('drag-end', { item: selectedItem, cell: targetCell, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
-					log('nudge', { direction, amount, targetCell });
 				}
 				return;
 			}
@@ -4491,7 +4155,7 @@ registerPlugin({
  * Handles creation, positioning, and cleanup automatically.
  */
 
-import { registerPlugin } from '../engine';
+import { listenEvents, registerPlugin } from '../engine';
 import type {
 	DragStartDetail,
 	DragMoveDetail,
@@ -4675,46 +4339,21 @@ export function attachPlaceholder(
 	}
 
 	// Attach listeners
-	gridElement.addEventListener(
-		'gridiot:drag-start',
-		handleDragStart as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:drag-move',
-		handleDragMove as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:drag-end',
-		handleDragEnd as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:drag-cancel',
-		handleDragCancel as EventListener
-	);
-	// Drop preview (algorithm-computed landing position)
-	gridElement.addEventListener(
-		'gridiot:drop-preview',
-		handleDropPreview as EventListener
-	);
-	// Resize events
-	gridElement.addEventListener(
-		'gridiot:resize-start',
-		handleResizeStart as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:resize-move',
-		handleResizeMove as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:resize-end',
-		handleResizeEnd as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:resize-cancel',
-		handleResizeCancel as EventListener
-	);
-	document.addEventListener('pointerup', handlePointerUp);
-	document.addEventListener('pointercancel', handlePointerCancel);
+	const removeGridListeners = listenEvents(gridElement, {
+		'gridiot:drag-start': handleDragStart as EventListener,
+		'gridiot:drag-move': handleDragMove as EventListener,
+		'gridiot:drag-end': handleDragEnd as EventListener,
+		'gridiot:drag-cancel': handleDragCancel as EventListener,
+		'gridiot:drop-preview': handleDropPreview as EventListener,
+		'gridiot:resize-start': handleResizeStart as EventListener,
+		'gridiot:resize-move': handleResizeMove as EventListener,
+		'gridiot:resize-end': handleResizeEnd as EventListener,
+		'gridiot:resize-cancel': handleResizeCancel as EventListener,
+	});
+	const removeDocListeners = listenEvents(document, {
+		pointerup: handlePointerUp,
+		pointercancel: handlePointerCancel,
+	});
 
 	// Public API
 	return {
@@ -4734,74 +4373,10 @@ export function attachPlaceholder(
 
 		destroy(): void {
 			remove();
-			gridElement.removeEventListener(
-				'gridiot:drag-start',
-				handleDragStart as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:drag-move',
-				handleDragMove as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:drag-end',
-				handleDragEnd as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:drag-cancel',
-				handleDragCancel as EventListener
-			);
-			// Drop preview
-			gridElement.removeEventListener(
-				'gridiot:drop-preview',
-				handleDropPreview as EventListener
-			);
-			// Resize events
-			gridElement.removeEventListener(
-				'gridiot:resize-start',
-				handleResizeStart as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:resize-move',
-				handleResizeMove as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:resize-end',
-				handleResizeEnd as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:resize-cancel',
-				handleResizeCancel as EventListener
-			);
-			document.removeEventListener('pointerup', handlePointerUp);
-			document.removeEventListener('pointercancel', handlePointerCancel);
+			removeGridListeners();
+			removeDocListeners();
 		},
 	};
-}
-
-/**
- * Default CSS for the placeholder.
- * Include this in your stylesheet or use attachPlaceholderStyles().
- */
-export const PLACEHOLDER_CSS = \`
-.gridiot-placeholder {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px dashed rgba(255, 255, 255, 0.4);
-  border-radius: 8px;
-  pointer-events: none;
-}
-\`;
-
-/**
- * Inject default placeholder styles into the document.
- * Call once at app initialization if you don't want to add CSS manually.
- */
-export function attachPlaceholderStyles(): void {
-	if (document.getElementById('gridiot-placeholder-styles')) return;
-
-	const style = document.createElement('style');
-	style.id = 'gridiot-placeholder-styles';
-	style.textContent = PLACEHOLDER_CSS;
-	document.head.appendChild(style);
 }
 
 // Register as a plugin for auto-initialization via init()
@@ -4827,11 +4402,6 @@ const DRAG_THRESHOLD = 5;
 const PREDICTION_THRESHOLD = 30;
 // Fraction of cell to lead ahead when prediction is active (0.5 = half a cell)
 const PREDICTION_LEAD = 0.5;
-
-const DEBUG = false;
-function log(...args: unknown[]) {
-	if (DEBUG) console.log('[pointer]', ...args);
-}
 
 interface PendingDrag {
 	item: HTMLElement;
@@ -4899,7 +4469,6 @@ registerPlugin({
 			item.setAttribute('data-gridiot-dragging', '');
 			document.body.classList.add('is-dragging');
 
-			log('drag-start', { startCell, rect: { left: rect.left, top: rect.top } });
 			// Emit drag-start BEFORE changing grid styles so originalPositions captures correct layout
 			core.emit('drag-start', { item, cell: startCell, colspan, rowspan, source: 'pointer' as const });
 
@@ -5049,7 +4618,6 @@ registerPlugin({
 						return; // Stay in current cell
 					}
 
-					log('drag-move', { cell, distX: distX.toFixed(2), distY: distY.toFixed(2) });
 					dragState.lastCell = cell;
 					dragState.lastTargetChangeTime = now;
 					core.emit('drag-move', { item, cell, x: e.clientX, y: e.clientY, colspan, rowspan, source: 'pointer' as const });
@@ -5063,7 +4631,6 @@ registerPlugin({
 
 			// If drag never started, this was just a click - nothing more to do
 			if (pendingDrag && !dragState) {
-				log('click (no drag)');
 				cleanupListeners(item, pendingDrag.pointerId);
 				pendingDrag = null;
 				return;
@@ -5108,10 +4675,8 @@ registerPlugin({
 					row: Math.max(1, Math.min(maxRow, rawCell.row)),
 				};
 
-				log('drag-end', { cell });
 				core.emit('drag-end', { item, cell, colspan, rowspan, source: 'pointer' as const });
 			} else {
-				log('drag-end', { cell: lastCell, note: 'using lastCell (pointer outside grid)' });
 				core.emit('drag-end', { item, cell: lastCell, colspan, rowspan, source: 'pointer' as const });
 			}
 
@@ -5119,7 +4684,6 @@ registerPlugin({
 
 			// FLIP: Animate from visual position to final grid position
 			requestAnimationFrame(() => {
-				log('FLIP', { firstRect: { left: firstRect.left.toFixed(0), top: firstRect.top.toFixed(0) } });
 				animateFLIPWithTracking(item, firstRect);
 			});
 		};
@@ -5288,27 +4852,12 @@ function detectHandle(
 	return null;
 }
 
-/**
- * Get cursor style for a resize handle
- */
-function getCursor(handle: ResizeHandle | null): string {
-	switch (handle) {
-		case 'nw':
-		case 'se':
-			return 'nwse-resize';
-		case 'ne':
-		case 'sw':
-			return 'nesw-resize';
-		case 'n':
-		case 's':
-			return 'ns-resize';
-		case 'e':
-		case 'w':
-			return 'ew-resize';
-		default:
-			return '';
-	}
-}
+const CURSOR: Record<string, string> = {
+	nw: 'nwse-resize', se: 'nwse-resize',
+	ne: 'nesw-resize', sw: 'nesw-resize',
+	n: 'ns-resize', s: 'ns-resize',
+	e: 'ew-resize', w: 'ew-resize',
+};
 
 /**
  * Create a size label element
@@ -5345,10 +4894,7 @@ function createSizeLabel(): HTMLElement {
 export function attachResize(
 	gridElement: HTMLElement,
 	options: ResizeOptions,
-): {
-	setSize(item: HTMLElement, size: { colspan: number; rowspan: number }): void;
-	destroy(): void;
-} {
+): { destroy(): void } {
 	const {
 		core,
 		handles = 'corners',
@@ -5593,89 +5139,40 @@ export function attachResize(
 		item.removeEventListener('pointercancel', onItemPointerCancel);
 	}
 
-	function finishResize() {
-		if (!activeResize) return;
-
-		const { item, pointerId, currentSize, currentCell, sizeLabel } = activeResize;
-
-		// Clean up item event listeners
+	function resetItem(item: HTMLElement, pointerId: number, sizeLabel: HTMLElement | null) {
 		cleanupResizeListeners(item, pointerId);
-
-		// Update data attributes to reflect new size
-		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
-		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
-
-		// Remove size label
-		if (sizeLabel) {
-			sizeLabel.remove();
-		}
-
-		// Emit resize-end while item is still position:fixed
-		emit<ResizeEndDetail>('resize-end', {
-			item,
-			cell: currentCell,
-			colspan: currentSize.colspan,
-			rowspan: currentSize.rowspan,
-			source: 'pointer',
-		});
-
-		// Clear fixed positioning — item returns to grid flow
+		if (sizeLabel) sizeLabel.remove();
 		item.style.position = '';
 		item.style.left = '';
 		item.style.top = '';
 		item.style.width = '';
 		item.style.height = '';
 		item.style.zIndex = '';
-		// Restore view transition name
 		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
-		if (itemId) {
-			item.style.viewTransitionName = itemId;
-		} else {
-			item.style.viewTransitionName = '';
-		}
+		item.style.viewTransitionName = itemId || '';
 		item.removeAttribute('data-gridiot-resizing');
 		item.removeAttribute('data-gridiot-handle-active');
+	}
 
+	function finishResize() {
+		if (!activeResize) return;
+		const { item, pointerId, currentSize, currentCell, sizeLabel } = activeResize;
+		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
+		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
+		emit<ResizeEndDetail>('resize-end', {
+			item, cell: currentCell,
+			colspan: currentSize.colspan, rowspan: currentSize.rowspan,
+			source: 'pointer',
+		});
+		resetItem(item, pointerId, sizeLabel);
 		activeResize = null;
 	}
 
 	function cancelResize() {
 		if (!activeResize) return;
-
 		const { item, pointerId, sizeLabel } = activeResize;
-
-		// Clean up item event listeners
-		cleanupResizeListeners(item, pointerId);
-
-		// Remove size label
-		if (sizeLabel) {
-			sizeLabel.remove();
-		}
-
-		// Clear fixed positioning — item returns to grid flow at its previous position
-		item.style.position = '';
-		item.style.left = '';
-		item.style.top = '';
-		item.style.width = '';
-		item.style.height = '';
-		item.style.zIndex = '';
-
-		// Restore view transition name
-		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
-		if (itemId) {
-			item.style.viewTransitionName = itemId;
-		} else {
-			item.style.viewTransitionName = '';
-		}
-
-		item.removeAttribute('data-gridiot-resizing');
-		item.removeAttribute('data-gridiot-handle-active');
-
-		emit<ResizeCancelDetail>('resize-cancel', {
-			item,
-			source: 'pointer',
-		});
-
+		emit<ResizeCancelDetail>('resize-cancel', { item, source: 'pointer' });
+		resetItem(item, pointerId, sizeLabel);
 		activeResize = null;
 	}
 
@@ -5746,7 +5243,7 @@ export function attachResize(
 				hoveredHandle = handle;
 
 				// Set cursor and hover attribute based on handle
-				item.style.cursor = getCursor(handle) || '';
+				item.style.cursor = (handle ? CURSOR[handle] : '') || '';
 				if (handle) {
 					item.setAttribute('data-gridiot-handle-hover', handle);
 				} else {
@@ -5772,36 +5269,6 @@ export function attachResize(
 	gridElement.addEventListener('pointermove', onPointerMove);
 	document.addEventListener('keydown', onKeyDown);
 
-	// Public API
-	function setSize(
-		item: HTMLElement,
-		size: { colspan: number; rowspan: number },
-	) {
-		const clampedColspan = Math.max(
-			minSize.colspan,
-			Math.min(maxSize.colspan, size.colspan),
-		);
-		const clampedRowspan = Math.max(
-			minSize.rowspan,
-			Math.min(maxSize.rowspan, size.rowspan),
-		);
-
-		const computed = getComputedStyle(item);
-		const column = parseInt(computed.gridColumnStart, 10) || 1;
-		const row = parseInt(computed.gridRowStart, 10) || 1;
-
-		item.setAttribute('data-gridiot-colspan', String(clampedColspan));
-		item.setAttribute('data-gridiot-rowspan', String(clampedRowspan));
-
-		emit<ResizeEndDetail>('resize-end', {
-			item,
-			cell: { column, row },
-			colspan: clampedColspan,
-			rowspan: clampedRowspan,
-			source: 'pointer',
-		});
-	}
-
 	function destroy() {
 		gridElement.removeEventListener('pointerdown', onPointerDown, {
 			capture: true,
@@ -5814,7 +5281,7 @@ export function attachResize(
 		}
 	}
 
-	return { setSize, destroy };
+	return { destroy };
 }
 
 // Register as a plugin for auto-initialization via init()
@@ -5855,11 +5322,6 @@ import type {
 	ResponsivePluginOptions,
 	StyleManager,
 } from '../types';
-
-const DEBUG = false;
-function log(...args: unknown[]) {
-	if (DEBUG) console.log('[responsive]', ...args);
-}
 
 /**
  * Responsive state exposed via provider registry
@@ -5912,7 +5374,6 @@ export function attachResponsive(
 			}
 		}
 
-		log('Inferred grid metrics:', { cellSize, gap });
 	}
 
 	/**
@@ -5947,7 +5408,6 @@ export function attachResponsive(
 
 		styles.set('base', css);
 		styles.commit();
-		log('Injected CSS for all breakpoints');
 	}
 
 	// Register provider if core is provided
@@ -5968,18 +5428,13 @@ export function attachResponsive(
 	// This prevents flash when server has already provided initial CSS
 	if (!hasServerRenderedCSS) {
 		injectCSS();
-	} else {
-		log('Skipping initial CSS injection - server-rendered CSS detected');
 	}
 
 	// Subscribe to layout model changes
 	// The subscription only fires on user actions (saveLayout/clearOverride),
 	// so we always inject CSS here - the initial hasServerRenderedCSS check
 	// prevents injection on page load, this handles user interactions.
-	const unsubscribe = layoutModel.subscribe(() => {
-		log('Layout model changed, regenerating CSS');
-		injectCSS();
-	});
+	const unsubscribe = layoutModel.subscribe(() => injectCSS());
 
 	// Watch for resize to update column count tracking
 	let lastColumnCount = layoutModel.currentColumnCount;
@@ -5994,18 +5449,10 @@ export function attachResponsive(
 			// Update layout model
 			layoutModel.setCurrentColumnCount(newColumnCount);
 
-			log('Column count changed:', previousCount, '->', newColumnCount);
-
-			// Emit event
-			const detail: ColumnCountChangeDetail = {
-				previousCount,
-				currentCount: newColumnCount,
-			};
-
 			gridElement.dispatchEvent(
 				new CustomEvent('gridiot:column-count-change', {
 					bubbles: true,
-					detail,
+					detail: { previousCount, currentCount: newColumnCount },
 				}),
 			);
 		}
@@ -6018,48 +5465,6 @@ export function attachResponsive(
 		resizeObserver.disconnect();
 		unsubscribe();
 	};
-}
-
-/**
- * Create a container wrapper element for container queries.
- * The grid must be inside a container with \`container-type: inline-size\`.
- *
- * If the grid's parent doesn't have container-type set, this helper
- * can wrap the grid or apply the necessary styles.
- *
- * @param gridElement - The grid container element
- * @returns The wrapper element (or the parent if already suitable)
- */
-export function ensureContainerWrapper(gridElement: HTMLElement): HTMLElement {
-	const parent = gridElement.parentElement;
-
-	if (parent) {
-		const style = getComputedStyle(parent);
-		if (style.containerType === 'inline-size' || style.containerType === 'size') {
-			// Parent already has container-type set
-			return parent;
-		}
-	}
-
-	// Check if the grid itself can be the container
-	// (not recommended, but possible)
-	const gridStyle = getComputedStyle(gridElement);
-	if (gridStyle.containerType === 'inline-size' || gridStyle.containerType === 'size') {
-		return gridElement;
-	}
-
-	// Need to apply container-type to parent or create a wrapper
-	if (parent) {
-		parent.style.containerType = 'inline-size';
-		log('Applied container-type: inline-size to parent');
-		return parent;
-	}
-
-	// Fallback: grid is at document root, can't do much
-	console.warn(
-		'[gridiot:responsive] Grid has no parent element. Container queries may not work.',
-	);
-	return gridElement;
 }
 
 // Register as a plugin for auto-initialization via init()
@@ -6098,17 +5503,9 @@ registerPlugin({
  */
 
 export interface FLIPOptions {
-	/** Animation duration in milliseconds. @default 200 */
 	duration?: number;
-	/** CSS easing function. @default 'cubic-bezier(0.2, 0, 0, 1)' */
 	easing?: string;
-	/** Include scale transform (for resize). @default false */
-	includeScale?: boolean;
-	/** Transform origin for scale animations. @default undefined (uses center) */
-	transformOrigin?: string;
-	/** Callback when animation starts */
 	onStart?: () => void;
-	/** Callback when animation finishes */
 	onFinish?: () => void;
 }
 
@@ -6142,56 +5539,25 @@ export function animateFLIP(
 	const {
 		duration = 200,
 		easing = 'cubic-bezier(0.2, 0, 0, 1)',
-		includeScale = false,
-		transformOrigin,
 		onStart,
 		onFinish,
 	} = options;
 
-	// Measure final position (the "Last" in FLIP)
 	const lastRect = element.getBoundingClientRect();
-
-	// Calculate position deltas (the "Invert" in FLIP)
 	const deltaX = firstRect.left - lastRect.left;
 	const deltaY = firstRect.top - lastRect.top;
 
-	const needsTranslate = Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1;
-
-	// Calculate scale deltas (for resize)
-	let scaleX = 1;
-	let scaleY = 1;
-	let needsScale = false;
-
-	if (includeScale) {
-		scaleX = firstRect.width / lastRect.width;
-		scaleY = firstRect.height / lastRect.height;
-		needsScale = Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01;
-	}
-
-	// Skip animation if no significant change
-	if (!needsTranslate && !needsScale) {
+	if (Math.abs(deltaX) <= 1 && Math.abs(deltaY) <= 1) {
 		onFinish?.();
 		return null;
 	}
 
 	onStart?.();
 
-	// Build keyframes based on what's needed
-	const keyframes: Keyframe[] = includeScale
-		? [
-				{
-					transform: \`translate(\${deltaX}px, \${deltaY}px) scale(\${scaleX}, \${scaleY})\`,
-					transformOrigin: transformOrigin ?? 'top left',
-				},
-				{
-					transform: 'translate(0, 0) scale(1, 1)',
-					transformOrigin: transformOrigin ?? 'top left',
-				},
-			]
-		: [
-				{ transform: \`translate(\${deltaX}px, \${deltaY}px)\` },
-				{ transform: 'translate(0, 0)' },
-			];
+	const keyframes: Keyframe[] = [
+		{ transform: \`translate(\${deltaX}px, \${deltaY}px)\` },
+		{ transform: 'translate(0, 0)' },
+	];
 
 	// Play the animation
 	const animation = element.animate(keyframes, {
@@ -6218,82 +5584,7 @@ export function getItemViewTransitionName(element: HTMLElement): string | null {
 }
 
 /**
- * Execute a FLIP animation while temporarily excluding the element from View Transitions.
- *
- * This is useful when you want to use FLIP for an animation instead of View Transitions,
- * to prevent the two from conflicting.
- *
- * @param element - The element to animate
- * @param fn - Function that performs the animation (receives firstRect)
- * @returns The Animation object, or null if no animation was needed
- *
- * @example
- * \`\`\`ts
- * const firstRect = element.getBoundingClientRect();
- *
- * // Make DOM changes
- * element.style.gridColumn = '2 / span 2';
- *
- * // Animate with View Transition exclusion
- * requestAnimationFrame(() => {
- *   withViewTransitionExclusion(element, () =>
- *     animateFLIP(element, firstRect)
- *   );
- * });
- * \`\`\`
- */
-export function withViewTransitionExclusion(
-	element: HTMLElement,
-	fn: () => Animation | null,
-): Animation | null {
-	// Exclude from View Transitions during FLIP
-	element.style.viewTransitionName = 'none';
-
-	const animation = fn();
-
-	const restoreViewTransitionName = () => {
-		const itemId = getItemViewTransitionName(element);
-		if (itemId) {
-			element.style.viewTransitionName = itemId;
-		}
-	};
-
-	if (animation) {
-		animation.addEventListener('finish', restoreViewTransitionName, { once: true });
-	} else {
-		// No animation needed, restore immediately
-		restoreViewTransitionName();
-	}
-
-	return animation;
-}
-
-/**
- * Perform a complete FLIP animation with data attribute tracking.
- *
- * This is a higher-level helper that:
- * 1. Excludes the element from View Transitions
- * 2. Sets a tracking attribute during animation
- * 3. Animates using FLIP
- * 4. Restores View Transition name when done
- *
- * @param element - The element to animate
- * @param firstRect - The element's bounding rect before the DOM change
- * @param options - Animation options plus optional attribute name
- *
- * @example
- * \`\`\`ts
- * const firstRect = element.getBoundingClientRect();
- * element.style.gridColumn = '2 / span 2';
- *
- * requestAnimationFrame(() => {
- *   animateFLIPWithTracking(element, firstRect, {
- *     attributeName: 'data-gridiot-dropping',
- *     includeScale: true,
- *     transformOrigin: 'top left',
- *   });
- * });
- * \`\`\`
+ * FLIP animation with View Transition exclusion and data attribute tracking.
  */
 export function animateFLIPWithTracking(
 	element: HTMLElement,
@@ -6347,30 +5638,27 @@ import '../plugins/responsive';
 // Core exports
 export {
 	getItemCell,
+	getItemSize,
 	getPlugin,
 	init,
+	listenEvents,
 	registerPlugin,
-	setItemCell,
 } from '../engine';
 export type * from '../types';
 
 // Layout model for responsive support
-export {
-	buildLayoutItems,
-	createLayoutModel,
-	layoutItemsToPositions,
-} from '../layout-model';
+export { createLayoutModel } from '../layout-model';
 
 // Backward compatibility: export attach functions for manual plugin usage
 export { attachCamera, type CameraInstance, type CameraOptions, type CameraState } from '../plugins/camera';
 export { attachResize, type ResizeOptions } from '../plugins/resize';
-export { attachPlaceholder, attachPlaceholderStyles, PLACEHOLDER_CSS, type PlaceholderInstance, type PlaceholderOptions } from '../plugins/placeholder';
+export { attachPlaceholder, type PlaceholderInstance, type PlaceholderOptions } from '../plugins/placeholder';
 export { attachPushAlgorithm, calculateLayout, layoutToCSS, readItemsFromDOM, type AttachPushAlgorithmOptions } from '../plugins/algorithm-push';
 export { attachReorderAlgorithm, calculateReorderLayout, getItemOrder, reflowItems, type AttachReorderAlgorithmOptions } from '../plugins/algorithm-reorder';
-export { attachResponsive, ensureContainerWrapper, type ResponsiveState } from '../plugins/responsive';
+export { attachResponsive, type ResponsiveState } from '../plugins/responsive';
 
 // FLIP utility
-export { animateFLIP, animateFLIPWithTracking, getItemViewTransitionName, withViewTransitionExclusion, type FLIPOptions } from '../utils/flip';
+export { animateFLIP, animateFLIPWithTracking, getItemViewTransitionName, type FLIPOptions } from '../utils/flip';
 `,
 	"bundles/minimal.ts": `// Minimal bundle - just pointer plugin
 import '../plugins/pointer';
@@ -6380,7 +5668,6 @@ export {
 	getPlugin,
 	init,
 	registerPlugin,
-	setItemCell,
 } from '../engine';
 export type * from '../types';
 `,
@@ -6390,7 +5677,6 @@ export {
 	getPlugin,
 	init,
 	registerPlugin,
-	setItemCell,
 } from '../engine';
 export type * from '../types';
 `,

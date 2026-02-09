@@ -216,7 +216,7 @@ export function attachPushAlgorithm(
 		},
 	};
 
-	return attachAlgorithm(gridElement, strategy, harnessOptions, 'algorithm-push');
+	return attachAlgorithm(gridElement, strategy, harnessOptions);
 }
 
 // Register as a plugin for auto-initialization via init()

@@ -23,11 +23,6 @@ import type {
 	StyleManager,
 } from '../types';
 
-const DEBUG = false;
-function log(...args: unknown[]) {
-	if (DEBUG) console.log('[responsive]', ...args);
-}
-
 /**
  * Responsive state exposed via provider registry
  */
@@ -79,7 +74,6 @@ export function attachResponsive(
 			}
 		}
 
-		log('Inferred grid metrics:', { cellSize, gap });
 	}
 
 	/**
@@ -114,7 +108,6 @@ export function attachResponsive(
 
 		styles.set('base', css);
 		styles.commit();
-		log('Injected CSS for all breakpoints');
 	}
 
 	// Register provider if core is provided
@@ -135,18 +128,13 @@ export function attachResponsive(
 	// This prevents flash when server has already provided initial CSS
 	if (!hasServerRenderedCSS) {
 		injectCSS();
-	} else {
-		log('Skipping initial CSS injection - server-rendered CSS detected');
 	}
 
 	// Subscribe to layout model changes
 	// The subscription only fires on user actions (saveLayout/clearOverride),
 	// so we always inject CSS here - the initial hasServerRenderedCSS check
 	// prevents injection on page load, this handles user interactions.
-	const unsubscribe = layoutModel.subscribe(() => {
-		log('Layout model changed, regenerating CSS');
-		injectCSS();
-	});
+	const unsubscribe = layoutModel.subscribe(() => injectCSS());
 
 	// Watch for resize to update column count tracking
 	let lastColumnCount = layoutModel.currentColumnCount;
@@ -161,18 +149,10 @@ export function attachResponsive(
 			// Update layout model
 			layoutModel.setCurrentColumnCount(newColumnCount);
 
-			log('Column count changed:', previousCount, '->', newColumnCount);
-
-			// Emit event
-			const detail: ColumnCountChangeDetail = {
-				previousCount,
-				currentCount: newColumnCount,
-			};
-
 			gridElement.dispatchEvent(
 				new CustomEvent('gridiot:column-count-change', {
 					bubbles: true,
-					detail,
+					detail: { previousCount, currentCount: newColumnCount },
 				}),
 			);
 		}
@@ -185,48 +165,6 @@ export function attachResponsive(
 		resizeObserver.disconnect();
 		unsubscribe();
 	};
-}
-
-/**
- * Create a container wrapper element for container queries.
- * The grid must be inside a container with `container-type: inline-size`.
- *
- * If the grid's parent doesn't have container-type set, this helper
- * can wrap the grid or apply the necessary styles.
- *
- * @param gridElement - The grid container element
- * @returns The wrapper element (or the parent if already suitable)
- */
-export function ensureContainerWrapper(gridElement: HTMLElement): HTMLElement {
-	const parent = gridElement.parentElement;
-
-	if (parent) {
-		const style = getComputedStyle(parent);
-		if (style.containerType === 'inline-size' || style.containerType === 'size') {
-			// Parent already has container-type set
-			return parent;
-		}
-	}
-
-	// Check if the grid itself can be the container
-	// (not recommended, but possible)
-	const gridStyle = getComputedStyle(gridElement);
-	if (gridStyle.containerType === 'inline-size' || gridStyle.containerType === 'size') {
-		return gridElement;
-	}
-
-	// Need to apply container-type to parent or create a wrapper
-	if (parent) {
-		parent.style.containerType = 'inline-size';
-		log('Applied container-type: inline-size to parent');
-		return parent;
-	}
-
-	// Fallback: grid is at document root, can't do much
-	console.warn(
-		'[gridiot:responsive] Grid has no parent element. Container queries may not work.',
-	);
-	return gridElement;
 }
 
 // Register as a plugin for auto-initialization via init()

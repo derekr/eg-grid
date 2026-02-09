@@ -6,6 +6,5 @@ export {
 	getPlugin,
 	init,
 	registerPlugin,
-	setItemCell,
 } from '../engine';
 export type * from '../types';

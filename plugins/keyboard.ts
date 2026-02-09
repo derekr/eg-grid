@@ -1,11 +1,6 @@
 import { getItemCell, getItemSize, registerPlugin } from '../engine';
 import type { GridCell, ItemPosition } from '../types';
-import { isDragging, isResizing } from '../state-machine';
-
-const DEBUG = false;
-function log(...args: unknown[]) {
-	if (DEBUG) console.log('[keyboard]', ...args);
-}
+import { isDragging } from '../state-machine';
 
 registerPlugin({
 	name: 'keyboard',
@@ -24,37 +19,22 @@ registerPlugin({
 		};
 
 		/**
-		 * Helper to capture all item positions from DOM
+		 * Capture all item positions and sizes in a single DOM walk
 		 */
-		const capturePositions = (): Map<string, ItemPosition> => {
+		const captureItemState = (): { positions: Map<string, ItemPosition>; sizes: Map<string, { width: number; height: number }> } => {
 			const positions = new Map<string, ItemPosition>();
-			const items = core.element.querySelectorAll('[data-gridiot-item]');
-			for (const item of items) {
-				const id = item.id || (item as HTMLElement).getAttribute('data-gridiot-item') || '';
-				if (id) {
-					const cell = getItemCell(item as HTMLElement);
-					positions.set(id, { column: cell.column, row: cell.row });
-				}
-			}
-			return positions;
-		};
-
-		/**
-		 * Helper to capture all item sizes from DOM
-		 */
-		const captureSizes = (): Map<string, { width: number; height: number }> => {
 			const sizes = new Map<string, { width: number; height: number }>();
-			const items = core.element.querySelectorAll('[data-gridiot-item]');
-			for (const item of items) {
+			for (const item of core.element.querySelectorAll('[data-gridiot-item]')) {
 				const el = item as HTMLElement;
 				const id = el.id || el.getAttribute('data-gridiot-item') || '';
 				if (id) {
-					const width = parseInt(el.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
-					const height = parseInt(el.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
-					sizes.set(id, { width, height });
+					const cell = getItemCell(el);
+					positions.set(id, { column: cell.column, row: cell.row });
+					const { colspan, rowspan } = getItemSize(el);
+					sizes.set(id, { width: colspan, height: rowspan });
 				}
 			}
-			return sizes;
+			return { positions, sizes };
 		};
 
 		/**
@@ -166,8 +146,6 @@ registerPlugin({
 				e.preventDefault();
 				stateMachine.transition({ type: 'TOGGLE_KEYBOARD_MODE' });
 				const keyboardMode = stateMachine.getState().keyboardModeActive;
-				log('keyboard mode:', keyboardMode);
-
 				if (keyboardMode) {
 					core.element.setAttribute('data-gridiot-keyboard-mode', '');
 					// If no item is selected, select the first one
@@ -227,12 +205,12 @@ registerPlugin({
 					core.emit('drag-end', { item: heldItem, cell: targetCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
 					stateMachine.transition({ type: 'COMMIT_INTERACTION' });
 					stateMachine.transition({ type: 'FINISH_COMMIT' });
-					log('drop', { cell: targetCell });
 				} else {
 					// Pick up the selected item
 					const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
 					const size = getItemSize(selectedItem);
 					const startCell = getItemCell(selectedItem);
+					const { positions, sizes } = captureItemState();
 
 					// Start interaction via state machine
 					stateMachine.transition({
@@ -243,8 +221,8 @@ registerPlugin({
 							itemId,
 							element: selectedItem,
 							columnCount: getColumnCount(),
-							originalPositions: capturePositions(),
-							originalSizes: captureSizes(),
+							originalPositions: positions,
+							originalSizes: sizes,
 							targetCell: startCell,
 							currentSize: { colspan: size.colspan, rowspan: size.rowspan },
 						},
@@ -252,7 +230,6 @@ registerPlugin({
 
 					selectedItem.setAttribute('data-gridiot-dragging', '');
 					core.emit('drag-start', { item: selectedItem, cell: startCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
-					log('pick up');
 				}
 				return;
 			}
@@ -267,7 +244,6 @@ registerPlugin({
 					const adjacentItem = findItemInDirection(fromCell, direction, selectedItem);
 					if (adjacentItem) {
 						core.select(adjacentItem);
-						log('select adjacent', direction);
 					}
 					return;
 				}
@@ -313,6 +289,7 @@ registerPlugin({
 					}
 
 					const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
+					const { positions: rPositions, sizes: rSizes } = captureItemState();
 
 					// Start resize interaction via state machine
 					stateMachine.transition({
@@ -323,8 +300,8 @@ registerPlugin({
 							itemId,
 							element: selectedItem,
 							columnCount: getColumnCount(),
-							originalPositions: capturePositions(),
-							originalSizes: captureSizes(),
+							originalPositions: rPositions,
+							originalSizes: rSizes,
 							targetCell: currentCell,
 							currentSize: { colspan: newColspan, rowspan: newRowspan },
 						},
@@ -375,8 +352,6 @@ registerPlugin({
 						}
 					}, 250);
 					pendingVtnRestore = { item: itemToRestore, timeoutId };
-
-					log('resize', { direction, newColspan, newRowspan });
 					return;
 				}
 
@@ -412,13 +387,11 @@ registerPlugin({
 						targetCell,
 					});
 					core.emit('drag-move', { item: heldItem, cell: targetCell, x: 0, y: 0, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
-					log('move', { direction, amount, targetCell });
 				} else {
 					// Nudge: Move item directly
 					// Emit drag-start then drag-end (skip drag-move since we don't need preview)
 					core.emit('drag-start', { item: selectedItem, cell: currentCell, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
 					core.emit('drag-end', { item: selectedItem, cell: targetCell, colspan: itemSize.colspan, rowspan: itemSize.rowspan, source: 'keyboard' as const });
-					log('nudge', { direction, amount, targetCell });
 				}
 				return;
 			}

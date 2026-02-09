@@ -160,22 +160,15 @@ export interface AlgorithmHarnessOptions {
  * @param gridElement - The grid container element
  * @param strategy - Algorithm-specific layout functions
  * @param options - Configuration options
- * @param debugLabel - Label for debug logging (e.g. 'algorithm-push')
  * @returns Cleanup function to detach the algorithm
  */
 export function attachAlgorithm(
 	gridElement: HTMLElement,
 	strategy: AlgorithmStrategy,
 	options: AlgorithmHarnessOptions = {},
-	debugLabel = 'algorithm',
 ): () => void {
 	const { selectorPrefix = '#', selectorSuffix = '', core, layoutModel } = options;
 	const styles: StyleManager | null = core?.styles ?? null;
-
-	const DEBUG = false;
-	function log(...args: unknown[]) {
-		if (DEBUG) console.log(`[${debugLabel}]`, ...args);
-	}
 
 	function getCurrentColumnCount(): number {
 		const style = getComputedStyle(gridElement);
@@ -222,6 +215,36 @@ export function attachAlgorithm(
 		return element.dataset.id || element.dataset.gridiotItem || '';
 	}
 
+	/** Read items from DOM with original positions restored (except the actively dragged item) */
+	function getItemsWithOriginals(excludeId: string | null, originals: Map<string, { column: number; row: number }>): ItemRect[] {
+		return readItemsFromDOM(gridElement).map((item) => {
+			const original = originals.get(item.id);
+			if (original && item.id !== excludeId) {
+				return { ...item, column: original.column, row: original.row };
+			}
+			return item;
+		});
+	}
+
+	/** Build resize items from original positions, with resized item updated */
+	function getResizeItems(
+		originals: Map<string, { column: number; row: number; width: number; height: number }>,
+		resizedId: string,
+		cell: GridCell,
+		colspan: number,
+		rowspan: number,
+	): ItemRect[] {
+		const items: ItemRect[] = [];
+		for (const [id, original] of originals) {
+			if (id === resizedId) {
+				items.push({ id, column: cell.column, row: cell.row, width: colspan, height: rowspan });
+			} else {
+				items.push({ id, column: original.column, row: original.row, width: original.width, height: original.height });
+			}
+		}
+		return items;
+	}
+
 	function saveAndClearPreview(layout: ItemRect[], columnCount: number, afterSave?: () => void): void {
 		if (!layoutModel || !columnCount) return;
 		const positions = new Map<string, ItemPosition>();
@@ -230,11 +253,9 @@ export function attachAlgorithm(
 		}
 		layoutModel.saveLayout(columnCount, positions);
 		if (afterSave) afterSave();
-		log('saved layout to model for', columnCount, 'columns');
 		if (styles) {
 			styles.clear('preview');
 			styles.commit();
-			log('cleared preview styles');
 		}
 	}
 
@@ -260,7 +281,6 @@ export function attachAlgorithm(
 					selectorSuffix,
 					maxColumns: capturedColumnCount ?? undefined,
 				});
-				log('injecting CSS:', css.substring(0, 200) + '...');
 				styles.set('preview', css);
 				styles.commit();
 
@@ -297,8 +317,7 @@ export function attachAlgorithm(
 			if (draggedElement && excludeId) {
 				draggedElement.style.viewTransitionName = 'dragging';
 			}
-			const transition = (document as any).startViewTransition(applyChanges);
-			transition.finished.then(() => log('view transition finished'));
+			(document as any).startViewTransition(applyChanges);
 		} else {
 			applyChanges();
 		}
@@ -335,7 +354,6 @@ export function attachAlgorithm(
 			styles.commit();
 		}
 
-		log('drag-start', { item: draggedItemId });
 	};
 
 	let pendingCell: GridCell | null = null;
@@ -348,23 +366,14 @@ export function attachAlgorithm(
 			const cameraState = core.providers.get<CameraState>('camera');
 			if (cameraState?.isScrolling) {
 				pendingCell = detail.cell;
-				log('drag-move deferred (camera scrolling)', pendingCell);
 				return;
 			}
 		}
 		pendingCell = null;
 
-		const items: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = originalPositions!.get(item.id);
-			if (original && item.id !== draggedItemId) {
-				return { ...item, column: original.column, row: original.row };
-			}
-			return item;
-		});
-
+		const items = getItemsWithOriginals(draggedItemId, originalPositions!);
 		const columns = dragStartColumnCount ?? getCurrentColumnCount();
 		const newLayout = strategy.calculateDragLayout(items, draggedItemId, detail.cell, columns);
-		log('drag-move', { targetCell: detail.cell });
 		applyLayout(newLayout, draggedItemId, true);
 
 		if (strategy.afterDragMove) {
@@ -375,14 +384,7 @@ export function attachAlgorithm(
 	const onDragEnd = (e: Event) => {
 		if (!draggedItemId || !originalPositions) return;
 		const detail = (e as CustomEvent<DragEndDetail>).detail;
-
-		const items: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = originalPositions!.get(item.id);
-			if (original && item.id !== draggedItemId) {
-				return { ...item, column: original.column, row: original.row };
-			}
-			return item;
-		});
+		const items = getItemsWithOriginals(draggedItemId, originalPositions!);
 
 		const columns = dragStartColumnCount ?? getCurrentColumnCount();
 		const finalLayout = strategy.calculateDragLayout(items, draggedItemId, detail.cell, columns);
@@ -414,14 +416,7 @@ export function attachAlgorithm(
 			draggedElement.style.viewTransitionName = '';
 		}
 
-		const restoreLayout: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = originalPositions!.get(item.id);
-			if (original) {
-				return { ...item, column: original.column, row: original.row };
-			}
-			return item;
-		});
-
+		const restoreLayout = getItemsWithOriginals(null, originalPositions!);
 		const restore = () => applyLayout(restoreLayout, null, false);
 
 		if ('startViewTransition' in document) {
@@ -449,22 +444,10 @@ export function attachAlgorithm(
 			cell = core?.getCellFromPoint(centerX, centerY) ?? null;
 		}
 
-		if (!cell) {
-			log('camera-settled, no cell to update to');
-			return;
-		}
-
-		log('camera-settled, updating to cell', cell);
+		if (!cell) return;
 		pendingCell = null;
 
-		const items: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = originalPositions!.get(item.id);
-			if (original && item.id !== draggedItemId) {
-				return { ...item, column: original.column, row: original.row };
-			}
-			return item;
-		});
-
+		const items = getItemsWithOriginals(draggedItemId, originalPositions!);
 		const columns = dragStartColumnCount ?? getCurrentColumnCount();
 		const newLayout = strategy.calculateDragLayout(items, draggedItemId!, cell, columns);
 		applyLayout(newLayout, draggedItemId, true);
@@ -512,7 +495,6 @@ export function attachAlgorithm(
 		}
 
 		lastResizeLayout = null;
-		log('resize-start', { item: resizedItemId });
 	};
 
 	const onResizeMove = (e: Event) => {
@@ -533,30 +515,9 @@ export function attachAlgorithm(
 			rowspan: detail.rowspan,
 		};
 
-		const items: ItemRect[] = [];
-		for (const [id, original] of resizeOriginalPositions) {
-			if (id === resizedItemId) {
-				items.push({
-					id,
-					column: detail.cell.column,
-					row: detail.cell.row,
-					width: detail.colspan,
-					height: detail.rowspan,
-				});
-			} else {
-				items.push({
-					id,
-					column: original.column,
-					row: original.row,
-					width: original.width,
-					height: original.height,
-				});
-			}
-		}
-
+		const items = getResizeItems(resizeOriginalPositions, resizedItemId, detail.cell, detail.colspan, detail.rowspan);
 		const columns = resizeStartColumnCount ?? getCurrentColumnCount();
 		const newLayout = strategy.calculateResizeLayout(items, resizedItemId, detail.cell, detail.colspan, detail.rowspan, columns);
-		log('resize-move', { size: { colspan: detail.colspan, rowspan: detail.rowspan } });
 		applyLayout(newLayout, resizedItemId, true);
 	};
 
@@ -564,27 +525,7 @@ export function attachAlgorithm(
 		if (!strategy.calculateResizeLayout) return;
 		if (!resizedItemId || !resizeOriginalPositions) return;
 		const detail = (e as CustomEvent<ResizeEndDetail>).detail;
-
-		const items: ItemRect[] = [];
-		for (const [id, original] of resizeOriginalPositions) {
-			if (id === resizedItemId) {
-				items.push({
-					id,
-					column: detail.cell.column,
-					row: detail.cell.row,
-					width: detail.colspan,
-					height: detail.rowspan,
-				});
-			} else {
-				items.push({
-					id,
-					column: original.column,
-					row: original.row,
-					width: original.width,
-					height: original.height,
-				});
-			}
-		}
+		const items = getResizeItems(resizeOriginalPositions, resizedItemId, detail.cell, detail.colspan, detail.rowspan);
 
 		const columns = resizeStartColumnCount ?? getCurrentColumnCount();
 		const finalLayout = strategy.calculateResizeLayout(items, resizedItemId, detail.cell, detail.colspan, detail.rowspan, columns);
@@ -611,20 +552,9 @@ export function attachAlgorithm(
 	const onResizeCancel = () => {
 		if (!resizedItemId || !resizeOriginalPositions) return;
 
-		const restoreLayout: ItemRect[] = readItemsFromDOM(gridElement).map((item) => {
-			const original = resizeOriginalPositions!.get(item.id);
-			if (original) {
-				return {
-					...item,
-					column: original.column,
-					row: original.row,
-					width: original.width,
-					height: original.height,
-				};
-			}
-			return item;
-		});
-
+		const restoreLayout = Array.from(resizeOriginalPositions, ([id, o]) => ({
+			id, column: o.column, row: o.row, width: o.width, height: o.height,
+		}));
 		const restore = () => applyLayout(restoreLayout, null, false);
 
 		if ('startViewTransition' in document) {

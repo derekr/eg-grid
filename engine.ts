@@ -38,21 +38,12 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 	const providerMap = new Map<string, () => unknown>();
 	const providers: ProviderRegistry = {
 		register<T>(capability: string, provider: () => T): void {
-			if (providerMap.has(capability)) {
-				console.warn(
-					`Gridiot: Provider for "${capability}" already registered, overwriting`,
-				);
-			}
 			providerMap.set(capability, provider);
 		},
 
 		get<T>(capability: string): T | undefined {
 			const provider = providerMap.get(capability);
 			return provider ? (provider() as T) : undefined;
-		},
-
-		has(capability: string): boolean {
-			return providerMap.has(capability);
 		},
 	};
 
@@ -188,42 +179,9 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 		},
 
 		destroy(): void {
-			observer.disconnect();
 			cleanups.forEach((cleanup) => cleanup());
 		},
 	};
-
-	// Observe position changes and animate with View Transitions
-	const observer = new MutationObserver((mutations) => {
-		// Collect items that changed position
-		const changedItems = new Set<HTMLElement>();
-
-		for (const mutation of mutations) {
-			if (
-				mutation.type === 'attributes' &&
-				mutation.target instanceof HTMLElement
-			) {
-				const item = mutation.target.closest(
-					'[data-gridiot-item]',
-				) as HTMLElement | null;
-				if (item && element.contains(item)) {
-					changedItems.add(item);
-				}
-			}
-		}
-
-		// Animate changes with View Transitions if available
-		if (changedItems.size > 0 && 'startViewTransition' in document) {
-			// Items already moved - View Transitions will handle animation
-			// The browser captures before/after states automatically
-		}
-	});
-
-	observer.observe(element, {
-		subtree: true,
-		attributes: true,
-		attributeFilter: ['style', 'class'],
-	});
 
 	// Register state machine provider for plugin access
 	providers.register('state', () => stateMachine.getState());
@@ -308,18 +266,10 @@ export function getItemSize(item: HTMLElement): { colspan: number; rowspan: numb
 }
 
 /**
- * Set an item's grid position
- */
-export function setItemCell(item: HTMLElement, cell: GridCell): void {
-	item.style.gridColumn = String(cell.column);
-	item.style.gridRow = String(cell.row);
-}
-
-/**
  * Attach multiple event listeners and return a cleanup function to remove them all
  */
 export function listenEvents(
-	element: HTMLElement,
+	element: EventTarget,
 	events: Record<string, EventListenerOrEventListenerObject>,
 ): () => void {
 	for (const [name, handler] of Object.entries(events)) {
@@ -332,23 +282,3 @@ export function listenEvents(
 	};
 }
 
-/**
- * Get grid info for a grid element
- */
-export function getGridInfo(element: HTMLElement) {
-	const rect = element.getBoundingClientRect();
-	const style = getComputedStyle(element);
-	const columns = parseGridTemplate(style.gridTemplateColumns);
-	const rows = parseGridTemplate(style.gridTemplateRows);
-	const columnGap = parseFloat(style.columnGap) || 0;
-	const rowGap = parseFloat(style.rowGap) || 0;
-
-	return {
-		rect,
-		columns,
-		rows,
-		gap: columnGap, // Assume uniform gap for simplicity
-		cellWidth: columns[0] || 0,
-		cellHeight: rows[0] || 0,
-	};
-}

@@ -5,7 +5,7 @@
  * Handles creation, positioning, and cleanup automatically.
  */
 
-import { registerPlugin } from '../engine';
+import { listenEvents, registerPlugin } from '../engine';
 import type {
 	DragStartDetail,
 	DragMoveDetail,
@@ -189,46 +189,21 @@ export function attachPlaceholder(
 	}
 
 	// Attach listeners
-	gridElement.addEventListener(
-		'gridiot:drag-start',
-		handleDragStart as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:drag-move',
-		handleDragMove as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:drag-end',
-		handleDragEnd as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:drag-cancel',
-		handleDragCancel as EventListener
-	);
-	// Drop preview (algorithm-computed landing position)
-	gridElement.addEventListener(
-		'gridiot:drop-preview',
-		handleDropPreview as EventListener
-	);
-	// Resize events
-	gridElement.addEventListener(
-		'gridiot:resize-start',
-		handleResizeStart as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:resize-move',
-		handleResizeMove as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:resize-end',
-		handleResizeEnd as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:resize-cancel',
-		handleResizeCancel as EventListener
-	);
-	document.addEventListener('pointerup', handlePointerUp);
-	document.addEventListener('pointercancel', handlePointerCancel);
+	const removeGridListeners = listenEvents(gridElement, {
+		'gridiot:drag-start': handleDragStart as EventListener,
+		'gridiot:drag-move': handleDragMove as EventListener,
+		'gridiot:drag-end': handleDragEnd as EventListener,
+		'gridiot:drag-cancel': handleDragCancel as EventListener,
+		'gridiot:drop-preview': handleDropPreview as EventListener,
+		'gridiot:resize-start': handleResizeStart as EventListener,
+		'gridiot:resize-move': handleResizeMove as EventListener,
+		'gridiot:resize-end': handleResizeEnd as EventListener,
+		'gridiot:resize-cancel': handleResizeCancel as EventListener,
+	});
+	const removeDocListeners = listenEvents(document, {
+		pointerup: handlePointerUp,
+		pointercancel: handlePointerCancel,
+	});
 
 	// Public API
 	return {
@@ -248,74 +223,10 @@ export function attachPlaceholder(
 
 		destroy(): void {
 			remove();
-			gridElement.removeEventListener(
-				'gridiot:drag-start',
-				handleDragStart as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:drag-move',
-				handleDragMove as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:drag-end',
-				handleDragEnd as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:drag-cancel',
-				handleDragCancel as EventListener
-			);
-			// Drop preview
-			gridElement.removeEventListener(
-				'gridiot:drop-preview',
-				handleDropPreview as EventListener
-			);
-			// Resize events
-			gridElement.removeEventListener(
-				'gridiot:resize-start',
-				handleResizeStart as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:resize-move',
-				handleResizeMove as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:resize-end',
-				handleResizeEnd as EventListener
-			);
-			gridElement.removeEventListener(
-				'gridiot:resize-cancel',
-				handleResizeCancel as EventListener
-			);
-			document.removeEventListener('pointerup', handlePointerUp);
-			document.removeEventListener('pointercancel', handlePointerCancel);
+			removeGridListeners();
+			removeDocListeners();
 		},
 	};
-}
-
-/**
- * Default CSS for the placeholder.
- * Include this in your stylesheet or use attachPlaceholderStyles().
- */
-export const PLACEHOLDER_CSS = `
-.gridiot-placeholder {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px dashed rgba(255, 255, 255, 0.4);
-  border-radius: 8px;
-  pointer-events: none;
-}
-`;
-
-/**
- * Inject default placeholder styles into the document.
- * Call once at app initialization if you don't want to add CSS manually.
- */
-export function attachPlaceholderStyles(): void {
-	if (document.getElementById('gridiot-placeholder-styles')) return;
-
-	const style = document.createElement('style');
-	style.id = 'gridiot-placeholder-styles';
-	style.textContent = PLACEHOLDER_CSS;
-	document.head.appendChild(style);
 }
 
 // Register as a plugin for auto-initialization via init()

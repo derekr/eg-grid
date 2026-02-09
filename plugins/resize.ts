@@ -104,27 +104,12 @@ function detectHandle(
 	return null;
 }
 
-/**
- * Get cursor style for a resize handle
- */
-function getCursor(handle: ResizeHandle | null): string {
-	switch (handle) {
-		case 'nw':
-		case 'se':
-			return 'nwse-resize';
-		case 'ne':
-		case 'sw':
-			return 'nesw-resize';
-		case 'n':
-		case 's':
-			return 'ns-resize';
-		case 'e':
-		case 'w':
-			return 'ew-resize';
-		default:
-			return '';
-	}
-}
+const CURSOR: Record<string, string> = {
+	nw: 'nwse-resize', se: 'nwse-resize',
+	ne: 'nesw-resize', sw: 'nesw-resize',
+	n: 'ns-resize', s: 'ns-resize',
+	e: 'ew-resize', w: 'ew-resize',
+};
 
 /**
  * Create a size label element
@@ -161,10 +146,7 @@ function createSizeLabel(): HTMLElement {
 export function attachResize(
 	gridElement: HTMLElement,
 	options: ResizeOptions,
-): {
-	setSize(item: HTMLElement, size: { colspan: number; rowspan: number }): void;
-	destroy(): void;
-} {
+): { destroy(): void } {
 	const {
 		core,
 		handles = 'corners',
@@ -409,89 +391,40 @@ export function attachResize(
 		item.removeEventListener('pointercancel', onItemPointerCancel);
 	}
 
-	function finishResize() {
-		if (!activeResize) return;
-
-		const { item, pointerId, currentSize, currentCell, sizeLabel } = activeResize;
-
-		// Clean up item event listeners
+	function resetItem(item: HTMLElement, pointerId: number, sizeLabel: HTMLElement | null) {
 		cleanupResizeListeners(item, pointerId);
-
-		// Update data attributes to reflect new size
-		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
-		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
-
-		// Remove size label
-		if (sizeLabel) {
-			sizeLabel.remove();
-		}
-
-		// Emit resize-end while item is still position:fixed
-		emit<ResizeEndDetail>('resize-end', {
-			item,
-			cell: currentCell,
-			colspan: currentSize.colspan,
-			rowspan: currentSize.rowspan,
-			source: 'pointer',
-		});
-
-		// Clear fixed positioning — item returns to grid flow
+		if (sizeLabel) sizeLabel.remove();
 		item.style.position = '';
 		item.style.left = '';
 		item.style.top = '';
 		item.style.width = '';
 		item.style.height = '';
 		item.style.zIndex = '';
-		// Restore view transition name
 		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
-		if (itemId) {
-			item.style.viewTransitionName = itemId;
-		} else {
-			item.style.viewTransitionName = '';
-		}
+		item.style.viewTransitionName = itemId || '';
 		item.removeAttribute('data-gridiot-resizing');
 		item.removeAttribute('data-gridiot-handle-active');
+	}
 
+	function finishResize() {
+		if (!activeResize) return;
+		const { item, pointerId, currentSize, currentCell, sizeLabel } = activeResize;
+		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
+		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
+		emit<ResizeEndDetail>('resize-end', {
+			item, cell: currentCell,
+			colspan: currentSize.colspan, rowspan: currentSize.rowspan,
+			source: 'pointer',
+		});
+		resetItem(item, pointerId, sizeLabel);
 		activeResize = null;
 	}
 
 	function cancelResize() {
 		if (!activeResize) return;
-
 		const { item, pointerId, sizeLabel } = activeResize;
-
-		// Clean up item event listeners
-		cleanupResizeListeners(item, pointerId);
-
-		// Remove size label
-		if (sizeLabel) {
-			sizeLabel.remove();
-		}
-
-		// Clear fixed positioning — item returns to grid flow at its previous position
-		item.style.position = '';
-		item.style.left = '';
-		item.style.top = '';
-		item.style.width = '';
-		item.style.height = '';
-		item.style.zIndex = '';
-
-		// Restore view transition name
-		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
-		if (itemId) {
-			item.style.viewTransitionName = itemId;
-		} else {
-			item.style.viewTransitionName = '';
-		}
-
-		item.removeAttribute('data-gridiot-resizing');
-		item.removeAttribute('data-gridiot-handle-active');
-
-		emit<ResizeCancelDetail>('resize-cancel', {
-			item,
-			source: 'pointer',
-		});
-
+		emit<ResizeCancelDetail>('resize-cancel', { item, source: 'pointer' });
+		resetItem(item, pointerId, sizeLabel);
 		activeResize = null;
 	}
 
@@ -562,7 +495,7 @@ export function attachResize(
 				hoveredHandle = handle;
 
 				// Set cursor and hover attribute based on handle
-				item.style.cursor = getCursor(handle) || '';
+				item.style.cursor = (handle ? CURSOR[handle] : '') || '';
 				if (handle) {
 					item.setAttribute('data-gridiot-handle-hover', handle);
 				} else {
@@ -588,36 +521,6 @@ export function attachResize(
 	gridElement.addEventListener('pointermove', onPointerMove);
 	document.addEventListener('keydown', onKeyDown);
 
-	// Public API
-	function setSize(
-		item: HTMLElement,
-		size: { colspan: number; rowspan: number },
-	) {
-		const clampedColspan = Math.max(
-			minSize.colspan,
-			Math.min(maxSize.colspan, size.colspan),
-		);
-		const clampedRowspan = Math.max(
-			minSize.rowspan,
-			Math.min(maxSize.rowspan, size.rowspan),
-		);
-
-		const computed = getComputedStyle(item);
-		const column = parseInt(computed.gridColumnStart, 10) || 1;
-		const row = parseInt(computed.gridRowStart, 10) || 1;
-
-		item.setAttribute('data-gridiot-colspan', String(clampedColspan));
-		item.setAttribute('data-gridiot-rowspan', String(clampedRowspan));
-
-		emit<ResizeEndDetail>('resize-end', {
-			item,
-			cell: { column, row },
-			colspan: clampedColspan,
-			rowspan: clampedRowspan,
-			source: 'pointer',
-		});
-	}
-
 	function destroy() {
 		gridElement.removeEventListener('pointerdown', onPointerDown, {
 			capture: true,
@@ -630,7 +533,7 @@ export function attachResize(
 		}
 	}
 
-	return { setSize, destroy };
+	return { destroy };
 }
 
 // Register as a plugin for auto-initialization via init()

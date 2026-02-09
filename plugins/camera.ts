@@ -8,7 +8,7 @@
  * The "active item" is: the dragged item during drag, or the selected item otherwise.
  */
 
-import { registerPlugin } from '../engine';
+import { listenEvents, registerPlugin } from '../engine';
 import type {
 	DragStartDetail,
 	DragMoveDetail,
@@ -444,44 +444,17 @@ export function attachCamera(
 		scrollTo(e.detail.item);
 	}
 
-	// Attach event listeners
-	gridElement.addEventListener(
-		'gridiot:drag-start',
-		onDragStart as EventListener
-	);
-	gridElement.addEventListener(
-		'gridiot:drag-move',
-		onDragMove as EventListener
-	);
-	gridElement.addEventListener('gridiot:drag-end', onDragEnd as EventListener);
-	gridElement.addEventListener(
-		'gridiot:drag-cancel',
-		onDragCancel as EventListener
-	);
-	gridElement.addEventListener('gridiot:select', onSelect as EventListener);
+	const removeListeners = listenEvents(gridElement, {
+		'gridiot:drag-start': onDragStart as EventListener,
+		'gridiot:drag-move': onDragMove as EventListener,
+		'gridiot:drag-end': onDragEnd as EventListener,
+		'gridiot:drag-cancel': onDragCancel as EventListener,
+		'gridiot:select': onSelect as EventListener,
+	});
 
 	function destroy(): void {
 		stopScrollLoop();
-		gridElement.removeEventListener(
-			'gridiot:drag-start',
-			onDragStart as EventListener
-		);
-		gridElement.removeEventListener(
-			'gridiot:drag-move',
-			onDragMove as EventListener
-		);
-		gridElement.removeEventListener(
-			'gridiot:drag-end',
-			onDragEnd as EventListener
-		);
-		gridElement.removeEventListener(
-			'gridiot:drag-cancel',
-			onDragCancel as EventListener
-		);
-		gridElement.removeEventListener(
-			'gridiot:select',
-			onSelect as EventListener
-		);
+		removeListeners();
 	}
 
 	return {
