@@ -37,3 +37,7 @@ coverage/
 .cache/
 
 .wrangler/
+
+# Dev tool configs
+mcp.json
+opencode.jsonc

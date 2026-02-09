@@ -235,19 +235,6 @@ Use container queries, not media queries:
 }
 ```
 
-## Reference Implementation
-
-**Consult `original-prototype.html` when implementing features.**
-
-The prototype demonstrates working implementations of:
-- Responsive layout switching
-- View Transitions integration
-- Drag with placeholder preview
-- Debug/config panels
-- Keyboard navigation patterns
-
-If something worked in the prototype, understand how before reimplementing.
-
 ## File Reference
 
 | File | Purpose |
@@ -259,7 +246,7 @@ If something worked in the prototype, understand how before reimplementing.
 | `plugins/keyboard.ts` | Arrow key navigation |
 | `plugins/algorithm-push-core.ts` | Pure push-down algorithm |
 | `plugins/algorithm-push.ts` | DOM integration for algorithm |
-| `original-prototype.html` | Reference implementation |
+| `eg-grid-element.ts` | `<eg-grid>` web component |
 
 ## Common Mistakes to Avoid
 
@@ -268,4 +255,3 @@ If something worked in the prototype, understand how before reimplementing.
 3. **DOM access in algorithm code** - Keep algorithms pure
 4. **Direct plugin-to-plugin calls** - Use events or state machine
 5. **Media queries instead of container queries** - Container queries are more flexible
-6. **Reimplementing without checking prototype** - Prototype has working patterns
