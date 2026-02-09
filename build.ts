@@ -1,64 +1,75 @@
-import * as esbuild from 'esbuild';
+import { build, type InlineConfig } from 'vite';
+import { resolve } from 'node:path';
+import { gzipSync } from 'node:zlib';
+import { statSync, readFileSync } from 'node:fs';
 
-const common: esbuild.BuildOptions = {
-	bundle: true,
-	format: 'esm',
-	target: 'es2022',
-	minify: false,
-	sourcemap: true,
-	ignoreAnnotations: true, // Ignore sideEffects: false
+const root = import.meta.dirname;
+
+const entries = [
+	{ entry: 'bundles/index.ts', name: 'gridiot', label: 'full' },
+	{ entry: 'plugins/algorithm-push.ts', name: 'algorithm-push', label: 'push algorithm' },
+	{ entry: 'plugins/algorithm-reorder.ts', name: 'algorithm-reorder', label: 'reorder algorithm' },
+	{ entry: 'plugins/dev-overlay.ts', name: 'dev-overlay', label: 'debug overlay' },
+	{ entry: 'plugins/placeholder.ts', name: 'placeholder', label: 'drop placeholder' },
+	{ entry: 'plugins/camera.ts', name: 'camera', label: 'auto-scroll' },
+	{ entry: 'plugins/resize.ts', name: 'resize', label: 'resize handles' },
+];
+
+const minifyOptions = {
+	compress: {
+		target: 'es2022',
+		dropDebugger: true,
+		unused: true,
+	},
+	mangle: {
+		toplevel: true,
+	},
 };
 
-// Build all bundles
-await Promise.all([
-	// Full bundle
-	esbuild.build({
-		...common,
-		entryPoints: ['bundles/index.ts'],
-		outfile: 'dist/gridiot.js',
-	}),
-	// Algorithm plugins (optional add-ons)
-	esbuild.build({
-		...common,
-		entryPoints: ['plugins/algorithm-push.ts'],
-		outfile: 'dist/algorithm-push.js',
-	}),
-	esbuild.build({
-		...common,
-		entryPoints: ['plugins/algorithm-reorder.ts'],
-		outfile: 'dist/algorithm-reorder.js',
-	}),
-	// Dev overlay plugin
-	esbuild.build({
-		...common,
-		entryPoints: ['plugins/dev-overlay.ts'],
-		outfile: 'dist/dev-overlay.js',
-	}),
-	// Placeholder plugin
-	esbuild.build({
-		...common,
-		entryPoints: ['plugins/placeholder.ts'],
-		outfile: 'dist/placeholder.js',
-	}),
-	// Camera plugin
-	esbuild.build({
-		...common,
-		entryPoints: ['plugins/camera.ts'],
-		outfile: 'dist/camera.js',
-	}),
-	// Resize plugin
-	esbuild.build({
-		...common,
-		entryPoints: ['plugins/resize.ts'],
-		outfile: 'dist/resize.js',
-	}),
-]);
+function libConfig(entry: string, fileName: string, minify: boolean): InlineConfig {
+	return {
+		root,
+		configFile: false,
+		logLevel: 'warn',
+		build: {
+			lib: {
+				entry: resolve(root, entry),
+				formats: ['es'],
+				fileName: () => fileName,
+			},
+			outDir: 'dist',
+			emptyOutDir: false,
+			sourcemap: true,
+			minify,
+			target: 'es2022',
+			rolldownOptions: minify ? { output: { minify: minifyOptions } } : undefined,
+		},
+	};
+}
 
-console.log('Built gridiot bundles:');
-console.log('  - dist/gridiot.js (full)');
-console.log('  - dist/algorithm-push.js (push layout algorithm)');
-console.log('  - dist/algorithm-reorder.js (reorder layout algorithm)');
-console.log('  - dist/dev-overlay.js (debug/config overlay)');
-console.log('  - dist/placeholder.js (drop placeholder)');
-console.log('  - dist/camera.js (viewport auto-scroll)');
-console.log('  - dist/resize.js (item resize handles)');
+// Build all bundles — unminified + minified
+await Promise.all(entries.flatMap(({ entry, name }) => [
+	build(libConfig(entry, `${name}.js`, false)),
+	build(libConfig(entry, `${name}.min.js`, true)),
+]));
+
+// Size report
+function formatSize(bytes: number): string {
+	return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+const col = 42;
+console.log(`\n  ${'Bundle'.padEnd(col)} ${'Raw'.padStart(9)} ${'Min'.padStart(9)} ${'Gzip'.padStart(9)}`);
+console.log(`  ${'─'.repeat(col)} ${'─'.repeat(9)} ${'─'.repeat(9)} ${'─'.repeat(9)}`);
+
+for (const { name, label } of entries) {
+	const rawPath = resolve(root, 'dist', `${name}.js`);
+	const minPath = resolve(root, 'dist', `${name}.min.js`);
+	const rawSize = statSync(rawPath).size;
+	const minBuf = readFileSync(minPath);
+	const minSize = minBuf.byteLength;
+	const gzSize = gzipSync(minBuf, { level: 9 }).byteLength;
+
+	const nameStr = `${name}.js (${label})`;
+	console.log(`  ${nameStr.padEnd(col)} ${formatSize(rawSize).padStart(9)} ${formatSize(minSize).padStart(9)} ${formatSize(gzSize).padStart(9)}`);
+}
