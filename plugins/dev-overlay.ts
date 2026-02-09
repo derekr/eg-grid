@@ -485,6 +485,7 @@ export function attachDevOverlay(
 		}
 
 		const toggles = configOptions.filter(o => o.type === 'boolean');
+		const selects = configOptions.filter(o => o.type === 'select');
 		const actions = configOptions.filter(o => o.type === 'action');
 
 		return `
@@ -494,6 +495,14 @@ export function attachDevOverlay(
 					<div class="egg-dev-config-row">
 						<span class="egg-dev-config-label">${option.label}</span>
 						<div class="egg-dev-toggle" data-key="${option.key}" data-checked="${option.value}"></div>
+					</div>
+				`).join('')}
+				${selects.map(option => `
+					<div class="egg-dev-config-row">
+						<span class="egg-dev-config-label">${option.label}</span>
+						<select class="egg-dev-select" data-key="${option.key}">
+							${(option.options || []).map(opt => `<option value="${opt}"${opt === option.value ? ' selected' : ''}>${opt}</option>`).join('')}
+						</select>
 					</div>
 				`).join('')}
 			</div>
