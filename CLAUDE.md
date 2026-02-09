@@ -21,8 +21,9 @@ These docs distill the W3C specs ([CSS Grid Level 1](https://www.w3.org/TR/css-g
 - To serve – `pnpx vite .`
 
 Outputs to `dist/`:
-- `eg-grid.js` - Full bundle (all plugins)
-- Individual plugins for add-on use
+- `eg-grid.js` / `eg-grid.min.js` - Full bundle (all plugins)
+- `eg-grid-element.js` / `eg-grid-element.min.js` - Web component
+- `dev-overlay.js` / `dev-overlay.min.js` - Debug panel (optional)
 
 
 ## Project Overview
@@ -156,10 +157,10 @@ Plugins communicate via custom events, not direct function calls:
 
 ```ts
 // Plugin emits
-core.emit('egg:drag-move', { item, cell, colspan, rowspan });
+core.emit('egg-drag-move', { item, cell, colspan, rowspan });
 
 // Consumer handles
-element.addEventListener('egg:drag-move', (e) => {
+element.addEventListener('egg-drag-move', (e) => {
   // Run algorithm, update layout
 });
 ```

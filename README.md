@@ -45,23 +45,23 @@ For full control, use `init()` directly:
 ## How It Works
 
 ```
-                              ┌──────────────────────┐
-                              │     State Machine     │
-                              │                       │
-                              │  idle → selected →    │
-                              │  interacting →        │
-                              │  committing → selected│
-                              └──────────┬───────────┘
+                              ┌────────────────────────┐
+                              │     State Machine      │
+                              │                        │
+                              │  idle → selected →     │
+                              │  interacting →         │
+                              │  committing → selected │
+                              └──────────┬─────────────┘
                                          │ orchestrates
                   ┌──────────────────────┼──────────────────────┐
                   │                      │                      │
-          ┌───────▼───────┐    ┌────────▼────────┐    ┌───────▼───────┐
-          │    Input       │    │   Algorithm      │    │    Output     │
-          │                │    │                  │    │               │
-          │  Pointer       │    │  Push (default)  │    │  CSS inject   │
-          │  Keyboard      │    │  Reorder         │    │  View Trans.  │
-          │  Resize        │    │  Server-side     │    │  ARIA live    │
-          └───────┬───────┘    └────────┬────────┘    └───────┬───────┘
+          ┌───────▼───────┐    ┌─────────▼───────┐    ┌─────────▼─────┐
+          │    Input      │    │   Algorithm     │    │    Output     │
+          │               │    │                 │    │               │
+          │  Pointer      │    │  Push (default) │    │  CSS inject   │
+          │  Keyboard     │    │  Reorder        │    │  View Trans.  │
+          │  Resize       │    │  Server-side    │    │  ARIA live    │
+          └───────┬───────┘    └─────────┬───────┘    └─────────┬─────┘
                   │                      │                      │
                   │     egg-drag-move    │   new layout CSS     │
                   │ ──────────────────►  │ ──────────────────►  │
@@ -83,13 +83,13 @@ One interaction at a time. Column count is captured at interaction start and hel
 ```
               SELECT              START_INTERACTION
   ┌──────┐ ──────────► ┌──────────┐ ──────────────► ┌──────────────┐
-  │ idle │              │ selected │                  │ interacting  │
+  │ idle │             │ selected │                 │ interacting  │
   └──────┘ ◄────────── └──────────┘ ◄────────────── └──────┬───────┘
               DESELECT     ▲  CANCEL_INTERACTION           │
                            │                    COMMIT_INTERACTION
                            │  FINISH_COMMIT          │
                            │                   ┌─────▼──────┐
-                           └─────────────────  │ committing  │
+                           └─────────────────  │ committing │
                                                └────────────┘
 ```
 
@@ -282,8 +282,31 @@ Items are styled via CSS attribute selectors. The library sets these automatical
 /* Resizing */
 [data-egg-resizing] { z-index: 100; }
 
-/* Keyboard mode */
+/* Keyboard mode (Shift+G) */
 [data-egg-keyboard-mode] { outline: 2px solid rgba(251, 191, 36, 0.3); }
+```
+
+### Placeholder
+
+The placeholder shows where a dragged item will land. Style it with a CSS class:
+
+```js
+init(grid, { placeholder: { className: 'drop-placeholder' } });
+```
+
+```css
+.drop-placeholder {
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  pointer-events: none;
+}
+```
+
+Or with the web component:
+
+```html
+<eg-grid placeholder-class="drop-placeholder">
 ```
 
 ### View Transitions
@@ -312,15 +335,17 @@ The `--item-id` custom property is set automatically by the web component, or ma
 
 ## Keyboard
 
+Tab to an item to start using keyboard shortcuts. Items should have `tabindex="0"` (the web component sets this automatically).
+
 | Key | Action |
 |---|---|
-| **Shift+G** | Toggle keyboard mode |
 | **Arrow keys** / **hjkl** | Nudge item by 1 cell |
 | **Shift+Arrow** / **Shift+hjkl** | Resize item |
 | **Ctrl+Arrow** / **Ctrl+hjkl** | Jump by item size |
 | **Alt+Arrow** / **Alt+hjkl** | Select adjacent item |
 | **Enter** / **Space** | Pick up / drop item |
 | **Escape** | Cancel or deselect |
+| **Shift+G** | Toggle keyboard mode (enables shortcuts without focusing an item) |
 
 ## Accessibility
 
@@ -346,13 +371,11 @@ Override announcements with template attributes (`{label}`, `{row}`, `{column}`,
 ```
 dist/
   eg-grid.js           Full bundle — all plugins
+  eg-grid.min.js       Minified
   eg-grid-element.js   Web component — <eg-grid> + all plugins
-  algorithm-push.js    Push algorithm (standalone)
-  algorithm-reorder.js Reorder algorithm (standalone)
-  camera.js            Auto-scroll (standalone)
-  resize.js            Resize handles (standalone)
-  placeholder.js       Drop placeholder (standalone)
-  dev-overlay.js       Debug panel (standalone, Shift+D)
+  eg-grid-element.min.js
+  dev-overlay.js       Debug panel (optional, Shift+D)
+  dev-overlay.min.js
 ```
 
 ## Building
