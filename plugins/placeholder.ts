@@ -1,5 +1,5 @@
 /**
- * Placeholder plugin for Gridiot
+ * Placeholder plugin for EG Grid
  *
  * Shows a visual placeholder where the dragged item will land.
  * Handles creation, positioning, and cleanup automatically.
@@ -21,7 +21,7 @@ import type {
 export interface PlaceholderOptions {
 	/**
 	 * CSS class name for the placeholder element.
-	 * @default 'gridiot-placeholder'
+	 * @default 'egg-placeholder'
 	 */
 	className?: string;
 
@@ -49,11 +49,11 @@ export interface PlaceholderInstance {
 }
 
 /**
- * Attach a placeholder to a Gridiot grid element.
+ * Attach a placeholder to a EG Grid grid element.
  *
  * @example
  * ```js
- * import { init } from './gridiot.js';
+ * import { init } from './eg-grid.js';
  * import { attachPlaceholder } from './placeholder.js';
  *
  * const grid = init(document.getElementById('grid'));
@@ -68,7 +68,7 @@ export function attachPlaceholder(
 	options: PlaceholderOptions = {}
 ): PlaceholderInstance {
 	const {
-		className = 'gridiot-placeholder',
+		className = 'egg-placeholder',
 		element: customElement,
 		disableViewTransition = true,
 	} = options;
@@ -175,8 +175,8 @@ export function attachPlaceholder(
 		requestAnimationFrame(() => {
 			if (
 				placeholder &&
-				!document.querySelector('[data-gridiot-dragging]') &&
-				!document.querySelector('[data-gridiot-resizing]')
+				!document.querySelector('[data-egg-dragging]') &&
+				!document.querySelector('[data-egg-resizing]')
 			) {
 				remove();
 			}
@@ -189,15 +189,15 @@ export function attachPlaceholder(
 
 	// Attach listeners
 	const removeGridListeners = listenEvents(gridElement, {
-		'gridiot:drag-start': handleDragStart as EventListener,
-		'gridiot:drag-move': handleDragMove as EventListener,
-		'gridiot:drag-end': handleDragEnd as EventListener,
-		'gridiot:drag-cancel': handleDragCancel as EventListener,
-		'gridiot:drop-preview': handleDropPreview as EventListener,
-		'gridiot:resize-start': handleResizeStart as EventListener,
-		'gridiot:resize-move': handleResizeMove as EventListener,
-		'gridiot:resize-end': handleResizeEnd as EventListener,
-		'gridiot:resize-cancel': handleResizeCancel as EventListener,
+		'egg:drag-start': handleDragStart as EventListener,
+		'egg:drag-move': handleDragMove as EventListener,
+		'egg:drag-end': handleDragEnd as EventListener,
+		'egg:drag-cancel': handleDragCancel as EventListener,
+		'egg:drop-preview': handleDropPreview as EventListener,
+		'egg:resize-start': handleResizeStart as EventListener,
+		'egg:resize-move': handleResizeMove as EventListener,
+		'egg:resize-end': handleResizeEnd as EventListener,
+		'egg:resize-cancel': handleResizeCancel as EventListener,
 	});
 	const removeDocListeners = listenEvents(document, {
 		pointerup: handlePointerUp,

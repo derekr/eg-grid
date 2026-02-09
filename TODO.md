@@ -1,4 +1,4 @@
-# Gridiot TODO
+# EG Grid TODO
 
 Tasks to achieve feature parity with the grid-layout.html prototype.
 
@@ -53,7 +53,7 @@ Should match the prototype pattern in `grid-layout.html`:
 - [x] Extract pure algorithm to `algorithm-push-core.ts`
 - [x] Add property-based tests for overlap invariant
 - [x] Make `algorithm-push.ts` just re-export the core functions
-- [x] Move event handling to Gridiot core or separate integration layer
+- [x] Move event handling to EG Grid core or separate integration layer
 - [x] Add CSS generation utility (`layoutToCSS(items, cols) → string`)
 - [x] Update examples to inject CSS instead of mutating element styles
 
@@ -66,14 +66,14 @@ Should match the prototype pattern in `grid-layout.html`:
 **Complexity:** Medium
 **Files:** `engine.ts`, `types.ts`, `plugins/pointer.ts`, `plugins/keyboard.ts`
 
-The prototype tracks a `selectedItemId` with visual feedback (yellow outline). Gridiot has no selection concept.
+The prototype tracks a `selectedItemId` with visual feedback (yellow outline). EG Grid has no selection concept.
 
 **Tasks:**
 - [x] Add `selectedItem: HTMLElement | null` to core state
-- [x] Add events: `gridiot:select`, `gridiot:deselect`
+- [x] Add events: `egg:select`, `egg:deselect`
 - [x] Emit select on click (pointer plugin)
 - [x] Emit deselect on Escape or click outside (keyboard plugin)
-- [x] Add `data-gridiot-selected` attribute for CSS styling
+- [x] Add `data-egg-selected` attribute for CSS styling
 - [x] Document selection API in README (events + styling documented)
 
 **Blocked by:** Nothing
@@ -146,7 +146,7 @@ The push algorithm now supports configurable options.
 **Complexity:** Medium per algorithm
 **Files:** `plugins/algorithm-*.ts`
 
-The prototype supports 5 algorithms. Gridiot has:
+The prototype supports 5 algorithms. EG Grid has:
 - ✅ push-down (implemented as `algorithm-push.ts`)
 - ⬜ reorder (not implemented)
 - ⬜ swap (not implemented, but custom example in README)
@@ -229,7 +229,7 @@ attachResize(gridElement, {
 
   // NEW: Visual handle options
   showHandles: true,       // inject visible handle elements (default: false)
-  handleClass: 'my-handle', // CSS class for handles (default: 'gridiot-resize-handle')
+  handleClass: 'my-handle', // CSS class for handles (default: 'eg-grid-resize-handle')
 
   // OR: Full customization
   renderHandle: (handle: ResizeHandle, item: HTMLElement) => HTMLElement,
@@ -244,29 +244,29 @@ attachResize(gridElement, {
 **Option A: Injected handle elements (recommended default)**
 ```html
 <!-- Plugin injects these into each grid item -->
-<div class="gridiot-resize-handle" data-handle="se"></div>
-<div class="gridiot-resize-handle" data-handle="sw"></div>
+<div class="eg-grid-resize-handle" data-handle="se"></div>
+<div class="eg-grid-resize-handle" data-handle="sw"></div>
 <!-- etc. -->
 ```
 
 ```css
 /* User styles with CSS */
-.gridiot-resize-handle {
+.eg-grid-resize-handle {
   position: absolute;
   width: 12px;
   height: 12px;
   background: transparent;
 }
-.gridiot-resize-handle[data-handle="se"] {
+.eg-grid-resize-handle[data-handle="se"] {
   bottom: 0;
   right: 0;
   cursor: nwse-resize;
 }
-.gridiot-resize-handle[data-handle="se"]:hover {
+.eg-grid-resize-handle[data-handle="se"]:hover {
   background: rgba(59, 130, 246, 0.5);
 }
 /* Active state during resize */
-[data-gridiot-resizing] .gridiot-resize-handle[data-handle="se"] {
+[data-egg-resizing] .eg-grid-resize-handle[data-handle="se"] {
   background: rgba(59, 130, 246, 0.8);
 }
 ```
@@ -274,12 +274,12 @@ attachResize(gridElement, {
 **Option B: Data attributes on item (CSS-only, no injected DOM)**
 ```html
 <!-- Plugin adds attributes on hover -->
-<div data-gridiot-item data-gridiot-handle-hover="se">
+<div data-egg-item data-egg-handle-hover="se">
 ```
 
 ```css
 /* User styles with pseudo-elements */
-[data-gridiot-item]::after {
+[data-egg-item]::after {
   content: '';
   position: absolute;
   bottom: 0;
@@ -289,7 +289,7 @@ attachResize(gridElement, {
   opacity: 0;
   transition: opacity 0.15s;
 }
-[data-gridiot-item][data-gridiot-handle-hover]::after {
+[data-egg-item][data-egg-handle-hover]::after {
   opacity: 1;
   background: url('resize-icon.svg');
 }
@@ -311,7 +311,7 @@ attachResize(gridElement, {
 **Option D: Use existing DOM elements**
 ```html
 <!-- User provides handle elements in their HTML -->
-<div data-gridiot-item>
+<div data-egg-item>
   <div data-resize-handle="se" class="my-corner"></div>
   Content...
 </div>
@@ -328,8 +328,8 @@ attachResize(gridElement, {
 **Tasks:**
 
 Phase 1 - Data attributes (minimal, CSS-only): ✅ Complete
-- [x] Add `data-gridiot-handle-hover="se"` to item on handle hover
-- [x] Add `data-gridiot-handle-active="se"` during resize
+- [x] Add `data-egg-handle-hover="se"` to item on handle hover
+- [x] Add `data-egg-handle-active="se"` during resize
 - [x] Document CSS patterns for pseudo-element handles (README updated)
 - [x] No DOM injection, backward compatible
 
@@ -353,21 +353,21 @@ Phase 3 - Custom handles (full flexibility):
 export function attachResizeStyles() {
   const style = document.createElement('style');
   style.textContent = `
-    .gridiot-resize-handle {
+    .eg-grid-resize-handle {
       position: absolute;
       width: 12px;
       height: 12px;
       z-index: 10;
     }
-    .gridiot-resize-handle[data-handle="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
-    .gridiot-resize-handle[data-handle="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
-    .gridiot-resize-handle[data-handle="ne"] { top: 0; right: 0; cursor: nesw-resize; }
-    .gridiot-resize-handle[data-handle="nw"] { top: 0; left: 0; cursor: nwse-resize; }
+    .eg-grid-resize-handle[data-handle="se"] { bottom: 0; right: 0; cursor: nwse-resize; }
+    .eg-grid-resize-handle[data-handle="sw"] { bottom: 0; left: 0; cursor: nesw-resize; }
+    .eg-grid-resize-handle[data-handle="ne"] { top: 0; right: 0; cursor: nesw-resize; }
+    .eg-grid-resize-handle[data-handle="nw"] { top: 0; left: 0; cursor: nwse-resize; }
     /* Edge handles */
-    .gridiot-resize-handle[data-handle="n"] { top: 0; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
-    .gridiot-resize-handle[data-handle="s"] { bottom: 0; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
-    .gridiot-resize-handle[data-handle="e"] { right: 0; top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }
-    .gridiot-resize-handle[data-handle="w"] { left: 0; top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }
+    .eg-grid-resize-handle[data-handle="n"] { top: 0; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
+    .eg-grid-resize-handle[data-handle="s"] { bottom: 0; left: 12px; right: 12px; height: 8px; cursor: ns-resize; }
+    .eg-grid-resize-handle[data-handle="e"] { right: 0; top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }
+    .eg-grid-resize-handle[data-handle="w"] { left: 0; top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; }
   `;
   document.head.appendChild(style);
 }
@@ -492,7 +492,7 @@ Camera plugin that handles viewport scrolling to keep active items visible.
 **Plugin coordination:**
 - Registers `'camera'` provider with `{ isScrolling, mode }` state
 - Algorithm plugin queries `isScrolling` to defer layout updates during scroll
-- Emits `gridiot:camera-settled` event when scrolling stops (after settle delay)
+- Emits `egg:camera-settled` event when scrolling stops (after settle delay)
 - Algorithm tracks `pendingCell` during scroll, applies on settle or clears when normal drag resumes
 
 **Configuration options:**
@@ -505,7 +505,7 @@ Camera plugin that handles viewport scrolling to keep active items visible.
   settleDelay: 50,     // ms after scroll stops before 'settled'
   scrollOnSelect: true,
   autoScrollOnDrag: true,
-  core: GridiotCore    // for provider registration
+  core: EggCore    // for provider registration
 }
 ```
 
@@ -600,7 +600,7 @@ User drags item
 **Tasks:**
 - [ ] Create proof-of-concept with simple fetch-based algorithm
 - [ ] Explore Datastar signal binding for drag state
-- [ ] Explore HTMX hx-trigger on gridiot events
+- [ ] Explore HTMX hx-trigger on eg-grid events
 - [ ] Document integration patterns
 - [ ] Consider SSE/WebSocket for real-time collaborative layout
 
@@ -757,7 +757,7 @@ The prototype has a "Compact Now" button and C key shortcut.
 
 **Tasks:**
 - [ ] Export `compact()` function from algorithm plugin
-- [ ] Emit `gridiot:compact` event after compaction
+- [ ] Emit `egg:compact` event after compaction
 - [ ] Handle C key in keyboard plugin (when compaction is manual)
 
 **Blocked by:** Algorithm Configuration (compaction toggle)
@@ -792,25 +792,25 @@ The prototype has a "Compact Now" button and C key shortcut.
 
 ### Event Model Comparison
 
-**Current Gridiot events:**
+**Current EG Grid events:**
 ```typescript
-gridiot:drag-start     { item: HTMLElement, cell: GridCell, colspan: number, rowspan: number }
-gridiot:drag-move      { item: HTMLElement, cell: GridCell, x: number, y: number, colspan: number, rowspan: number }
-gridiot:drag-end       { item: HTMLElement, cell: GridCell, colspan: number, rowspan: number }
-gridiot:drag-cancel    { item: HTMLElement }
-gridiot:select         { item: HTMLElement }
-gridiot:deselect       { item: HTMLElement | null }
-gridiot:camera-settled { }  // Emitted by camera plugin after scroll stops + settle delay
+egg:drag-start     { item: HTMLElement, cell: GridCell, colspan: number, rowspan: number }
+egg:drag-move      { item: HTMLElement, cell: GridCell, x: number, y: number, colspan: number, rowspan: number }
+egg:drag-end       { item: HTMLElement, cell: GridCell, colspan: number, rowspan: number }
+egg:drag-cancel    { item: HTMLElement }
+egg:select         { item: HTMLElement }
+egg:deselect       { item: HTMLElement | null }
+egg:camera-settled { }  // Emitted by camera plugin after scroll stops + settle delay
 ```
 
 **Planned additions:**
 ```typescript
-gridiot:compact        { }  // Manual compaction trigger (not yet)
+egg:compact        { }  // Manual compaction trigger (not yet)
 // Note: drag events now include `source: 'pointer' | 'keyboard'` field (no separate item-move event needed)
-gridiot:resize-start   { item, originalSize: { colspan, rowspan } }
-gridiot:resize-move    { item, currentSize: { colspan, rowspan }, preview: { width, height } }
-gridiot:resize-end     { item, newSize: { colspan, rowspan } }
-gridiot:resize-cancel  { item }
+egg:resize-start   { item, originalSize: { colspan, rowspan } }
+egg:resize-move    { item, currentSize: { colspan, rowspan }, preview: { width, height } }
+egg:resize-end     { item, newSize: { colspan, rowspan } }
+egg:resize-cancel  { item }
 ```
 
 ### Architecture Decisions (Resolved)

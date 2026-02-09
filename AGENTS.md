@@ -23,13 +23,13 @@ These docs distill the W3C specs ([CSS Grid Level 1](https://www.w3.org/TR/css-g
 - To serve – `pnpx vite .`
 
 Outputs to `dist/`:
-- `gridiot.js` - Full bundle (all plugins)
+- `eg-grid.js` - Full bundle (all plugins)
 - Individual plugins for add-on use
 
 
 ## Project Overview
 
-**Gridiot** is a zero-dependency CSS Grid drag-and-drop library. The core philosophy is **separation of concerns**: the library handles input detection and grid measurement, while layout algorithms are pluggable.
+**EG Grid** is a zero-dependency CSS Grid drag-and-drop library. The core philosophy is **separation of concerns**: the library handles input detection and grid measurement, while layout algorithms are pluggable.
 
 ### Goals
 
@@ -140,11 +140,11 @@ This separation enables:
 Use `data-*` attributes for state, CSS selectors for styling:
 
 ```html
-<div data-gridiot-item data-gridiot-dragging data-gridiot-colspan="2">
+<div data-egg-item data-egg-dragging data-egg-colspan="2">
 ```
 
 ```css
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   opacity: 0.8;
   z-index: 100;
 }
@@ -158,10 +158,10 @@ Plugins communicate via custom events, not direct function calls:
 
 ```ts
 // Plugin emits
-core.emit('gridiot:drag-move', { item, cell, colspan, rowspan });
+core.emit('egg:drag-move', { item, cell, colspan, rowspan });
 
 // Consumer handles
-element.addEventListener('gridiot:drag-move', (e) => {
+element.addEventListener('egg:drag-move', (e) => {
   // Run algorithm, update layout
 });
 ```

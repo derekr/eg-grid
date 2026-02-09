@@ -2,11 +2,11 @@
 
 > Source: https://www.w3.org/TR/css-grid-1/
 
-This document captures critical CSS Grid concepts for Gridiot development. The library relies on CSS Grid for all layout positioning.
+This document captures critical CSS Grid concepts for EG Grid development. The library relies on CSS Grid for all layout positioning.
 
 ## Core Principle
 
-**CSS Grid does the layout math.** Gridiot sets `grid-column` and `grid-row` values; the browser computes pixel positions.
+**CSS Grid does the layout math.** EG Grid sets `grid-column` and `grid-row` values; the browser computes pixel positions.
 
 ---
 
@@ -142,7 +142,7 @@ align-content: start | end | center | space-between | space-around;
 
 ---
 
-## Gridiot-Specific Patterns
+## EG Grid-Specific Patterns
 
 ### Reading Grid Position
 

@@ -1,5 +1,5 @@
 /**
- * Tests for the Gridiot State Machine
+ * Tests for the EG Grid State Machine
  *
  * These tests verify the state machine enforces correct transitions
  * and maintains invariants across all interaction modes.
@@ -17,8 +17,8 @@ import {
 	shouldUseViewTransition,
 	shouldUseFlip,
 	getInteractionColumnCount,
-	type GridiotState,
-	type GridiotStateMachine,
+	type EggState,
+	type EggStateMachine,
 	type InteractionContext,
 	type StateTransition,
 } from './state-machine';
@@ -459,7 +459,7 @@ describe('Derived State Helpers', () => {
 // ============================================================================
 
 describe('State Machine Instance', () => {
-	let machine: GridiotStateMachine;
+	let machine: EggStateMachine;
 
 	beforeEach(() => {
 		machine = createStateMachine();

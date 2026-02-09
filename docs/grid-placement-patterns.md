@@ -1,6 +1,6 @@
 # Grid Placement Patterns
 
-Common CSS Grid placement patterns used in Gridiot.
+Common CSS Grid placement patterns used in EG Grid.
 
 ---
 

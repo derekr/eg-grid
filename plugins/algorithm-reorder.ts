@@ -1,20 +1,20 @@
 /**
- * Reorder layout algorithm for Gridiot
+ * Reorder layout algorithm for EG Grid
  *
  * Sequence-based reflow: items have a logical order, dragging changes
  * position in that sequence, all items reflow like CSS Grid auto-placement.
  *
  * Usage (pure functions):
- *   import { calculateReorderLayout, reflowItems, layoutToCSS } from 'gridiot/algorithm-reorder';
+ *   import { calculateReorderLayout, reflowItems, layoutToCSS } from 'eg-grid/algorithm-reorder';
  *
  * Usage (DOM integration):
- *   import { attachReorderAlgorithm } from 'gridiot/algorithm-reorder';
+ *   import { attachReorderAlgorithm } from 'eg-grid/algorithm-reorder';
  *   const detach = attachReorderAlgorithm(grid.element, { core });
  */
 
 import type {
 	GridCell,
-	GridiotCore,
+	EggCore,
 	ResponsiveLayoutModel,
 } from '../types';
 
@@ -202,7 +202,7 @@ export function calculateReorderLayout(
 export interface AttachReorderAlgorithmOptions {
 	selectorPrefix?: string;
 	selectorSuffix?: string;
-	core?: GridiotCore;
+	core?: EggCore;
 	layoutModel?: ResponsiveLayoutModel;
 }
 
@@ -237,7 +237,7 @@ export function attachReorderAlgorithm(
 					rowspan: landingItem.height,
 				};
 				queueMicrotask(() => {
-					el.dispatchEvent(new CustomEvent('gridiot:drop-preview', {
+					el.dispatchEvent(new CustomEvent('egg:drop-preview', {
 						detail: previewDetail,
 						bubbles: true,
 					}));

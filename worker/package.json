@@ -1,5 +1,5 @@
 {
-  "name": "gridiot-worker",
+  "name": "eg-grid-worker",
   "private": true,
   "type": "module",
   "scripts": {

@@ -15,7 +15,7 @@ import type {
   DragStartDetail,
   DragSource,
   GridCell,
-  GridiotCore,
+  EggCore,
   ItemPosition,
   ResizeCancelDetail,
   ResizeEndDetail,
@@ -88,17 +88,17 @@ export function layoutToCSS(
  * Read item positions from DOM elements
  */
 export function readItemsFromDOM(container: HTMLElement): ItemRect[] {
-  const elements = container.querySelectorAll("[data-gridiot-item]");
+  const elements = container.querySelectorAll("[data-egg-item]");
   return Array.from(elements).map((el) => {
     const element = el as HTMLElement;
     const style = getComputedStyle(element);
     const column = parseInt(style.gridColumnStart, 10) || 1;
     const row = parseInt(style.gridRowStart, 10) || 1;
     const width =
-      parseInt(element.getAttribute("data-gridiot-colspan") || "1", 10) || 1;
+      parseInt(element.getAttribute("data-egg-colspan") || "1", 10) || 1;
     const height =
-      parseInt(element.getAttribute("data-gridiot-rowspan") || "1", 10) || 1;
-    const id = element.dataset.id || element.dataset.gridiotItem || "";
+      parseInt(element.getAttribute("data-egg-rowspan") || "1", 10) || 1;
+    const id = element.dataset.id || element.dataset.eggItem || "";
 
     return { id, column, row, width, height };
   });
@@ -142,7 +142,7 @@ export interface AlgorithmStrategy {
 export interface AlgorithmHarnessOptions {
   selectorPrefix?: string;
   selectorSuffix?: string;
-  core?: GridiotCore;
+  core?: EggCore;
   layoutModel?: ResponsiveLayoutModel;
 }
 
@@ -206,7 +206,7 @@ export function attachAlgorithm(
   let resizeStartColumnCount: number | null = null;
 
   function getItemId(element: HTMLElement): string {
-    return element.dataset.id || element.dataset.gridiotItem || "";
+    return element.dataset.id || element.dataset.eggItem || "";
   }
 
   /** Read items from DOM with original positions restored (except the actively dragged item) */
@@ -300,7 +300,7 @@ export function attachAlgorithm(
         styles.set("preview", css);
         styles.commit();
 
-        const elements = gridElement.querySelectorAll("[data-gridiot-item]");
+        const elements = gridElement.querySelectorAll("[data-egg-item]");
         for (const el of elements) {
           const element = el as HTMLElement;
           const id = getItemId(element);
@@ -311,7 +311,7 @@ export function attachAlgorithm(
           }
         }
       } else {
-        const elements = gridElement.querySelectorAll("[data-gridiot-item]");
+        const elements = gridElement.querySelectorAll("[data-egg-item]");
         for (const el of elements) {
           const element = el as HTMLElement;
           const id = getItemId(element);
@@ -320,12 +320,12 @@ export function attachAlgorithm(
           if (item) {
             const colspan =
               parseInt(
-                element.getAttribute("data-gridiot-colspan") || "1",
+                element.getAttribute("data-egg-colspan") || "1",
                 10,
               ) || 1;
             const rowspan =
               parseInt(
-                element.getAttribute("data-gridiot-rowspan") || "1",
+                element.getAttribute("data-egg-rowspan") || "1",
                 10,
               ) || 1;
             element.style.gridColumn = `${item.column} / span ${colspan}`;
@@ -365,7 +365,7 @@ export function attachAlgorithm(
     }
 
     if (styles) {
-      const elements = gridElement.querySelectorAll("[data-gridiot-item]");
+      const elements = gridElement.querySelectorAll("[data-egg-item]");
       for (const el of elements) {
         const element = el as HTMLElement;
         if (element !== draggedElement) {
@@ -526,7 +526,7 @@ export function attachAlgorithm(
     }
 
     if (styles) {
-      const elements = gridElement.querySelectorAll("[data-gridiot-item]");
+      const elements = gridElement.querySelectorAll("[data-egg-item]");
       for (const el of elements) {
         const element = el as HTMLElement;
         if (element !== resizedElement) {
@@ -660,14 +660,14 @@ export function attachAlgorithm(
   // =========================================================================
 
   return listenEvents(gridElement, {
-    "gridiot:drag-start": onDragStart,
-    "gridiot:drag-move": onDragMove,
-    "gridiot:drag-end": onDragEnd,
-    "gridiot:drag-cancel": onDragCancel,
-    "gridiot:camera-settled": onCameraSettled,
-    "gridiot:resize-start": onResizeStart,
-    "gridiot:resize-move": onResizeMove,
-    "gridiot:resize-end": onResizeEnd,
-    "gridiot:resize-cancel": onResizeCancel,
+    "egg:drag-start": onDragStart,
+    "egg:drag-move": onDragMove,
+    "egg:drag-end": onDragEnd,
+    "egg:drag-cancel": onDragCancel,
+    "egg:camera-settled": onCameraSettled,
+    "egg:resize-start": onResizeStart,
+    "egg:resize-move": onResizeMove,
+    "egg:resize-end": onResizeEnd,
+    "egg:resize-cancel": onResizeCancel,
   });
 }

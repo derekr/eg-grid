@@ -105,8 +105,8 @@ export interface GridInfo {
 }
 
 // Re-export state machine types for convenience
-import type { GridiotStateMachine, GridiotState, StateTransition } from './state-machine';
-export type { GridiotStateMachine, GridiotState, StateTransition };
+import type { EggStateMachine, EggState, StateTransition } from './state-machine';
+export type { EggStateMachine, EggState, StateTransition };
 
 /**
  * Centralized CSS injection manager.
@@ -127,7 +127,7 @@ export interface StyleManager {
 	commit(): void;
 }
 
-export interface GridiotCore {
+export interface EggCore {
 	element: HTMLElement;
 	getCellFromPoint(x: number, y: number): GridCell | null;
 	getGridInfo(): GridInfo;
@@ -140,7 +140,7 @@ export interface GridiotCore {
 	deselect(): void;
 
 	// Centralized state machine for interaction management
-	stateMachine: GridiotStateMachine;
+	stateMachine: EggStateMachine;
 
 	// Centralized CSS injection
 	styles: StyleManager;
@@ -427,17 +427,17 @@ export interface DropPreviewDetail {
 // Custom event types for type-safe event listeners
 declare global {
 	interface HTMLElementEventMap {
-		'gridiot:drag-start': CustomEvent<DragStartDetail>;
-		'gridiot:drag-move': CustomEvent<DragMoveDetail>;
-		'gridiot:drag-end': CustomEvent<DragEndDetail>;
-		'gridiot:drag-cancel': CustomEvent<DragCancelDetail>;
-		'gridiot:select': CustomEvent<SelectDetail>;
-		'gridiot:deselect': CustomEvent<DeselectDetail>;
-		'gridiot:column-count-change': CustomEvent<ColumnCountChangeDetail>;
-		'gridiot:resize-start': CustomEvent<ResizeStartDetail>;
-		'gridiot:resize-move': CustomEvent<ResizeMoveDetail>;
-		'gridiot:resize-end': CustomEvent<ResizeEndDetail>;
-		'gridiot:resize-cancel': CustomEvent<ResizeCancelDetail>;
-		'gridiot:drop-preview': CustomEvent<DropPreviewDetail>;
+		'egg:drag-start': CustomEvent<DragStartDetail>;
+		'egg:drag-move': CustomEvent<DragMoveDetail>;
+		'egg:drag-end': CustomEvent<DragEndDetail>;
+		'egg:drag-cancel': CustomEvent<DragCancelDetail>;
+		'egg:select': CustomEvent<SelectDetail>;
+		'egg:deselect': CustomEvent<DeselectDetail>;
+		'egg:column-count-change': CustomEvent<ColumnCountChangeDetail>;
+		'egg:resize-start': CustomEvent<ResizeStartDetail>;
+		'egg:resize-move': CustomEvent<ResizeMoveDetail>;
+		'egg:resize-end': CustomEvent<ResizeEndDetail>;
+		'egg:resize-cancel': CustomEvent<ResizeCancelDetail>;
+		'egg:drop-preview': CustomEvent<DropPreviewDetail>;
 	}
 }

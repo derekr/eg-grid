@@ -1,19 +1,19 @@
 /**
- * Push-down layout algorithm for Gridiot
+ * Push-down layout algorithm for EG Grid
  *
  * This module provides both:
  * 1. Pure algorithm functions (overlap detection, push-down, compaction)
  * 2. DOM integration via the shared algorithm harness
  *
  * Usage (pure functions):
- *   import { calculateLayout, layoutToCSS } from 'gridiot/algorithm-push';
+ *   import { calculateLayout, layoutToCSS } from 'eg-grid/algorithm-push';
  *   const newLayout = calculateLayout(items, movedId, targetCell);
  *   core.styles.set('preview', layoutToCSS(newLayout));
  *   core.styles.commit();
  *
  * Usage (DOM integration):
- *   import { init } from 'gridiot';
- *   import { attachPushAlgorithm } from 'gridiot/algorithm-push';
+ *   import { init } from 'eg-grid';
+ *   import { attachPushAlgorithm } from 'eg-grid/algorithm-push';
  *
  *   const grid = init(element);
  *   const detach = attachPushAlgorithm(grid.element);
@@ -21,7 +21,7 @@
 
 import type {
 	GridCell,
-	GridiotCore,
+	EggCore,
 	ResponsiveLayoutModel,
 } from '../types';
 
@@ -183,14 +183,14 @@ export interface AttachPushAlgorithmOptions {
 	 * When false, items only get pushed down but won't float back up to fill gaps.
 	 */
 	compaction?: boolean;
-	core?: GridiotCore;
+	core?: EggCore;
 	layoutModel?: ResponsiveLayoutModel;
 }
 
 /**
  * Attach push-down algorithm to a grid element.
  *
- * This creates event listeners for gridiot drag events and updates
+ * This creates event listeners for eg-grid drag events and updates
  * the layout when items are moved. Layout changes are animated
  * via View Transitions.
  *

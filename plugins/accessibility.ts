@@ -5,14 +5,14 @@ import type {
 	DragMoveDetail,
 	DragStartDetail,
 	GridCell,
-	GridiotCore,
+	EggCore,
 	ResizeCancelDetail,
 	ResizeEndDetail,
 	ResizeMoveDetail,
 	ResizeStartDetail,
 } from '../types';
 
-export function attachAccessibility(core: GridiotCore): () => void {
+export function attachAccessibility(core: EggCore): () => void {
 	// Create live region for screen reader announcements
 	const liveRegion = document.createElement('div');
 	liveRegion.setAttribute('aria-live', 'assertive');
@@ -44,7 +44,7 @@ export function attachAccessibility(core: GridiotCore): () => void {
 
 	function getLabel(item: HTMLElement): string {
 		return (
-			item.getAttribute('data-gridiot-label') ||
+			item.getAttribute('data-egg-label') ||
 			item.getAttribute('aria-label') ||
 			item.id ||
 			'Item'
@@ -62,8 +62,8 @@ export function attachAccessibility(core: GridiotCore): () => void {
 		fallback: string,
 	): string {
 		const template =
-			item.getAttribute(`data-gridiot-announce-${event}`) ||
-			core.element.getAttribute(`data-gridiot-announce-${event}`);
+			item.getAttribute(`data-egg-announce-${event}`) ||
+			core.element.getAttribute(`data-egg-announce-${event}`);
 		if (!template) return fallback;
 		return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '');
 	}
@@ -174,14 +174,14 @@ export function attachAccessibility(core: GridiotCore): () => void {
 	};
 
 	const unlisten = listenEvents(core.element, {
-		'gridiot:drag-start': onDragStart as EventListener,
-		'gridiot:drag-move': onDragMove as EventListener,
-		'gridiot:drag-end': onDragEnd as EventListener,
-		'gridiot:drag-cancel': onDragCancel as EventListener,
-		'gridiot:resize-start': onResizeStart as EventListener,
-		'gridiot:resize-move': onResizeMove as EventListener,
-		'gridiot:resize-end': onResizeEnd as EventListener,
-		'gridiot:resize-cancel': onResizeCancel as EventListener,
+		'egg:drag-start': onDragStart as EventListener,
+		'egg:drag-move': onDragMove as EventListener,
+		'egg:drag-end': onDragEnd as EventListener,
+		'egg:drag-cancel': onDragCancel as EventListener,
+		'egg:resize-start': onResizeStart as EventListener,
+		'egg:resize-move': onResizeMove as EventListener,
+		'egg:resize-end': onResizeEnd as EventListener,
+		'egg:resize-cancel': onResizeCancel as EventListener,
 	});
 
 	return () => {

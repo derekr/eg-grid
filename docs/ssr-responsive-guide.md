@@ -166,9 +166,9 @@ Your server needs:
   <div class="grid-wrapper">
     <div class="grid" id="grid">
       {% for item in items %}
-      <div id="{{ item.id }}" data-gridiot-item
-           data-gridiot-colspan="{{ item.width }}"
-           data-gridiot-rowspan="{{ item.height }}">
+      <div id="{{ item.id }}" data-egg-item
+           data-egg-colspan="{{ item.width }}"
+           data-egg-rowspan="{{ item.height }}">
         {{ item.content }}
       </div>
       {% endfor %}
@@ -219,11 +219,11 @@ layoutModel.subscribe(() => {
 
 ## Progressive Enhancement
 
-Once JS loads, gridiot takes over:
+Once JS loads, eg-grid takes over:
 
 ```js
-import { init, createLayoutModel, attachResponsive } from 'gridiot';
-import { attachPushAlgorithm } from 'gridiot/algorithm-push';
+import { init, createLayoutModel, attachResponsive } from 'eg-grid';
+import { attachPushAlgorithm } from 'eg-grid/algorithm-push';
 
 // Build model from same data server used
 const layoutModel = createLayoutModel({
@@ -262,7 +262,7 @@ layoutModel.subscribe(() => {
 
 ## Reference Implementation
 
-See `gridiot/layout-model.ts` for the canonical TypeScript implementation of:
+See `eg-grid/layout-model.ts` for the canonical TypeScript implementation of:
 - `deriveLayoutForColumns()` - first-fit compaction algorithm
 - `generateAllBreakpointCSS()` - complete CSS generation
 

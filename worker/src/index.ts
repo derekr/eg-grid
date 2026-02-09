@@ -89,8 +89,8 @@ async function handleBuild(request: Request, url: URL): Promise<Response> {
 			headers: {
 				'Content-Type': 'application/javascript; charset=utf-8',
 				'Cache-Control': 'public, max-age=31536000, immutable',
-				'X-Gridiot-Plugins': sorted.join(',') || '(core only)',
-				'X-Gridiot-Size': String(result.size),
+				'X-Egg-Plugins': sorted.join(',') || '(core only)',
+				'X-Egg-Size': String(result.size),
 			},
 		});
 		request.cf && await cache.put(cacheKey, cacheResponse);
@@ -163,8 +163,8 @@ async function handleBundle(request: Request, url: URL): Promise<Response> {
 		'Content-Type': 'application/javascript; charset=utf-8',
 		'Content-Disposition': `attachment; filename="${filename}"`,
 		'Cache-Control': 'public, max-age=31536000, immutable',
-		'X-Gridiot-Plugins': sorted.join(',') || '(core only)',
-		'X-Gridiot-Size': String(result.size),
+		'X-Egg-Plugins': sorted.join(',') || '(core only)',
+		'X-Egg-Size': String(result.size),
 		'X-Bundle-Time': `${elapsed}ms`,
 		'X-Cache': 'MISS',
 		...corsHeaders(),
@@ -177,8 +177,8 @@ async function handleBundle(request: Request, url: URL): Promise<Response> {
 		headers: {
 			'Content-Type': 'application/javascript; charset=utf-8',
 			'Cache-Control': 'public, max-age=31536000, immutable',
-			'X-Gridiot-Plugins': sorted.join(',') || '(core only)',
-			'X-Gridiot-Size': String(result.size),
+			'X-Egg-Plugins': sorted.join(',') || '(core only)',
+			'X-Egg-Size': String(result.size),
 		},
 	});
 	request.cf && await cache.put(cacheKey, cacheResponse);
@@ -189,9 +189,9 @@ async function handleBundle(request: Request, url: URL): Promise<Response> {
 function resolvePlugins(url: URL): { list: string[] } | { error: string } {
 	// Path aliases
 	const path = url.pathname;
-	if (path === '/bundle/gridiot.js') return { list: [...PLUGIN_NAMES] };
-	if (path === '/bundle/gridiot-minimal.js') return { list: ['pointer'] };
-	if (path === '/bundle/gridiot-core.js') return { list: [] };
+	if (path === '/bundle/eg-grid.js') return { list: [...PLUGIN_NAMES] };
+	if (path === '/bundle/eg-grid-minimal.js') return { list: ['pointer'] };
+	if (path === '/bundle/eg-grid-core.js') return { list: [] };
 
 	// Query param
 	const param = url.searchParams.get('plugins');
@@ -214,10 +214,10 @@ function resolvePlugins(url: URL): { list: string[] } | { error: string } {
 }
 
 function bundleFilename(plugins: string[]): string {
-	if (plugins.length === 0) return 'gridiot-core.js';
-	if (plugins.length === PLUGIN_NAMES.length) return 'gridiot.js';
-	if (plugins.length === 1 && plugins[0] === 'pointer') return 'gridiot-minimal.js';
-	return 'gridiot-custom.js';
+	if (plugins.length === 0) return 'eg-grid-core.js';
+	if (plugins.length === PLUGIN_NAMES.length) return 'eg-grid.js';
+	if (plugins.length === 1 && plugins[0] === 'pointer') return 'eg-grid-minimal.js';
+	return 'eg-grid-custom.js';
 }
 
 function corsHeaders(): Record<string, string> {
@@ -225,7 +225,7 @@ function corsHeaders(): Record<string, string> {
 		'Access-Control-Allow-Origin': '*',
 		'Access-Control-Allow-Methods': 'GET, OPTIONS',
 		'Access-Control-Allow-Headers': 'Content-Type',
-		'Access-Control-Expose-Headers': 'X-Gridiot-Plugins, X-Gridiot-Size, X-Bundle-Time, X-Cache',
+		'Access-Control-Expose-Headers': 'X-Egg-Plugins, X-Egg-Size, X-Bundle-Time, X-Cache',
 	};
 }
 

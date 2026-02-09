@@ -94,7 +94,7 @@ async function dragAndCapture(
 	return { placeholderPositions, finalDropPosition };
 }
 
-test.describe('Gridiot Drag Placeholder', () => {
+test.describe('EG Grid Drag Placeholder', () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto(`${BASE_URL}/example-advanced.html`);
 		await page.waitForSelector('.grid');

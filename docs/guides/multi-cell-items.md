@@ -6,22 +6,22 @@ This guide covers how to work with items that span multiple columns and/or rows.
 
 ### HTML
 
-Use `data-gridiot-colspan` and `data-gridiot-rowspan` attributes:
+Use `data-egg-colspan` and `data-egg-rowspan` attributes:
 
 ```html
 <div
-  data-gridiot-item
-  data-gridiot-colspan="2"
-  data-gridiot-rowspan="2"
+  data-egg-item
+  data-egg-colspan="2"
+  data-egg-rowspan="2"
   style="grid-column: 1 / span 2; grid-row: 1 / span 2"
 >
   Large Widget
 </div>
 
 <div
-  data-gridiot-item
-  data-gridiot-colspan="1"
-  data-gridiot-rowspan="1"
+  data-egg-item
+  data-egg-colspan="1"
+  data-egg-rowspan="1"
   style="grid-column: 3; grid-row: 1"
 >
   Small Widget
@@ -34,8 +34,8 @@ Keep inline styles in sync with data attributes:
 
 ```javascript
 function setItemPosition(item, cell) {
-  const colspan = parseInt(item.dataset.gridiotColspan || '1');
-  const rowspan = parseInt(item.dataset.gridiotRowspan || '1');
+  const colspan = parseInt(item.dataset.eg-gridColspan || '1');
+  const rowspan = parseInt(item.dataset.eg-gridRowspan || '1');
 
   item.style.gridColumn = `${cell.column} / span ${colspan}`;
   item.style.gridRow = `${cell.row} / span ${rowspan}`;
@@ -49,8 +49,8 @@ function setItemPosition(item, cell) {
 ```javascript
 function getItemDimensions(item) {
   return {
-    width: parseInt(item.dataset.gridiotColspan || '1'),
-    height: parseInt(item.dataset.gridiotRowspan || '1'),
+    width: parseInt(item.dataset.eg-gridColspan || '1'),
+    height: parseInt(item.dataset.eg-gridRowspan || '1'),
   };
 }
 ```
@@ -126,8 +126,8 @@ function pushDown(items, movedItem) {
 
 ```javascript
 function showPlaceholder(grid, cell, item) {
-  const colspan = parseInt(item.dataset.gridiotColspan || '1');
-  const rowspan = parseInt(item.dataset.gridiotRowspan || '1');
+  const colspan = parseInt(item.dataset.eg-gridColspan || '1');
+  const rowspan = parseInt(item.dataset.eg-gridRowspan || '1');
 
   placeholder.style.gridColumn = `${cell.column} / span ${colspan}`;
   placeholder.style.gridRow = `${cell.row} / span ${rowspan}`;
@@ -139,7 +139,7 @@ function showPlaceholder(grid, cell, item) {
 The item maintains its size while dragging:
 
 ```css
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   /* Pointer plugin sets width/height to match original size */
   /* via inline styles during drag */
 }
@@ -147,18 +147,18 @@ The item maintains its size while dragging:
 
 ## Resizing Items
 
-Gridiot focuses on drag-and-drop, not resizing. For resize functionality:
+EG Grid focuses on drag-and-drop, not resizing. For resize functionality:
 
 ```javascript
 // Separate resize handles
 item.querySelector('.resize-handle').addEventListener('pointerdown', (e) => {
-  e.stopPropagation(); // Prevent gridiot drag
+  e.stopPropagation(); // Prevent eg-grid drag
   startResize(item, e);
 });
 
 function onResize(item, newWidth, newHeight) {
-  item.dataset.gridiotColspan = String(newWidth);
-  item.dataset.gridiotRowspan = String(newHeight);
+  item.dataset.eg-gridColspan = String(newWidth);
+  item.dataset.eg-gridRowspan = String(newHeight);
   item.style.gridColumn = `${col} / span ${newWidth}`;
   item.style.gridRow = `${row} / span ${newHeight}`;
 
@@ -174,10 +174,10 @@ function onResize(item, newWidth, newHeight) {
   <!-- Large chart: 2x2 -->
   <div
     class="widget"
-    data-gridiot-item
-    data-gridiot-label="Revenue Chart"
-    data-gridiot-colspan="2"
-    data-gridiot-rowspan="2"
+    data-egg-item
+    data-egg-label="Revenue Chart"
+    data-egg-colspan="2"
+    data-egg-rowspan="2"
     style="grid-column: 1 / span 2; grid-row: 1 / span 2; --item-id: revenue"
     tabindex="0"
   >
@@ -188,8 +188,8 @@ function onResize(item, newWidth, newHeight) {
   <!-- Metric cards: 1x1 each -->
   <div
     class="widget"
-    data-gridiot-item
-    data-gridiot-label="Total Users"
+    data-egg-item
+    data-egg-label="Total Users"
     style="grid-column: 3; grid-row: 1; --item-id: users"
     tabindex="0"
   >
@@ -199,8 +199,8 @@ function onResize(item, newWidth, newHeight) {
 
   <div
     class="widget"
-    data-gridiot-item
-    data-gridiot-label="Conversion Rate"
+    data-egg-item
+    data-egg-label="Conversion Rate"
     style="grid-column: 4; grid-row: 1; --item-id: conversion"
     tabindex="0"
   >
@@ -211,9 +211,9 @@ function onResize(item, newWidth, newHeight) {
   <!-- Wide chart: 2x1 -->
   <div
     class="widget"
-    data-gridiot-item
-    data-gridiot-label="Traffic Sources"
-    data-gridiot-colspan="2"
+    data-egg-item
+    data-egg-label="Traffic Sources"
+    data-egg-colspan="2"
     style="grid-column: 3 / span 2; grid-row: 2; --item-id: traffic"
     tabindex="0"
   >
@@ -247,10 +247,10 @@ Include size in announcements:
 
 ```html
 <div
-  data-gridiot-item
-  data-gridiot-label="Revenue Chart (2 columns, 2 rows)"
-  data-gridiot-colspan="2"
-  data-gridiot-rowspan="2"
+  data-egg-item
+  data-egg-label="Revenue Chart (2 columns, 2 rows)"
+  data-egg-colspan="2"
+  data-egg-rowspan="2"
 >
   ...
 </div>
@@ -261,8 +261,8 @@ Or customize the announcement:
 ```html
 <div
   id="grid"
-  data-gridiot-announce-grab="{label} grabbed. Spans multiple cells."
-  data-gridiot-announce-drop="{label} placed at row {row}, column {column}."
+  data-egg-announce-grab="{label} grabbed. Spans multiple cells."
+  data-egg-announce-drop="{label} placed at row {row}, column {column}."
 >
   ...
 </div>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gridiot — Architecture Explorer</title>
+  <title>EG Grid — Architecture Explorer</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -79,15 +79,15 @@
 
     .grid[data-pointer-active] .item { cursor: grab; }
 
-    .item[data-gridiot-dragging] {
+    .item[data-egg-dragging] {
       cursor: grabbing;
       transform: scale(1.03);
       filter: drop-shadow(0 16px 32px rgba(0,0,0,0.5));
       z-index: 100;
     }
-    .item[data-gridiot-dropping] { z-index: 100; }
-    .item[data-gridiot-selected] { outline: 2px solid #fbbf24; outline-offset: 2px; }
-    .item[data-gridiot-resizing] { z-index: 100; outline: 2px solid rgba(251, 191, 36, 0.5); outline-offset: 2px; }
+    .item[data-egg-dropping] { z-index: 100; }
+    .item[data-egg-selected] { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    .item[data-egg-resizing] { z-index: 100; outline: 2px solid rgba(251, 191, 36, 0.5); outline-offset: 2px; }
 
     /* Resize handle indicators */
     .item::after {
@@ -98,23 +98,23 @@
       border-radius: 3px;
       background: rgba(59, 130, 246, 0.7);
     }
-    .item[data-gridiot-handle-hover="se"]::after { opacity: 1; width: 12px; height: 12px; bottom: 4px; right: 4px; }
-    .item[data-gridiot-handle-hover="sw"]::after { opacity: 1; width: 12px; height: 12px; bottom: 4px; left: 4px; }
-    .item[data-gridiot-handle-hover="ne"]::after { opacity: 1; width: 12px; height: 12px; top: 4px; right: 4px; }
-    .item[data-gridiot-handle-hover="nw"]::after { opacity: 1; width: 12px; height: 12px; top: 4px; left: 4px; }
-    .item[data-gridiot-handle-hover="n"]::after { opacity: 1; height: 3px; top: 4px; left: 16px; right: 16px; }
-    .item[data-gridiot-handle-hover="s"]::after { opacity: 1; height: 3px; bottom: 4px; left: 16px; right: 16px; }
-    .item[data-gridiot-handle-hover="e"]::after { opacity: 1; width: 3px; right: 4px; top: 16px; bottom: 16px; }
-    .item[data-gridiot-handle-hover="w"]::after { opacity: 1; width: 3px; left: 4px; top: 16px; bottom: 16px; }
-    .item[data-gridiot-handle-active]::after { opacity: 1; background: rgba(59, 130, 246, 0.95); box-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
-    .item[data-gridiot-handle-active="se"]::after { width: 12px; height: 12px; bottom: 4px; right: 4px; top: auto; left: auto; }
-    .item[data-gridiot-handle-active="sw"]::after { width: 12px; height: 12px; bottom: 4px; left: 4px; top: auto; right: auto; }
-    .item[data-gridiot-handle-active="ne"]::after { width: 12px; height: 12px; top: 4px; right: 4px; bottom: auto; left: auto; }
-    .item[data-gridiot-handle-active="nw"]::after { width: 12px; height: 12px; top: 4px; left: 4px; bottom: auto; right: auto; }
-    .item[data-gridiot-handle-active="n"]::after { height: 3px; top: 4px; left: 16px; right: 16px; bottom: auto; width: auto; }
-    .item[data-gridiot-handle-active="s"]::after { height: 3px; bottom: 4px; left: 16px; right: 16px; top: auto; width: auto; }
-    .item[data-gridiot-handle-active="e"]::after { width: 3px; right: 4px; top: 16px; bottom: 16px; left: auto; height: auto; }
-    .item[data-gridiot-handle-active="w"]::after { width: 3px; left: 4px; top: 16px; bottom: 16px; right: auto; height: auto; }
+    .item[data-egg-handle-hover="se"]::after { opacity: 1; width: 12px; height: 12px; bottom: 4px; right: 4px; }
+    .item[data-egg-handle-hover="sw"]::after { opacity: 1; width: 12px; height: 12px; bottom: 4px; left: 4px; }
+    .item[data-egg-handle-hover="ne"]::after { opacity: 1; width: 12px; height: 12px; top: 4px; right: 4px; }
+    .item[data-egg-handle-hover="nw"]::after { opacity: 1; width: 12px; height: 12px; top: 4px; left: 4px; }
+    .item[data-egg-handle-hover="n"]::after { opacity: 1; height: 3px; top: 4px; left: 16px; right: 16px; }
+    .item[data-egg-handle-hover="s"]::after { opacity: 1; height: 3px; bottom: 4px; left: 16px; right: 16px; }
+    .item[data-egg-handle-hover="e"]::after { opacity: 1; width: 3px; right: 4px; top: 16px; bottom: 16px; }
+    .item[data-egg-handle-hover="w"]::after { opacity: 1; width: 3px; left: 4px; top: 16px; bottom: 16px; }
+    .item[data-egg-handle-active]::after { opacity: 1; background: rgba(59, 130, 246, 0.95); box-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
+    .item[data-egg-handle-active="se"]::after { width: 12px; height: 12px; bottom: 4px; right: 4px; top: auto; left: auto; }
+    .item[data-egg-handle-active="sw"]::after { width: 12px; height: 12px; bottom: 4px; left: 4px; top: auto; right: auto; }
+    .item[data-egg-handle-active="ne"]::after { width: 12px; height: 12px; top: 4px; right: 4px; bottom: auto; left: auto; }
+    .item[data-egg-handle-active="nw"]::after { width: 12px; height: 12px; top: 4px; left: 4px; bottom: auto; right: auto; }
+    .item[data-egg-handle-active="n"]::after { height: 3px; top: 4px; left: 16px; right: 16px; bottom: auto; width: auto; }
+    .item[data-egg-handle-active="s"]::after { height: 3px; bottom: 4px; left: 16px; right: 16px; top: auto; width: auto; }
+    .item[data-egg-handle-active="e"]::after { width: 3px; right: 4px; top: 16px; bottom: 16px; left: auto; height: auto; }
+    .item[data-egg-handle-active="w"]::after { width: 3px; left: 4px; top: 16px; bottom: 16px; right: auto; height: auto; }
 
     /* Resize handle flash on plugin enable */
     @keyframes handle-flash {
@@ -363,7 +363,7 @@
     .css-output.empty { color: #3a3a3a; font-style: italic; }
 
     /* Keyboard mode */
-    .grid[data-gridiot-keyboard-mode] {
+    .grid[data-egg-keyboard-mode] {
       outline: 2px solid rgba(251, 191, 36, 0.3);
       outline-offset: 4px;
     }
@@ -491,21 +491,21 @@
     <div class="grid-area">
       <div class="grid-container" id="grid-container">
         <div class="grid" id="grid">
-          <div id="item-a" class="item" data-gridiot-item data-gridiot-label="Item A" data-id="item-a" data-gridiot-colspan="2" data-color="1"
+          <div id="item-a" class="item" data-egg-item data-egg-label="Item A" data-id="item-a" data-egg-colspan="2" data-color="1"
             style="grid-column: 1 / span 2; grid-row: 1; --item-id: item-a" tabindex="0">A (2&times;1)</div>
-          <div id="item-b" class="item" data-gridiot-item data-gridiot-label="Item B" data-id="item-b" data-color="2"
+          <div id="item-b" class="item" data-egg-item data-egg-label="Item B" data-id="item-b" data-color="2"
             style="grid-column: 3; grid-row: 1; --item-id: item-b" tabindex="0">B</div>
-          <div id="item-c" class="item" data-gridiot-item data-gridiot-label="Item C" data-id="item-c" data-color="3"
+          <div id="item-c" class="item" data-egg-item data-egg-label="Item C" data-id="item-c" data-color="3"
             style="grid-column: 4; grid-row: 1; --item-id: item-c" tabindex="0">C</div>
-          <div id="item-d" class="item" data-gridiot-item data-gridiot-label="Item D" data-id="item-d" data-gridiot-rowspan="2" data-color="4"
+          <div id="item-d" class="item" data-egg-item data-egg-label="Item D" data-id="item-d" data-egg-rowspan="2" data-color="4"
             style="grid-column: 1; grid-row: 2 / span 2; --item-id: item-d" tabindex="0">D (1&times;2)</div>
-          <div id="item-e" class="item" data-gridiot-item data-gridiot-label="Item E" data-id="item-e" data-gridiot-colspan="2" data-color="5"
+          <div id="item-e" class="item" data-egg-item data-egg-label="Item E" data-id="item-e" data-egg-colspan="2" data-color="5"
             style="grid-column: 2 / span 2; grid-row: 2; --item-id: item-e" tabindex="0">E (2&times;1)</div>
-          <div id="item-f" class="item" data-gridiot-item data-gridiot-label="Item F" data-id="item-f" data-color="6"
+          <div id="item-f" class="item" data-egg-item data-egg-label="Item F" data-id="item-f" data-color="6"
             style="grid-column: 4; grid-row: 2; --item-id: item-f" tabindex="0">F</div>
-          <div id="item-g" class="item" data-gridiot-item data-gridiot-label="Item G" data-id="item-g" data-color="1"
+          <div id="item-g" class="item" data-egg-item data-egg-label="Item G" data-id="item-g" data-color="1"
             style="grid-column: 2; grid-row: 3; --item-id: item-g" tabindex="0">G</div>
-          <div id="item-h" class="item" data-gridiot-item data-gridiot-label="Item H" data-id="item-h" data-gridiot-colspan="2" data-color="2"
+          <div id="item-h" class="item" data-egg-item data-egg-label="Item H" data-id="item-h" data-egg-colspan="2" data-color="2"
             style="grid-column: 3 / span 2; grid-row: 3; --item-id: item-h" tabindex="0">H (2&times;1)</div>
         </div>
         <div class="grid-overlay" id="grid-overlay"></div>
@@ -676,7 +676,7 @@
   </div>
 
   <!-- Single style element: core.styles manages layers (base + preview) -->
-  <style id="gridiot-styles"></style>
+  <style id="egg-styles"></style>
 
   <script type="module">
     // Import full bundle (auto-registers all plugins) + manual attach functions
@@ -691,7 +691,7 @@
 
     const gridElement = document.getElementById('grid');
     const gridContainer = document.getElementById('grid-container');
-    const gridiotStyleElement = document.getElementById('gridiot-styles');
+    const eggStyleElement = document.getElementById('egg-styles');
 
     // =========================================================================
     // Layout Model (for responsive plugin)
@@ -726,7 +726,7 @@
     // Plugins are imported (auto-registered) but not initialized.
     // We'll manually attach/detach them via toggles.
     const core = init(gridElement, {
-      styleElement: gridiotStyleElement,
+      styleElement: eggStyleElement,
       disablePlugins: [
         'pointer', 'keyboard', 'accessibility',
         'algorithm-push', 'algorithm-reorder', 'placeholder', 'camera', 'resize', 'responsive',
@@ -741,7 +741,7 @@
 
     // Clear inline grid-column/grid-row from items so stylesheet rules can take effect
     function clearInlineGridStyles() {
-      const items = gridElement.querySelectorAll('[data-gridiot-item]');
+      const items = gridElement.querySelectorAll('[data-egg-item]');
       for (const item of items) {
         item.style.removeProperty('grid-column');
         item.style.removeProperty('grid-row');
@@ -751,13 +751,13 @@
     // When detaching algorithm, preserve item positions as inline styles
     // so items don't lose their positions when CSS injection stops.
     function preservePositionsAsInlineStyles() {
-      const items = gridElement.querySelectorAll('[data-gridiot-item]');
+      const items = gridElement.querySelectorAll('[data-egg-item]');
       for (const item of items) {
         const cs = getComputedStyle(item);
         const colStart = parseInt(cs.gridColumnStart, 10) || 1;
         const rowStart = parseInt(cs.gridRowStart, 10) || 1;
-        const colspan = parseInt(item.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
-        const rowspan = parseInt(item.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
+        const colspan = parseInt(item.getAttribute('data-egg-colspan') || '1', 10) || 1;
+        const rowspan = parseInt(item.getAttribute('data-egg-rowspan') || '1', 10) || 1;
         item.style.gridColumn = colspan > 1 ? `${colStart} / span ${colspan}` : `${colStart}`;
         item.style.gridRow = rowspan > 1 ? `${rowStart} / span ${rowspan}` : `${rowStart}`;
       }
@@ -861,7 +861,7 @@
     }
 
     function flashResizeHandles() {
-      const items = gridElement.querySelectorAll('[data-gridiot-item]');
+      const items = gridElement.querySelectorAll('[data-egg-item]');
       for (const item of items) item.classList.add('resize-flash');
       setTimeout(() => {
         for (const item of items) item.classList.remove('resize-flash');
@@ -917,7 +917,7 @@
     EVENT_NAMES.forEach(name => {
       eventCounts[name] = 0;
 
-      gridElement.addEventListener(`gridiot:${name}`, () => {
+      gridElement.addEventListener(`egg:${name}`, () => {
         const badge = document.querySelector(`[data-event="${name}"]`);
         if (!badge) return;
 
@@ -980,7 +980,7 @@
     const cssOutput = document.getElementById('css-output');
 
     function updateCSSOutput() {
-      const css = gridiotStyleElement.textContent?.trim();
+      const css = eggStyleElement.textContent?.trim();
 
       if (css) {
         cssOutput.textContent = css;
@@ -992,7 +992,7 @@
     }
 
     const cssObserver = new MutationObserver(updateCSSOutput);
-    cssObserver.observe(gridiotStyleElement, {
+    cssObserver.observe(eggStyleElement, {
       childList: true,
       characterData: true,
       subtree: true,
@@ -1096,7 +1096,7 @@
     }
 
     // Update badge when column count changes
-    gridElement.addEventListener('gridiot:column-count-change', () => {
+    gridElement.addEventListener('egg:column-count-change', () => {
       updateColumnBadge();
     });
 

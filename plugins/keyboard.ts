@@ -1,12 +1,12 @@
 import { getItemCell, getItemSize } from '../engine';
-import type { GridCell, GridiotCore } from '../types';
+import type { GridCell, EggCore } from '../types';
 import { isDragging } from '../state-machine';
 
 /**
- * Attach keyboard navigation and drag to a GridiotCore instance.
+ * Attach keyboard navigation and drag to a EggCore instance.
  * @returns Cleanup function
  */
-export function attachKeyboard(core: GridiotCore): () => void {
+export function attachKeyboard(core: EggCore): () => void {
 	const { stateMachine } = core;
 
 	// Track keyboard mode locally (Shift+G toggle)
@@ -87,7 +87,7 @@ export function attachKeyboard(core: GridiotCore): () => void {
 		excludeItem: HTMLElement,
 	): HTMLElement | null => {
 		const items = Array.from(
-			core.element.querySelectorAll('[data-gridiot-item]'),
+			core.element.querySelectorAll('[data-egg-item]'),
 		) as HTMLElement[];
 
 		let bestItem: HTMLElement | null = null;
@@ -134,16 +134,16 @@ export function attachKeyboard(core: GridiotCore): () => void {
 			e.preventDefault();
 			keyboardModeActive = !keyboardModeActive;
 			if (keyboardModeActive) {
-				core.element.setAttribute('data-gridiot-keyboard-mode', '');
+				core.element.setAttribute('data-egg-keyboard-mode', '');
 				// If no item is selected, select the first one
 				if (!core.selectedItem) {
-					const firstItem = core.element.querySelector('[data-gridiot-item]') as HTMLElement | null;
+					const firstItem = core.element.querySelector('[data-egg-item]') as HTMLElement | null;
 					if (firstItem) {
 						core.select(firstItem);
 					}
 				}
 			} else {
-				core.element.removeAttribute('data-gridiot-keyboard-mode');
+				core.element.removeAttribute('data-egg-keyboard-mode');
 			}
 			return;
 		}
@@ -162,7 +162,7 @@ export function attachKeyboard(core: GridiotCore): () => void {
 			e.preventDefault();
 			const heldItem = getHeldItem();
 			if (heldItem) {
-				heldItem.removeAttribute('data-gridiot-dragging');
+				heldItem.removeAttribute('data-egg-dragging');
 				core.emit('drag-cancel', { item: heldItem, source: 'keyboard' as const });
 				stateMachine.transition({ type: 'CANCEL_INTERACTION' });
 				keyboardTargetCell = null;
@@ -173,7 +173,7 @@ export function attachKeyboard(core: GridiotCore): () => void {
 			if (keyboardModeActive) {
 				keyboardModeActive = false;
 			}
-			core.element.removeAttribute('data-gridiot-keyboard-mode');
+			core.element.removeAttribute('data-egg-keyboard-mode');
 			return;
 		}
 
@@ -187,14 +187,14 @@ export function attachKeyboard(core: GridiotCore): () => void {
 				// Drop the held item - use locally tracked target cell
 				const targetCell = keyboardTargetCell ?? getItemCell(heldItem);
 				const size = getItemSize(heldItem);
-				heldItem.removeAttribute('data-gridiot-dragging');
+				heldItem.removeAttribute('data-egg-dragging');
 				core.emit('drag-end', { item: heldItem, cell: targetCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
 				stateMachine.transition({ type: 'COMMIT_INTERACTION' });
 				stateMachine.transition({ type: 'FINISH_COMMIT' });
 				keyboardTargetCell = null;
 			} else {
 				// Pick up the selected item
-				const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
+				const itemId = selectedItem.id || selectedItem.getAttribute('data-egg-item') || '';
 				const size = getItemSize(selectedItem);
 				const startCell = getItemCell(selectedItem);
 
@@ -211,7 +211,7 @@ export function attachKeyboard(core: GridiotCore): () => void {
 				});
 
 				keyboardTargetCell = startCell;
-				selectedItem.setAttribute('data-gridiot-dragging', '');
+				selectedItem.setAttribute('data-egg-dragging', '');
 				core.emit('drag-start', { item: selectedItem, cell: startCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
 			}
 			return;
@@ -271,7 +271,7 @@ export function attachKeyboard(core: GridiotCore): () => void {
 					pendingVtnRestore = null;
 				}
 
-				const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
+				const itemId = selectedItem.id || selectedItem.getAttribute('data-egg-item') || '';
 
 				// Start resize interaction via state machine
 				stateMachine.transition({
@@ -303,8 +303,8 @@ export function attachKeyboard(core: GridiotCore): () => void {
 				});
 
 				// Update item data attributes (algorithm reads these for size)
-				selectedItem.setAttribute('data-gridiot-colspan', String(newColspan));
-				selectedItem.setAttribute('data-gridiot-rowspan', String(newRowspan));
+				selectedItem.setAttribute('data-egg-colspan', String(newColspan));
+				selectedItem.setAttribute('data-egg-rowspan', String(newRowspan));
 
 				// Don't set inline grid styles - let algorithm handle layout via CSS rules
 				// This allows View Transitions to animate other items smoothly
@@ -376,6 +376,6 @@ export function attachKeyboard(core: GridiotCore): () => void {
 
 	return () => {
 		document.removeEventListener('keydown', onKeyDown);
-		core.element.removeAttribute('data-gridiot-keyboard-mode');
+		core.element.removeAttribute('data-egg-keyboard-mode');
 	};
 }

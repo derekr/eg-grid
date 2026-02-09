@@ -1,7 +1,7 @@
 // Auto-generated — do not edit. Run `pnpm sync-sources` to update.
 export const SOURCES: Record<string, string> = {
-	"engine.ts": `import type { GridCell, GridiotCore, InitOptions, Plugin, PluginOptions, ProviderRegistry, StyleManager } from './types';
-import { createStateMachine, type GridiotStateMachine } from './state-machine';
+	"engine.ts": `import type { GridCell, EggCore, InitOptions, Plugin, PluginOptions, ProviderRegistry, StyleManager } from './types';
+import { createStateMachine, type EggStateMachine } from './state-machine';
 
 // Global plugin registry
 const plugins = new Map<string, Plugin>();
@@ -15,12 +15,12 @@ export function getPlugin(name: string): Plugin | undefined {
 }
 
 /**
- * Initialize Gridiot on a CSS Grid element
+ * Initialize EG Grid on a CSS Grid element
  *
  * @param element - The CSS Grid container element
  * @param options - Configuration options including layoutModel, styleElement, and plugin options
  */
-export function init(element: HTMLElement, options: InitOptions = {}): GridiotCore {
+export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 	const {
 		layoutModel,
 		styleElement,
@@ -88,7 +88,7 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 		},
 	};
 
-	const core: GridiotCore = {
+	const core: EggCore = {
 		element,
 		providers,
 		stateMachine,
@@ -109,15 +109,15 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 
 			// Remove selection from previous item
 			if (previousItem) {
-				previousItem.removeAttribute('data-gridiot-selected');
+				previousItem.removeAttribute('data-egg-selected');
 			}
 
 			// Update state machine and local element reference
 			if (item) {
-				const itemId = item.id || item.getAttribute('data-gridiot-item') || '';
+				const itemId = item.id || item.getAttribute('data-egg-item') || '';
 				stateMachine.transition({ type: 'SELECT', itemId, element: item });
 				selectedElement = item;
-				item.setAttribute('data-gridiot-selected', '');
+				item.setAttribute('data-egg-selected', '');
 				this.emit('select', { item });
 			} else {
 				stateMachine.transition({ type: 'DESELECT' });
@@ -155,7 +155,7 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 
 		emit<T>(event: string, detail: T): void {
 			element.dispatchEvent(
-				new CustomEvent(\`gridiot:\${event}\`, {
+				new CustomEvent(\`egg:\${event}\`, {
 					bubbles: true,
 					detail,
 				}),
@@ -262,8 +262,8 @@ export function getItemCell(item: HTMLElement): GridCell {
  */
 export function getItemSize(item: HTMLElement): { colspan: number; rowspan: number } {
 	return {
-		colspan: parseInt(item.getAttribute('data-gridiot-colspan') || '1', 10) || 1,
-		rowspan: parseInt(item.getAttribute('data-gridiot-rowspan') || '1', 10) || 1,
+		colspan: parseInt(item.getAttribute('data-egg-colspan') || '1', 10) || 1,
+		rowspan: parseInt(item.getAttribute('data-egg-rowspan') || '1', 10) || 1,
 	};
 }
 
@@ -453,8 +453,8 @@ export interface LayoutState {
 }
 
 // Re-export state machine types for convenience
-import type { GridiotStateMachine, GridiotState, StateTransition } from './state-machine';
-export type { GridiotStateMachine, GridiotState, StateTransition };
+import type { EggStateMachine, EggState, StateTransition } from './state-machine';
+export type { EggStateMachine, EggState, StateTransition };
 
 /**
  * Centralized CSS injection manager.
@@ -475,7 +475,7 @@ export interface StyleManager {
 	commit(): void;
 }
 
-export interface GridiotCore {
+export interface EggCore {
 	element: HTMLElement;
 	getCellFromPoint(x: number, y: number): GridCell | null;
 	getGridInfo(): GridInfo;
@@ -491,7 +491,7 @@ export interface GridiotCore {
 	providers: ProviderRegistry;
 
 	// Centralized state machine for interaction management
-	stateMachine: GridiotStateMachine;
+	stateMachine: EggStateMachine;
 
 	// Centralized CSS injection
 	styles: StyleManager;
@@ -499,7 +499,7 @@ export interface GridiotCore {
 
 export interface Plugin<T = unknown> {
 	name: string;
-	init(core: GridiotCore, options?: T): (() => void) | void;
+	init(core: EggCore, options?: T): (() => void) | void;
 }
 
 // ============================================================================
@@ -774,23 +774,23 @@ export interface DropPreviewDetail {
 // Custom event types for type-safe event listeners
 declare global {
 	interface HTMLElementEventMap {
-		'gridiot:drag-start': CustomEvent<DragStartDetail>;
-		'gridiot:drag-move': CustomEvent<DragMoveDetail>;
-		'gridiot:drag-end': CustomEvent<DragEndDetail>;
-		'gridiot:drag-cancel': CustomEvent<DragCancelDetail>;
-		'gridiot:select': CustomEvent<SelectDetail>;
-		'gridiot:deselect': CustomEvent<DeselectDetail>;
-		'gridiot:column-count-change': CustomEvent<ColumnCountChangeDetail>;
-		'gridiot:resize-start': CustomEvent<ResizeStartDetail>;
-		'gridiot:resize-move': CustomEvent<ResizeMoveDetail>;
-		'gridiot:resize-end': CustomEvent<ResizeEndDetail>;
-		'gridiot:resize-cancel': CustomEvent<ResizeCancelDetail>;
-		'gridiot:drop-preview': CustomEvent<DropPreviewDetail>;
+		'egg:drag-start': CustomEvent<DragStartDetail>;
+		'egg:drag-move': CustomEvent<DragMoveDetail>;
+		'egg:drag-end': CustomEvent<DragEndDetail>;
+		'egg:drag-cancel': CustomEvent<DragCancelDetail>;
+		'egg:select': CustomEvent<SelectDetail>;
+		'egg:deselect': CustomEvent<DeselectDetail>;
+		'egg:column-count-change': CustomEvent<ColumnCountChangeDetail>;
+		'egg:resize-start': CustomEvent<ResizeStartDetail>;
+		'egg:resize-move': CustomEvent<ResizeMoveDetail>;
+		'egg:resize-end': CustomEvent<ResizeEndDetail>;
+		'egg:resize-cancel': CustomEvent<ResizeCancelDetail>;
+		'egg:drop-preview': CustomEvent<DropPreviewDetail>;
 	}
 }
 `,
 	"state-machine.ts": `/**
- * Centralized State Machine for Gridiot
+ * Centralized State Machine for EG Grid
  *
  * This module provides a single source of truth for interaction state,
  * replacing the distributed state management across plugins.
@@ -812,7 +812,7 @@ export type InteractionMode = 'pointer' | 'keyboard';
 
 export type InteractionType = 'drag' | 'resize';
 
-export type GridiotPhase =
+export type EggPhase =
 	| 'idle'
 	| 'selected'
 	| 'interacting'  // Active drag or resize
@@ -843,8 +843,8 @@ export interface InteractionContext {
 	useViewTransition: boolean;
 }
 
-export interface GridiotState {
-	phase: GridiotPhase;
+export interface EggState {
+	phase: EggPhase;
 	selectedItemId: string | null;
 	interaction: InteractionContext | null;
 	/** Track if keyboard mode is active (Shift+G toggle) */
@@ -865,12 +865,12 @@ export type StateTransition =
 	| { type: 'FINISH_COMMIT' }
 	| { type: 'TOGGLE_KEYBOARD_MODE' };
 
-export interface GridiotStateMachine {
-	getState(): GridiotState;
-	transition(action: StateTransition): GridiotState;
+export interface EggStateMachine {
+	getState(): EggState;
+	transition(action: StateTransition): EggState;
 }
 
-function reducer(state: GridiotState, action: StateTransition): GridiotState {
+function reducer(state: EggState, action: StateTransition): EggState {
 	switch (action.type) {
 		case 'SELECT': {
 			// Can select from idle or selected (changes selection)
@@ -979,8 +979,8 @@ function reducer(state: GridiotState, action: StateTransition): GridiotState {
 /**
  * Create a state machine instance
  */
-export function createStateMachine(): GridiotStateMachine {
-	let state: GridiotState = {
+export function createStateMachine(): EggStateMachine {
+	let state: EggState = {
 		phase: 'idle',
 		selectedItemId: null,
 		interaction: null,
@@ -1002,7 +1002,7 @@ export function createStateMachine(): GridiotStateMachine {
 	};
 }
 
-export function isDragging(state: GridiotState): boolean {
+export function isDragging(state: EggState): boolean {
 	return (state.phase === 'interacting' || state.phase === 'committing') && state.interaction?.type === 'drag';
 }
 `,
@@ -1379,7 +1379,7 @@ registerPlugin({
 
 		function getLabel(item: HTMLElement): string {
 			return (
-				item.getAttribute('data-gridiot-label') ||
+				item.getAttribute('data-egg-label') ||
 				item.getAttribute('aria-label') ||
 				item.id ||
 				'Item'
@@ -1397,8 +1397,8 @@ registerPlugin({
 			fallback: string,
 		): string {
 			const template =
-				item.getAttribute(\`data-gridiot-announce-\${event}\`) ||
-				core.element.getAttribute(\`data-gridiot-announce-\${event}\`);
+				item.getAttribute(\`data-egg-announce-\${event}\`) ||
+				core.element.getAttribute(\`data-egg-announce-\${event}\`);
 			if (!template) return fallback;
 			return template.replace(/\\{(\\w+)\\}/g, (_, key) => vars[key] ?? '');
 		}
@@ -1509,14 +1509,14 @@ registerPlugin({
 		};
 
 		const unlisten = listenEvents(core.element, {
-			'gridiot:drag-start': onDragStart as EventListener,
-			'gridiot:drag-move': onDragMove as EventListener,
-			'gridiot:drag-end': onDragEnd as EventListener,
-			'gridiot:drag-cancel': onDragCancel as EventListener,
-			'gridiot:resize-start': onResizeStart as EventListener,
-			'gridiot:resize-move': onResizeMove as EventListener,
-			'gridiot:resize-end': onResizeEnd as EventListener,
-			'gridiot:resize-cancel': onResizeCancel as EventListener,
+			'egg:drag-start': onDragStart as EventListener,
+			'egg:drag-move': onDragMove as EventListener,
+			'egg:drag-end': onDragEnd as EventListener,
+			'egg:drag-cancel': onDragCancel as EventListener,
+			'egg:resize-start': onResizeStart as EventListener,
+			'egg:resize-move': onResizeMove as EventListener,
+			'egg:resize-end': onResizeEnd as EventListener,
+			'egg:resize-cancel': onResizeCancel as EventListener,
 		});
 
 		return () => {
@@ -1544,7 +1544,7 @@ import type {
 	DragStartDetail,
 	DragSource,
 	GridCell,
-	GridiotCore,
+	EggCore,
 	ItemPosition,
 	LayoutState,
 	ResizeCancelDetail,
@@ -1616,17 +1616,17 @@ export function layoutToCSS(
  * Read item positions from DOM elements
  */
 export function readItemsFromDOM(container: HTMLElement): ItemRect[] {
-	const elements = container.querySelectorAll('[data-gridiot-item]');
+	const elements = container.querySelectorAll('[data-egg-item]');
 	return Array.from(elements).map((el) => {
 		const element = el as HTMLElement;
 		const style = getComputedStyle(element);
 		const column = parseInt(style.gridColumnStart, 10) || 1;
 		const row = parseInt(style.gridRowStart, 10) || 1;
 		const width =
-			parseInt(element.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
+			parseInt(element.getAttribute('data-egg-colspan') || '1', 10) || 1;
 		const height =
-			parseInt(element.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
-		const id = element.dataset.id || element.dataset.gridiotItem || '';
+			parseInt(element.getAttribute('data-egg-rowspan') || '1', 10) || 1;
+		const id = element.dataset.id || element.dataset.eggItem || '';
 
 		return { id, column, row, width, height };
 	});
@@ -1670,7 +1670,7 @@ export interface AlgorithmStrategy {
 export interface AlgorithmHarnessOptions {
 	selectorPrefix?: string;
 	selectorSuffix?: string;
-	core?: GridiotCore;
+	core?: EggCore;
 	layoutModel?: ResponsiveLayoutModel;
 }
 
@@ -1740,7 +1740,7 @@ export function attachAlgorithm(
 	}
 
 	function getItemId(element: HTMLElement): string {
-		return element.dataset.id || element.dataset.gridiotItem || '';
+		return element.dataset.id || element.dataset.eggItem || '';
 	}
 
 	/** Read items from DOM with original positions restored (except the actively dragged item) */
@@ -1812,7 +1812,7 @@ export function attachAlgorithm(
 				styles.set('preview', css);
 				styles.commit();
 
-				const elements = gridElement.querySelectorAll('[data-gridiot-item]');
+				const elements = gridElement.querySelectorAll('[data-egg-item]');
 				for (const el of elements) {
 					const element = el as HTMLElement;
 					const id = getItemId(element);
@@ -1823,15 +1823,15 @@ export function attachAlgorithm(
 					}
 				}
 			} else {
-				const elements = gridElement.querySelectorAll('[data-gridiot-item]');
+				const elements = gridElement.querySelectorAll('[data-egg-item]');
 				for (const el of elements) {
 					const element = el as HTMLElement;
 					const id = getItemId(element);
 					if (id === excludeId) continue;
 					const item = layout.find((it) => it.id === id);
 					if (item) {
-						const colspan = parseInt(element.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
-						const rowspan = parseInt(element.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
+						const colspan = parseInt(element.getAttribute('data-egg-colspan') || '1', 10) || 1;
+						const rowspan = parseInt(element.getAttribute('data-egg-rowspan') || '1', 10) || 1;
 						element.style.gridColumn = \`\${item.column} / span \${colspan}\`;
 						element.style.gridRow = \`\${item.row} / span \${rowspan}\`;
 					}
@@ -1869,7 +1869,7 @@ export function attachAlgorithm(
 		}
 
 		if (styles) {
-			const elements = gridElement.querySelectorAll('[data-gridiot-item]');
+			const elements = gridElement.querySelectorAll('[data-egg-item]');
 			for (const el of elements) {
 				const element = el as HTMLElement;
 				if (element !== draggedElement) {
@@ -2009,7 +2009,7 @@ export function attachAlgorithm(
 		}
 
 		if (styles) {
-			const elements = gridElement.querySelectorAll('[data-gridiot-item]');
+			const elements = gridElement.querySelectorAll('[data-egg-item]');
 			for (const el of elements) {
 				const element = el as HTMLElement;
 				if (element !== resizedElement) {
@@ -2104,34 +2104,34 @@ export function attachAlgorithm(
 	// =========================================================================
 
 	return listenEvents(gridElement, {
-		'gridiot:drag-start': onDragStart,
-		'gridiot:drag-move': onDragMove,
-		'gridiot:drag-end': onDragEnd,
-		'gridiot:drag-cancel': onDragCancel,
-		'gridiot:camera-settled': onCameraSettled,
-		'gridiot:resize-start': onResizeStart,
-		'gridiot:resize-move': onResizeMove,
-		'gridiot:resize-end': onResizeEnd,
-		'gridiot:resize-cancel': onResizeCancel,
+		'egg:drag-start': onDragStart,
+		'egg:drag-move': onDragMove,
+		'egg:drag-end': onDragEnd,
+		'egg:drag-cancel': onDragCancel,
+		'egg:camera-settled': onCameraSettled,
+		'egg:resize-start': onResizeStart,
+		'egg:resize-move': onResizeMove,
+		'egg:resize-end': onResizeEnd,
+		'egg:resize-cancel': onResizeCancel,
 	});
 }
 `,
 	"plugins/algorithm-push.ts": `/**
- * Push-down layout algorithm for Gridiot
+ * Push-down layout algorithm for EG Grid
  *
  * This module provides both:
  * 1. Pure algorithm functions (overlap detection, push-down, compaction)
  * 2. DOM integration via the shared algorithm harness
  *
  * Usage (pure functions):
- *   import { calculateLayout, layoutToCSS } from 'gridiot/algorithm-push';
+ *   import { calculateLayout, layoutToCSS } from 'eg-grid/algorithm-push';
  *   const newLayout = calculateLayout(items, movedId, targetCell);
  *   core.styles.set('preview', layoutToCSS(newLayout));
  *   core.styles.commit();
  *
  * Usage (DOM integration):
- *   import { init } from 'gridiot';
- *   import { attachPushAlgorithm } from 'gridiot/algorithm-push';
+ *   import { init } from 'eg-grid';
+ *   import { attachPushAlgorithm } from 'eg-grid/algorithm-push';
  *
  *   const grid = init(element);
  *   const detach = attachPushAlgorithm(grid.element);
@@ -2142,7 +2142,7 @@ import { registerPlugin } from '../engine';
 import type {
 	AlgorithmPushPluginOptions,
 	GridCell,
-	GridiotCore,
+	EggCore,
 	ResponsiveLayoutModel,
 } from '../types';
 
@@ -2304,14 +2304,14 @@ export interface AttachPushAlgorithmOptions {
 	 * When false, items only get pushed down but won't float back up to fill gaps.
 	 */
 	compaction?: boolean;
-	core?: GridiotCore;
+	core?: EggCore;
 	layoutModel?: ResponsiveLayoutModel;
 }
 
 /**
  * Attach push-down algorithm to a grid element.
  *
- * This creates event listeners for gridiot drag events and updates
+ * This creates event listeners for eg-grid drag events and updates
  * the layout when items are moved. Layout changes are animated
  * via View Transitions.
  *
@@ -2343,7 +2343,7 @@ registerPlugin({
 	init(
 		core,
 		options?: AlgorithmPushPluginOptions & {
-			core?: GridiotCore;
+			core?: EggCore;
 			layoutModel?: ResponsiveLayoutModel;
 		},
 	) {
@@ -2355,16 +2355,16 @@ registerPlugin({
 });
 `,
 	"plugins/algorithm-reorder.ts": `/**
- * Reorder layout algorithm for Gridiot
+ * Reorder layout algorithm for EG Grid
  *
  * Sequence-based reflow: items have a logical order, dragging changes
  * position in that sequence, all items reflow like CSS Grid auto-placement.
  *
  * Usage (pure functions):
- *   import { calculateReorderLayout, reflowItems, layoutToCSS } from 'gridiot/algorithm-reorder';
+ *   import { calculateReorderLayout, reflowItems, layoutToCSS } from 'eg-grid/algorithm-reorder';
  *
  * Usage (DOM integration):
- *   import { attachReorderAlgorithm } from 'gridiot/algorithm-reorder';
+ *   import { attachReorderAlgorithm } from 'eg-grid/algorithm-reorder';
  *   const detach = attachReorderAlgorithm(grid.element, { core });
  */
 
@@ -2373,7 +2373,7 @@ import { registerPlugin } from '../engine';
 import type {
 	AlgorithmReorderPluginOptions,
 	GridCell,
-	GridiotCore,
+	EggCore,
 	ResponsiveLayoutModel,
 } from '../types';
 
@@ -2561,7 +2561,7 @@ export function calculateReorderLayout(
 export interface AttachReorderAlgorithmOptions {
 	selectorPrefix?: string;
 	selectorSuffix?: string;
-	core?: GridiotCore;
+	core?: EggCore;
 	layoutModel?: ResponsiveLayoutModel;
 }
 
@@ -2596,7 +2596,7 @@ export function attachReorderAlgorithm(
 					rowspan: landingItem.height,
 				};
 				queueMicrotask(() => {
-					el.dispatchEvent(new CustomEvent('gridiot:drop-preview', {
+					el.dispatchEvent(new CustomEvent('egg:drop-preview', {
 						detail: previewDetail,
 						bubbles: true,
 					}));
@@ -2620,7 +2620,7 @@ registerPlugin({
 	init(
 		core,
 		options?: AlgorithmReorderPluginOptions & {
-			core?: GridiotCore;
+			core?: EggCore;
 			layoutModel?: ResponsiveLayoutModel;
 		},
 	) {
@@ -2632,7 +2632,7 @@ registerPlugin({
 });
 `,
 	"plugins/camera.ts": `/**
- * Camera plugin for Gridiot
+ * Camera plugin for EG Grid
  *
  * Handles viewport scrolling to keep the active item visible:
  * - Auto-scroll when dragging near viewport edges
@@ -2649,7 +2649,7 @@ import type {
 	DragCancelDetail,
 	SelectDetail,
 	DragState,
-	GridiotCore,
+	EggCore,
 	CameraPluginOptions,
 } from '../types';
 
@@ -2714,10 +2714,10 @@ export interface CameraOptions {
 	settleDelay?: number;
 
 	/**
-	 * Gridiot core instance for provider registration.
+	 * EG Grid core instance for provider registration.
 	 * If provided, registers a 'camera' provider.
 	 */
-	core?: GridiotCore;
+	core?: EggCore;
 }
 
 /**
@@ -2793,7 +2793,7 @@ function getViewportRect(
 }
 
 /**
- * Attach camera behavior to a Gridiot grid element.
+ * Attach camera behavior to a EG Grid grid element.
  */
 export function attachCamera(
 	gridElement: HTMLElement,
@@ -2848,7 +2848,7 @@ export function attachCamera(
 				settleTimeoutId = null;
 				// Emit settle event so algorithm can recalculate
 				gridElement.dispatchEvent(
-					new CustomEvent('gridiot:camera-settled', { bubbles: true })
+					new CustomEvent('egg:camera-settled', { bubbles: true })
 				);
 			}, settleDelay);
 		}
@@ -3078,11 +3078,11 @@ export function attachCamera(
 	}
 
 	const removeListeners = listenEvents(gridElement, {
-		'gridiot:drag-start': onDragStart as EventListener,
-		'gridiot:drag-move': onDragMove as EventListener,
-		'gridiot:drag-end': onDragEnd as EventListener,
-		'gridiot:drag-cancel': onDragCancel as EventListener,
-		'gridiot:select': onSelect as EventListener,
+		'egg:drag-start': onDragStart as EventListener,
+		'egg:drag-move': onDragMove as EventListener,
+		'egg:drag-end': onDragEnd as EventListener,
+		'egg:drag-cancel': onDragCancel as EventListener,
+		'egg:select': onSelect as EventListener,
 	});
 
 	function destroy(): void {
@@ -3109,7 +3109,7 @@ export function attachCamera(
 // Register as a plugin for auto-initialization via init()
 registerPlugin({
 	name: 'camera',
-	init(core, options?: CameraPluginOptions & { core?: GridiotCore }) {
+	init(core, options?: CameraPluginOptions & { core?: EggCore }) {
 		const instance = attachCamera(core.element, {
 			...options,
 			core: options?.core ?? core,
@@ -3119,7 +3119,7 @@ registerPlugin({
 });
 `,
 	"plugins/dev-overlay.ts": `/**
- * Development overlay plugin for Gridiot
+ * Development overlay plugin for EG Grid
  *
  * Provides a toggleable panel with:
  * - Debug tab: Grid info, item positions, event log
@@ -3129,7 +3129,7 @@ registerPlugin({
  */
 
 import { getItemCell } from '../engine';
-import type { DragState, GridInfo, GridiotCore, LayoutState } from '../types';
+import type { DragState, GridInfo, EggCore, LayoutState } from '../types';
 
 export interface DevOverlayOptions {
 	/** Initial tab to show ('debug' | 'config') */
@@ -3138,8 +3138,8 @@ export interface DevOverlayOptions {
 	toggleKey?: string;
 	/** Initial visibility */
 	visible?: boolean;
-	/** GridiotCore instance for provider access */
-	core?: GridiotCore;
+	/** EggCore instance for provider access */
+	core?: EggCore;
 }
 
 export interface ConfigOption {
@@ -3159,7 +3159,7 @@ interface EventLogEntry {
 }
 
 const STYLES = \`
-.gridiot-dev-overlay {
+.egg-dev-overlay {
 	position: fixed;
 	bottom: 16px;
 	right: 16px;
@@ -3178,17 +3178,17 @@ const STYLES = \`
 	view-transition-name: dev-overlay;
 }
 
-.gridiot-dev-overlay[hidden] {
+.egg-dev-overlay[hidden] {
 	display: none;
 }
 
-.gridiot-dev-tabs {
+.egg-dev-tabs {
 	display: flex;
 	border-bottom: 1px solid #333;
 	flex-shrink: 0;
 }
 
-.gridiot-dev-tab {
+.egg-dev-tab {
 	flex: 1;
 	padding: 8px 12px;
 	background: transparent;
@@ -3201,30 +3201,30 @@ const STYLES = \`
 	letter-spacing: 0.5px;
 }
 
-.gridiot-dev-tab:hover {
+.egg-dev-tab:hover {
 	color: #ccc;
 }
 
-.gridiot-dev-tab[data-active="true"] {
+.egg-dev-tab[data-active="true"] {
 	color: #fff;
 	background: #222;
 }
 
-.gridiot-dev-content {
+.egg-dev-content {
 	flex: 1;
 	overflow-y: auto;
 	padding: 12px;
 }
 
-.gridiot-dev-section {
+.egg-dev-section {
 	margin-bottom: 12px;
 }
 
-.gridiot-dev-section:last-child {
+.egg-dev-section:last-child {
 	margin-bottom: 0;
 }
 
-.gridiot-dev-section-title {
+.egg-dev-section-title {
 	color: #888;
 	font-size: 10px;
 	text-transform: uppercase;
@@ -3232,75 +3232,75 @@ const STYLES = \`
 	margin-bottom: 6px;
 }
 
-.gridiot-dev-grid-info {
+.egg-dev-grid-info {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 4px;
 }
 
-.gridiot-dev-info-item {
+.egg-dev-info-item {
 	display: flex;
 	justify-content: space-between;
 }
 
-.gridiot-dev-info-label {
+.egg-dev-info-label {
 	color: #888;
 }
 
-.gridiot-dev-info-value {
+.egg-dev-info-value {
 	color: #4ade80;
 }
 
-.gridiot-dev-items-list {
+.egg-dev-items-list {
 	max-height: 120px;
 	overflow-y: auto;
 }
 
-.gridiot-dev-item-row {
+.egg-dev-item-row {
 	display: flex;
 	justify-content: space-between;
 	padding: 2px 0;
 	border-bottom: 1px solid #222;
 }
 
-.gridiot-dev-item-id {
+.egg-dev-item-id {
 	color: #60a5fa;
 }
 
-.gridiot-dev-item-pos {
+.egg-dev-item-pos {
 	color: #888;
 }
 
-.gridiot-dev-event-log {
+.egg-dev-event-log {
 	max-height: 150px;
 	overflow-y: auto;
 }
 
-.gridiot-dev-event {
+.egg-dev-event {
 	padding: 2px 0;
 	border-bottom: 1px solid #222;
 	display: flex;
 	gap: 8px;
 }
 
-.gridiot-dev-event-time {
+.egg-dev-event-time {
 	color: #666;
 	flex-shrink: 0;
 }
 
-.gridiot-dev-event-type {
+.egg-dev-event-type {
 	color: #f472b6;
 	flex-shrink: 0;
 }
 
-.gridiot-dev-event-detail {
+.egg-dev-event-detail {
 	color: #888;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.gridiot-dev-config-row {
+.egg-dev-config-row {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -3308,11 +3308,11 @@ const STYLES = \`
 	border-bottom: 1px solid #222;
 }
 
-.gridiot-dev-config-label {
+.egg-dev-config-label {
 	color: #ccc;
 }
 
-.gridiot-dev-toggle {
+.egg-dev-toggle {
 	position: relative;
 	width: 36px;
 	height: 20px;
@@ -3322,11 +3322,11 @@ const STYLES = \`
 	transition: background 0.2s;
 }
 
-.gridiot-dev-toggle[data-checked="true"] {
+.egg-dev-toggle[data-checked="true"] {
 	background: #4ade80;
 }
 
-.gridiot-dev-toggle::after {
+.egg-dev-toggle::after {
 	content: '';
 	position: absolute;
 	top: 2px;
@@ -3338,11 +3338,11 @@ const STYLES = \`
 	transition: transform 0.2s;
 }
 
-.gridiot-dev-toggle[data-checked="true"]::after {
+.egg-dev-toggle[data-checked="true"]::after {
 	transform: translateX(16px);
 }
 
-.gridiot-dev-select {
+.egg-dev-select {
 	background: #333;
 	color: #fff;
 	border: 1px solid #444;
@@ -3352,7 +3352,7 @@ const STYLES = \`
 	font-size: 12px;
 }
 
-.gridiot-dev-close {
+.egg-dev-close {
 	position: absolute;
 	top: 8px;
 	right: 8px;
@@ -3365,11 +3365,11 @@ const STYLES = \`
 	padding: 4px;
 }
 
-.gridiot-dev-close:hover {
+.egg-dev-close:hover {
 	color: #fff;
 }
 
-.gridiot-dev-hint {
+.egg-dev-hint {
 	color: #666;
 	font-size: 10px;
 	text-align: center;
@@ -3377,7 +3377,7 @@ const STYLES = \`
 	border-top: 1px solid #222;
 }
 
-.gridiot-dev-action-btn {
+.egg-dev-action-btn {
 	background: #333;
 	color: #fff;
 	border: 1px solid #444;
@@ -3389,15 +3389,15 @@ const STYLES = \`
 	transition: background 0.2s;
 }
 
-.gridiot-dev-action-btn:hover {
+.egg-dev-action-btn:hover {
 	background: #444;
 }
 
-.gridiot-dev-action-btn:active {
+.egg-dev-action-btn:active {
 	background: #555;
 }
 
-.gridiot-dev-status {
+.egg-dev-status {
 	color: #888;
 	font-size: 11px;
 	margin-top: 4px;
@@ -3414,10 +3414,10 @@ export function attachDevOverlay(
 	const { initialTab = 'debug', toggleKey = 'D', visible = false, core } = options;
 
 	// Inject styles
-	let styleElement = document.getElementById('gridiot-dev-overlay-styles') as HTMLStyleElement | null;
+	let styleElement = document.getElementById('egg-dev-overlay-styles') as HTMLStyleElement | null;
 	if (!styleElement) {
 		styleElement = document.createElement('style');
-		styleElement.id = 'gridiot-dev-overlay-styles';
+		styleElement.id = 'egg-dev-overlay-styles';
 		styleElement.textContent = STYLES;
 		document.head.appendChild(styleElement);
 	}
@@ -3431,7 +3431,7 @@ export function attachDevOverlay(
 
 	// Create overlay element
 	const overlay = document.createElement('div');
-	overlay.className = 'gridiot-dev-overlay';
+	overlay.className = 'egg-dev-overlay';
 	overlay.hidden = !isVisible;
 
 	function formatTime(time: number): string {
@@ -3441,24 +3441,24 @@ export function attachDevOverlay(
 
 	function render() {
 		const gridInfo = core?.getGridInfo();
-		const items = Array.from(gridElement.querySelectorAll('[data-gridiot-item]')) as HTMLElement[];
+		const items = Array.from(gridElement.querySelectorAll('[data-egg-item]')) as HTMLElement[];
 
 		overlay.innerHTML = \`
-			<button class="gridiot-dev-close">&times;</button>
-			<div class="gridiot-dev-tabs">
-				<button class="gridiot-dev-tab" data-tab="debug" data-active="\${currentTab === 'debug'}">Debug</button>
-				<button class="gridiot-dev-tab" data-tab="config" data-active="\${currentTab === 'config'}">Config</button>
+			<button class="egg-dev-close">&times;</button>
+			<div class="egg-dev-tabs">
+				<button class="egg-dev-tab" data-tab="debug" data-active="\${currentTab === 'debug'}">Debug</button>
+				<button class="egg-dev-tab" data-tab="config" data-active="\${currentTab === 'config'}">Config</button>
 			</div>
-			<div class="gridiot-dev-content">
+			<div class="egg-dev-content">
 				\${currentTab === 'debug' ? renderDebugTab(gridInfo, items) : renderConfigTab()}
 			</div>
-			<div class="gridiot-dev-hint">Shift+\${toggleKey} to toggle</div>
+			<div class="egg-dev-hint">Shift+\${toggleKey} to toggle</div>
 		\`;
 
 		// Attach event listeners
-		overlay.querySelector('.gridiot-dev-close')?.addEventListener('click', hide);
+		overlay.querySelector('.egg-dev-close')?.addEventListener('click', hide);
 
-		overlay.querySelectorAll('.gridiot-dev-tab').forEach(tab => {
+		overlay.querySelectorAll('.egg-dev-tab').forEach(tab => {
 			tab.addEventListener('click', () => {
 				currentTab = (tab as HTMLElement).dataset.tab as 'debug' | 'config';
 				render();
@@ -3466,7 +3466,7 @@ export function attachDevOverlay(
 		});
 
 		// Config toggles
-		overlay.querySelectorAll('.gridiot-dev-toggle').forEach(toggle => {
+		overlay.querySelectorAll('.egg-dev-toggle').forEach(toggle => {
 			toggle.addEventListener('click', () => {
 				const key = (toggle as HTMLElement).dataset.key;
 				const option = configOptions.find(o => o.key === key);
@@ -3479,7 +3479,7 @@ export function attachDevOverlay(
 		});
 
 		// Config selects
-		overlay.querySelectorAll('.gridiot-dev-select').forEach(select => {
+		overlay.querySelectorAll('.egg-dev-select').forEach(select => {
 			select.addEventListener('change', (e) => {
 				const key = (select as HTMLElement).dataset.key;
 				const option = configOptions.find(o => o.key === key);
@@ -3491,7 +3491,7 @@ export function attachDevOverlay(
 		});
 
 		// Action buttons
-		overlay.querySelectorAll('.gridiot-dev-action-btn').forEach(btn => {
+		overlay.querySelectorAll('.egg-dev-action-btn').forEach(btn => {
 			btn.addEventListener('click', () => {
 				const key = (btn as HTMLElement).dataset.key;
 				const option = configOptions.find(o => o.key === key);
@@ -3503,92 +3503,92 @@ export function attachDevOverlay(
 	}
 
 	function renderDebugTab(gridInfo: GridInfo | undefined, items: HTMLElement[]): string {
-		if (!gridInfo) return '<div class="gridiot-dev-section">No core available</div>';
+		if (!gridInfo) return '<div class="egg-dev-section">No core available</div>';
 		// Query providers for live state
 		const dragState = core?.providers.get<DragState>('drag');
 		const layoutState = core?.providers.get<LayoutState>('layout');
 
 		return \`
 			\${core ? \`
-			<div class="gridiot-dev-section">
-				<div class="gridiot-dev-section-title">Providers</div>
-				<div class="gridiot-dev-grid-info">
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">drag</span>
-						<span class="gridiot-dev-info-value">\${dragState ? \`dragging \${dragState.item.dataset.id || dragState.item.id || '?'}\` : 'idle'}</span>
+			<div class="egg-dev-section">
+				<div class="egg-dev-section-title">Providers</div>
+				<div class="egg-dev-grid-info">
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">drag</span>
+						<span class="egg-dev-info-value">\${dragState ? \`dragging \${dragState.item.dataset.id || dragState.item.id || '?'}\` : 'idle'}</span>
 					</div>
 					\${dragState ? \`
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">cell</span>
-						<span class="gridiot-dev-info-value">(\${dragState.cell.column}, \${dragState.cell.row})</span>
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">cell</span>
+						<span class="egg-dev-info-value">(\${dragState.cell.column}, \${dragState.cell.row})</span>
 					</div>
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">start</span>
-						<span class="gridiot-dev-info-value">(\${dragState.startCell.column}, \${dragState.startCell.row})</span>
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">start</span>
+						<span class="egg-dev-info-value">(\${dragState.startCell.column}, \${dragState.startCell.row})</span>
 					</div>
 					\` : ''}
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">layout</span>
-						<span class="gridiot-dev-info-value">\${layoutState ? \`\${layoutState.items.length} items, \${layoutState.columns} cols\` : 'none'}</span>
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">layout</span>
+						<span class="egg-dev-info-value">\${layoutState ? \`\${layoutState.items.length} items, \${layoutState.columns} cols\` : 'none'}</span>
 					</div>
 				</div>
 			</div>
 			\` : ''}
-			<div class="gridiot-dev-section">
-				<div class="gridiot-dev-section-title">Grid Info</div>
-				<div class="gridiot-dev-grid-info">
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">Columns</span>
-						<span class="gridiot-dev-info-value">\${gridInfo.columns.length}</span>
+			<div class="egg-dev-section">
+				<div class="egg-dev-section-title">Grid Info</div>
+				<div class="egg-dev-grid-info">
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">Columns</span>
+						<span class="egg-dev-info-value">\${gridInfo.columns.length}</span>
 					</div>
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">Rows</span>
-						<span class="gridiot-dev-info-value">\${gridInfo.rows.length}</span>
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">Rows</span>
+						<span class="egg-dev-info-value">\${gridInfo.rows.length}</span>
 					</div>
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">Cell W</span>
-						<span class="gridiot-dev-info-value">\${Math.round(gridInfo.cellWidth)}px</span>
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">Cell W</span>
+						<span class="egg-dev-info-value">\${Math.round(gridInfo.cellWidth)}px</span>
 					</div>
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">Cell H</span>
-						<span class="gridiot-dev-info-value">\${Math.round(gridInfo.cellHeight)}px</span>
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">Cell H</span>
+						<span class="egg-dev-info-value">\${Math.round(gridInfo.cellHeight)}px</span>
 					</div>
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">Gap</span>
-						<span class="gridiot-dev-info-value">\${gridInfo.gap}px</span>
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">Gap</span>
+						<span class="egg-dev-info-value">\${gridInfo.gap}px</span>
 					</div>
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">Items</span>
-						<span class="gridiot-dev-info-value">\${items.length}</span>
+					<div class="egg-dev-info-item">
+						<span class="egg-dev-info-label">Items</span>
+						<span class="egg-dev-info-value">\${items.length}</span>
 					</div>
 				</div>
 			</div>
-			<div class="gridiot-dev-section">
-				<div class="gridiot-dev-section-title">Items</div>
-				<div class="gridiot-dev-items-list">
+			<div class="egg-dev-section">
+				<div class="egg-dev-section-title">Items</div>
+				<div class="egg-dev-items-list">
 					\${items.map(item => {
 						const cell = getItemCell(item);
 						const id = item.dataset.id || item.id || '?';
-						const colspan = item.getAttribute('data-gridiot-colspan') || '1';
-						const rowspan = item.getAttribute('data-gridiot-rowspan') || '1';
+						const colspan = item.getAttribute('data-egg-colspan') || '1';
+						const rowspan = item.getAttribute('data-egg-rowspan') || '1';
 						return \`
-							<div class="gridiot-dev-item-row">
-								<span class="gridiot-dev-item-id">\${id}</span>
-								<span class="gridiot-dev-item-pos">col \${cell.column}, row \${cell.row} (\${colspan}×\${rowspan})</span>
+							<div class="egg-dev-item-row">
+								<span class="egg-dev-item-id">\${id}</span>
+								<span class="egg-dev-item-pos">col \${cell.column}, row \${cell.row} (\${colspan}×\${rowspan})</span>
 							</div>
 						\`;
 					}).join('')}
 				</div>
 			</div>
-			<div class="gridiot-dev-section">
-				<div class="gridiot-dev-section-title">Event Log</div>
-				<div class="gridiot-dev-event-log">
+			<div class="egg-dev-section">
+				<div class="egg-dev-section-title">Event Log</div>
+				<div class="egg-dev-event-log">
 					\${eventLog.length === 0 ? '<div style="color: #666">No events yet</div>' : ''}
 					\${eventLog.slice(-20).reverse().map(entry => \`
-						<div class="gridiot-dev-event">
-							<span class="gridiot-dev-event-time">\${formatTime(entry.time)}</span>
-							<span class="gridiot-dev-event-type">\${entry.type}</span>
-							<span class="gridiot-dev-event-detail">\${entry.detail}</span>
+						<div class="egg-dev-event">
+							<span class="egg-dev-event-time">\${formatTime(entry.time)}</span>
+							<span class="egg-dev-event-type">\${entry.type}</span>
+							<span class="egg-dev-event-detail">\${entry.detail}</span>
 						</div>
 					\`).join('')}
 				</div>
@@ -3605,22 +3605,22 @@ export function attachDevOverlay(
 		const actions = configOptions.filter(o => o.type === 'action');
 
 		return \`
-			<div class="gridiot-dev-section">
-				<div class="gridiot-dev-section-title">Options</div>
+			<div class="egg-dev-section">
+				<div class="egg-dev-section-title">Options</div>
 				\${toggles.map(option => \`
-					<div class="gridiot-dev-config-row">
-						<span class="gridiot-dev-config-label">\${option.label}</span>
-						<div class="gridiot-dev-toggle" data-key="\${option.key}" data-checked="\${option.value}"></div>
+					<div class="egg-dev-config-row">
+						<span class="egg-dev-config-label">\${option.label}</span>
+						<div class="egg-dev-toggle" data-key="\${option.key}" data-checked="\${option.value}"></div>
 					</div>
 				\`).join('')}
 			</div>
 			\${actions.length > 0 ? \`
-				<div class="gridiot-dev-section">
-					<div class="gridiot-dev-section-title">Actions</div>
+				<div class="egg-dev-section">
+					<div class="egg-dev-section-title">Actions</div>
 					\${actions.map(option => \`
-						<div class="gridiot-dev-config-row">
-							<span class="gridiot-dev-config-label">\${option.label}</span>
-							<button class="gridiot-dev-action-btn" data-key="\${option.key}">Run</button>
+						<div class="egg-dev-config-row">
+							<span class="egg-dev-config-label">\${option.label}</span>
+							<button class="egg-dev-action-btn" data-key="\${option.key}">Run</button>
 						</div>
 					\`).join('')}
 				</div>
@@ -3714,12 +3714,12 @@ export function attachDevOverlay(
 	};
 
 	// Attach listeners
-	gridElement.addEventListener('gridiot:drag-start', onDragStart);
-	gridElement.addEventListener('gridiot:drag-move', onDragMove);
-	gridElement.addEventListener('gridiot:drag-end', onDragEnd);
-	gridElement.addEventListener('gridiot:drag-cancel', onDragCancel);
-	gridElement.addEventListener('gridiot:select', onSelect);
-	gridElement.addEventListener('gridiot:deselect', onDeselect);
+	gridElement.addEventListener('egg:drag-start', onDragStart);
+	gridElement.addEventListener('egg:drag-move', onDragMove);
+	gridElement.addEventListener('egg:drag-end', onDragEnd);
+	gridElement.addEventListener('egg:drag-cancel', onDragCancel);
+	gridElement.addEventListener('egg:select', onSelect);
+	gridElement.addEventListener('egg:deselect', onDeselect);
 	document.addEventListener('keydown', onKeyDown);
 
 	// Add to DOM
@@ -3727,12 +3727,12 @@ export function attachDevOverlay(
 	render();
 
 	function destroy() {
-		gridElement.removeEventListener('gridiot:drag-start', onDragStart);
-		gridElement.removeEventListener('gridiot:drag-move', onDragMove);
-		gridElement.removeEventListener('gridiot:drag-end', onDragEnd);
-		gridElement.removeEventListener('gridiot:drag-cancel', onDragCancel);
-		gridElement.removeEventListener('gridiot:select', onSelect);
-		gridElement.removeEventListener('gridiot:deselect', onDeselect);
+		gridElement.removeEventListener('egg:drag-start', onDragStart);
+		gridElement.removeEventListener('egg:drag-move', onDragMove);
+		gridElement.removeEventListener('egg:drag-end', onDragEnd);
+		gridElement.removeEventListener('egg:drag-cancel', onDragCancel);
+		gridElement.removeEventListener('egg:select', onSelect);
+		gridElement.removeEventListener('egg:deselect', onDeselect);
 		document.removeEventListener('keydown', onKeyDown);
 		overlay.remove();
 	}
@@ -3766,9 +3766,9 @@ registerPlugin({
 		const captureItemState = (): { positions: Map<string, ItemPosition>; sizes: Map<string, { width: number; height: number }> } => {
 			const positions = new Map<string, ItemPosition>();
 			const sizes = new Map<string, { width: number; height: number }>();
-			for (const item of core.element.querySelectorAll('[data-gridiot-item]')) {
+			for (const item of core.element.querySelectorAll('[data-egg-item]')) {
 				const el = item as HTMLElement;
-				const id = el.id || el.getAttribute('data-gridiot-item') || '';
+				const id = el.id || el.getAttribute('data-egg-item') || '';
 				if (id) {
 					const cell = getItemCell(el);
 					positions.set(id, { column: cell.column, row: cell.row });
@@ -3841,7 +3841,7 @@ registerPlugin({
 			excludeItem: HTMLElement,
 		): HTMLElement | null => {
 			const items = Array.from(
-				core.element.querySelectorAll('[data-gridiot-item]'),
+				core.element.querySelectorAll('[data-egg-item]'),
 			) as HTMLElement[];
 
 			let bestItem: HTMLElement | null = null;
@@ -3889,16 +3889,16 @@ registerPlugin({
 				stateMachine.transition({ type: 'TOGGLE_KEYBOARD_MODE' });
 				const keyboardMode = stateMachine.getState().keyboardModeActive;
 				if (keyboardMode) {
-					core.element.setAttribute('data-gridiot-keyboard-mode', '');
+					core.element.setAttribute('data-egg-keyboard-mode', '');
 					// If no item is selected, select the first one
 					if (!core.selectedItem) {
-						const firstItem = core.element.querySelector('[data-gridiot-item]') as HTMLElement | null;
+						const firstItem = core.element.querySelector('[data-egg-item]') as HTMLElement | null;
 						if (firstItem) {
 							core.select(firstItem);
 						}
 					}
 				} else {
-					core.element.removeAttribute('data-gridiot-keyboard-mode');
+					core.element.removeAttribute('data-egg-keyboard-mode');
 				}
 				return;
 			}
@@ -3918,7 +3918,7 @@ registerPlugin({
 				e.preventDefault();
 				const heldItem = getHeldItem();
 				if (heldItem) {
-					heldItem.removeAttribute('data-gridiot-dragging');
+					heldItem.removeAttribute('data-egg-dragging');
 					core.emit('drag-cancel', { item: heldItem, source: 'keyboard' as const });
 					stateMachine.transition({ type: 'CANCEL_INTERACTION' });
 				} else if (selectedItem) {
@@ -3928,7 +3928,7 @@ registerPlugin({
 				if (stateMachine.getState().keyboardModeActive) {
 					stateMachine.transition({ type: 'TOGGLE_KEYBOARD_MODE' });
 				}
-				core.element.removeAttribute('data-gridiot-keyboard-mode');
+				core.element.removeAttribute('data-egg-keyboard-mode');
 				return;
 			}
 
@@ -3943,13 +3943,13 @@ registerPlugin({
 					const state = stateMachine.getState();
 					const targetCell = state.interaction?.targetCell ?? getItemCell(heldItem);
 					const size = getItemSize(heldItem);
-					heldItem.removeAttribute('data-gridiot-dragging');
+					heldItem.removeAttribute('data-egg-dragging');
 					core.emit('drag-end', { item: heldItem, cell: targetCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
 					stateMachine.transition({ type: 'COMMIT_INTERACTION' });
 					stateMachine.transition({ type: 'FINISH_COMMIT' });
 				} else {
 					// Pick up the selected item
-					const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
+					const itemId = selectedItem.id || selectedItem.getAttribute('data-egg-item') || '';
 					const size = getItemSize(selectedItem);
 					const startCell = getItemCell(selectedItem);
 					const { positions, sizes } = captureItemState();
@@ -3970,7 +3970,7 @@ registerPlugin({
 						},
 					});
 
-					selectedItem.setAttribute('data-gridiot-dragging', '');
+					selectedItem.setAttribute('data-egg-dragging', '');
 					core.emit('drag-start', { item: selectedItem, cell: startCell, colspan: size.colspan, rowspan: size.rowspan, source: 'keyboard' as const });
 				}
 				return;
@@ -4030,7 +4030,7 @@ registerPlugin({
 						pendingVtnRestore = null;
 					}
 
-					const itemId = selectedItem.id || selectedItem.getAttribute('data-gridiot-item') || '';
+					const itemId = selectedItem.id || selectedItem.getAttribute('data-egg-item') || '';
 					const { positions: rPositions, sizes: rSizes } = captureItemState();
 
 					// Start resize interaction via state machine
@@ -4067,8 +4067,8 @@ registerPlugin({
 					});
 
 					// Update item data attributes (algorithm reads these for size)
-					selectedItem.setAttribute('data-gridiot-colspan', String(newColspan));
-					selectedItem.setAttribute('data-gridiot-rowspan', String(newRowspan));
+					selectedItem.setAttribute('data-egg-colspan', String(newColspan));
+					selectedItem.setAttribute('data-egg-rowspan', String(newRowspan));
 
 					// Don't set inline grid styles - let algorithm handle layout via CSS rules
 					// This allows View Transitions to animate other items smoothly
@@ -4143,13 +4143,13 @@ registerPlugin({
 
 		return () => {
 			document.removeEventListener('keydown', onKeyDown);
-			core.element.removeAttribute('data-gridiot-keyboard-mode');
+			core.element.removeAttribute('data-egg-keyboard-mode');
 		};
 	},
 });
 `,
 	"plugins/placeholder.ts": `/**
- * Placeholder plugin for Gridiot
+ * Placeholder plugin for EG Grid
  *
  * Shows a visual placeholder where the dragged item will land.
  * Handles creation, positioning, and cleanup automatically.
@@ -4172,7 +4172,7 @@ import type {
 export interface PlaceholderOptions {
 	/**
 	 * CSS class name for the placeholder element.
-	 * @default 'gridiot-placeholder'
+	 * @default 'egg-placeholder'
 	 */
 	className?: string;
 
@@ -4200,11 +4200,11 @@ export interface PlaceholderInstance {
 }
 
 /**
- * Attach a placeholder to a Gridiot grid element.
+ * Attach a placeholder to a EG Grid grid element.
  *
  * @example
  * \`\`\`js
- * import { init } from './gridiot.js';
+ * import { init } from './eg-grid.js';
  * import { attachPlaceholder } from './placeholder.js';
  *
  * const grid = init(document.getElementById('grid'));
@@ -4219,7 +4219,7 @@ export function attachPlaceholder(
 	options: PlaceholderOptions = {}
 ): PlaceholderInstance {
 	const {
-		className = 'gridiot-placeholder',
+		className = 'egg-placeholder',
 		element: customElement,
 		disableViewTransition = true,
 	} = options;
@@ -4326,8 +4326,8 @@ export function attachPlaceholder(
 		requestAnimationFrame(() => {
 			if (
 				placeholder &&
-				!document.querySelector('[data-gridiot-dragging]') &&
-				!document.querySelector('[data-gridiot-resizing]')
+				!document.querySelector('[data-egg-dragging]') &&
+				!document.querySelector('[data-egg-resizing]')
 			) {
 				remove();
 			}
@@ -4340,15 +4340,15 @@ export function attachPlaceholder(
 
 	// Attach listeners
 	const removeGridListeners = listenEvents(gridElement, {
-		'gridiot:drag-start': handleDragStart as EventListener,
-		'gridiot:drag-move': handleDragMove as EventListener,
-		'gridiot:drag-end': handleDragEnd as EventListener,
-		'gridiot:drag-cancel': handleDragCancel as EventListener,
-		'gridiot:drop-preview': handleDropPreview as EventListener,
-		'gridiot:resize-start': handleResizeStart as EventListener,
-		'gridiot:resize-move': handleResizeMove as EventListener,
-		'gridiot:resize-end': handleResizeEnd as EventListener,
-		'gridiot:resize-cancel': handleResizeCancel as EventListener,
+		'egg:drag-start': handleDragStart as EventListener,
+		'egg:drag-move': handleDragMove as EventListener,
+		'egg:drag-end': handleDragEnd as EventListener,
+		'egg:drag-cancel': handleDragCancel as EventListener,
+		'egg:drop-preview': handleDropPreview as EventListener,
+		'egg:resize-start': handleResizeStart as EventListener,
+		'egg:resize-move': handleResizeMove as EventListener,
+		'egg:resize-end': handleResizeEnd as EventListener,
+		'egg:resize-cancel': handleResizeCancel as EventListener,
 	});
 	const removeDocListeners = listenEvents(document, {
 		pointerup: handlePointerUp,
@@ -4466,7 +4466,7 @@ registerPlugin({
 				dragStartY: e.clientY,
 			};
 
-			item.setAttribute('data-gridiot-dragging', '');
+			item.setAttribute('data-egg-dragging', '');
 			document.body.classList.add('is-dragging');
 
 			// Emit drag-start BEFORE changing grid styles so originalPositions captures correct layout
@@ -4486,7 +4486,7 @@ registerPlugin({
 
 		const onPointerDown = (e: PointerEvent) => {
 			const item = (e.target as HTMLElement).closest(
-				'[data-gridiot-item]',
+				'[data-egg-item]',
 			) as HTMLElement | null;
 			if (!item) return;
 
@@ -4709,7 +4709,7 @@ registerPlugin({
 			if (dragState) {
 				const { item, pointerId } = dragState;
 
-				item.removeAttribute('data-gridiot-dragging');
+				item.removeAttribute('data-egg-dragging');
 				document.body.classList.remove('is-dragging');
 				item.style.position = '';
 				item.style.left = '';
@@ -4747,17 +4747,17 @@ registerPlugin({
 });
 `,
 	"plugins/resize.ts": `/**
- * Resize plugin for Gridiot
+ * Resize plugin for EG Grid
  *
  * Pure input plugin — detects resize gestures on grid item corners/edges
  * and emits resize-start/move/end/cancel events. Does NOT persist layout.
  * A behavior plugin (e.g., Algorithm) listens for resize-end and handles persistence.
  *
  * Usage:
- *   import { attachResize } from 'gridiot/resize';
+ *   import { attachResize } from 'eg-grid/resize';
  *
  *   const detach = attachResize(gridElement, {
- *     core,                 // GridiotCore instance (required)
+ *     core,                 // EggCore instance (required)
  *     handles: 'corners',   // 'corners' | 'edges' | 'all'
  *     handleSize: 12,
  *     minSize: { colspan: 1, rowspan: 1 },
@@ -4768,7 +4768,7 @@ registerPlugin({
 import { getItemSize, registerPlugin } from '../engine';
 import type {
 	GridCell,
-	GridiotCore,
+	EggCore,
 	ResizeCancelDetail,
 	ResizeEndDetail,
 	ResizeHandle,
@@ -4780,8 +4780,8 @@ import type {
 
 
 export interface ResizeOptions {
-	/** GridiotCore instance (required) */
-	core: GridiotCore;
+	/** EggCore instance (required) */
+	core: EggCore;
 	/** Which handles to show: 'corners' | 'edges' | 'all' (default: 'corners') */
 	handles?: 'corners' | 'edges' | 'all';
 	/** Size of the hit zone for handles in pixels (default: 12) */
@@ -4864,7 +4864,7 @@ const CURSOR: Record<string, string> = {
  */
 function createSizeLabel(): HTMLElement {
 	const label = document.createElement('div');
-	label.className = 'gridiot-resize-label';
+	label.className = 'egg-resize-label';
 	label.style.cssText = \`
 		position: absolute;
 		top: 50%;
@@ -4921,7 +4921,7 @@ export function attachResize(
 
 	function emit<T>(event: string, detail: T): void {
 		gridElement.dispatchEvent(
-			new CustomEvent(\`gridiot:\${event}\`, {
+			new CustomEvent(\`egg:\${event}\`, {
 				bubbles: true,
 				detail,
 			}),
@@ -4961,9 +4961,9 @@ export function attachResize(
 			startPointerY: e.clientY,
 		};
 
-		item.setAttribute('data-gridiot-resizing', '');
-		item.setAttribute('data-gridiot-handle-active', handle);
-		item.removeAttribute('data-gridiot-handle-hover'); // Clear hover state
+		item.setAttribute('data-egg-resizing', '');
+		item.setAttribute('data-egg-handle-active', handle);
+		item.removeAttribute('data-egg-handle-hover'); // Clear hover state
 		item.setPointerCapture(e.pointerId);
 
 		// Add event listeners to item (pointer capture sends events to this element)
@@ -5150,15 +5150,15 @@ export function attachResize(
 		item.style.zIndex = '';
 		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
 		item.style.viewTransitionName = itemId || '';
-		item.removeAttribute('data-gridiot-resizing');
-		item.removeAttribute('data-gridiot-handle-active');
+		item.removeAttribute('data-egg-resizing');
+		item.removeAttribute('data-egg-handle-active');
 	}
 
 	function finishResize() {
 		if (!activeResize) return;
 		const { item, pointerId, currentSize, currentCell, sizeLabel } = activeResize;
-		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
-		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
+		item.setAttribute('data-egg-colspan', String(currentSize.colspan));
+		item.setAttribute('data-egg-rowspan', String(currentSize.rowspan));
 		emit<ResizeEndDetail>('resize-end', {
 			item, cell: currentCell,
 			colspan: currentSize.colspan, rowspan: currentSize.rowspan,
@@ -5181,7 +5181,7 @@ export function attachResize(
 	// Use capture phase to intercept before pointer plugin
 	const onPointerDown = (e: PointerEvent) => {
 		const item = (e.target as HTMLElement).closest(
-			'[data-gridiot-item]',
+			'[data-egg-item]',
 		) as HTMLElement | null;
 		if (!item) return;
 
@@ -5221,7 +5221,7 @@ export function attachResize(
 
 		// Handle hover cursor changes
 		const item = (e.target as HTMLElement).closest(
-			'[data-gridiot-item]',
+			'[data-egg-item]',
 		) as HTMLElement | null;
 
 		if (item) {
@@ -5231,12 +5231,12 @@ export function attachResize(
 				// Clear previous item's hover state
 				if (hoveredItem && hoveredItem !== item) {
 					hoveredItem.style.cursor = '';
-					hoveredItem.removeAttribute('data-gridiot-handle-hover');
+					hoveredItem.removeAttribute('data-egg-handle-hover');
 				}
 
 				// Clear hover attribute if handle changed on same item
 				if (hoveredItem === item && hoveredHandle && !handle) {
-					item.removeAttribute('data-gridiot-handle-hover');
+					item.removeAttribute('data-egg-handle-hover');
 				}
 
 				hoveredItem = item;
@@ -5245,14 +5245,14 @@ export function attachResize(
 				// Set cursor and hover attribute based on handle
 				item.style.cursor = (handle ? CURSOR[handle] : '') || '';
 				if (handle) {
-					item.setAttribute('data-gridiot-handle-hover', handle);
+					item.setAttribute('data-egg-handle-hover', handle);
 				} else {
-					item.removeAttribute('data-gridiot-handle-hover');
+					item.removeAttribute('data-egg-handle-hover');
 				}
 			}
 		} else if (hoveredItem) {
 			hoveredItem.style.cursor = '';
-			hoveredItem.removeAttribute('data-gridiot-handle-hover');
+			hoveredItem.removeAttribute('data-egg-handle-hover');
 			hoveredItem = null;
 			hoveredHandle = null;
 		}
@@ -5287,7 +5287,7 @@ export function attachResize(
 // Register as a plugin for auto-initialization via init()
 registerPlugin({
 	name: 'resize',
-	init(core, options?: ResizePluginOptions & { core?: GridiotCore }) {
+	init(core, options?: ResizePluginOptions & { core?: EggCore }) {
 		const instance = attachResize(core.element, {
 			...options,
 			core: options?.core ?? core,
@@ -5307,7 +5307,7 @@ export type { ResizeHandle };
  * - Detect column count changes via ResizeObserver
  * - Inject CSS for all breakpoints using container queries
  * - Register 'columnCount' provider for other plugins
- * - Emit 'gridiot:column-count-change' events
+ * - Emit 'egg:column-count-change' events
  * - Regenerate CSS when layout model changes
  *
  * CSS is injected once on init and regenerated when the layout model changes.
@@ -5317,7 +5317,7 @@ export type { ResizeHandle };
 import { registerPlugin } from '../engine';
 import type {
 	ColumnCountChangeDetail,
-	GridiotCore,
+	EggCore,
 	ResponsiveLayoutModel,
 	ResponsivePluginOptions,
 	StyleManager,
@@ -5338,13 +5338,13 @@ export interface ResponsiveState {
  *
  * @param gridElement - The grid container element
  * @param options - Configuration options including layout model and style element
- * @param core - Optional GridiotCore for provider registration
+ * @param core - Optional EggCore for provider registration
  * @returns Cleanup function to detach the plugin
  */
 export function attachResponsive(
 	gridElement: HTMLElement,
 	options: ResponsivePluginOptions,
-	core?: GridiotCore,
+	core?: EggCore,
 ): () => void {
 	const { layoutModel } = options;
 	const styles: StyleManager | null = core?.styles ?? null;
@@ -5450,7 +5450,7 @@ export function attachResponsive(
 			layoutModel.setCurrentColumnCount(newColumnCount);
 
 			gridElement.dispatchEvent(
-				new CustomEvent('gridiot:column-count-change', {
+				new CustomEvent('egg:column-count-change', {
 					bubbles: true,
 					detail: { previousCount, currentCount: newColumnCount },
 				}),
@@ -5473,7 +5473,7 @@ registerPlugin({
 	init(
 		core,
 		options?: ResponsivePluginOptions & {
-			core?: GridiotCore;
+			core?: EggCore;
 			layoutModel?: ResponsiveLayoutModel;
 		},
 	) {
@@ -5591,7 +5591,7 @@ export function animateFLIPWithTracking(
 	firstRect: DOMRect,
 	options: FLIPOptions & { attributeName?: string } = {},
 ): Animation | null {
-	const { attributeName = 'data-gridiot-dropping', ...flipOptions } = options;
+	const { attributeName = 'data-egg-dropping', ...flipOptions } = options;
 
 	// Exclude from View Transitions
 	element.style.viewTransitionName = 'none';

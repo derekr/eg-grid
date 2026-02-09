@@ -6,7 +6,7 @@ import { statSync, readFileSync } from 'node:fs';
 const root = import.meta.dirname;
 
 const entries = [
-	{ entry: 'bundles/index.ts', name: 'gridiot', label: 'full' },
+	{ entry: 'bundles/index.ts', name: 'eg-grid', label: 'full' },
 	{ entry: 'plugins/algorithm-push.ts', name: 'algorithm-push', label: 'push algorithm' },
 	{ entry: 'plugins/algorithm-reorder.ts', name: 'algorithm-reorder', label: 'reorder algorithm' },
 	{ entry: 'plugins/dev-overlay.ts', name: 'dev-overlay', label: 'debug overlay' },

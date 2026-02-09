@@ -1,6 +1,6 @@
 # Custom Layout Algorithms
 
-Gridiot separates input handling from layout logic. This guide shows how to implement your own layout algorithm.
+EG Grid separates input handling from layout logic. This guide shows how to implement your own layout algorithm.
 
 ## How Algorithms Work
 
@@ -30,7 +30,7 @@ export function attachMyAlgorithm(gridElement: HTMLElement): () => void {
 
     // Save positions for potential cancel
     originalPositions = new Map();
-    gridElement.querySelectorAll('[data-gridiot-item]').forEach((el) => {
+    gridElement.querySelectorAll('[data-egg-item]').forEach((el) => {
       const style = getComputedStyle(el);
       originalPositions.set(el, {
         column: parseInt(style.gridColumnStart) || 1,
@@ -72,17 +72,17 @@ export function attachMyAlgorithm(gridElement: HTMLElement): () => void {
   };
 
   // Register listeners
-  gridElement.addEventListener('gridiot:drag-start', onDragStart);
-  gridElement.addEventListener('gridiot:drag-move', onDragMove);
-  gridElement.addEventListener('gridiot:drag-end', onDragEnd);
-  gridElement.addEventListener('gridiot:drag-cancel', onDragCancel);
+  gridElement.addEventListener('egg:drag-start', onDragStart);
+  gridElement.addEventListener('egg:drag-move', onDragMove);
+  gridElement.addEventListener('egg:drag-end', onDragEnd);
+  gridElement.addEventListener('egg:drag-cancel', onDragCancel);
 
   // Return cleanup function
   return () => {
-    gridElement.removeEventListener('gridiot:drag-start', onDragStart);
-    gridElement.removeEventListener('gridiot:drag-move', onDragMove);
-    gridElement.removeEventListener('gridiot:drag-end', onDragEnd);
-    gridElement.removeEventListener('gridiot:drag-cancel', onDragCancel);
+    gridElement.removeEventListener('egg:drag-start', onDragStart);
+    gridElement.removeEventListener('egg:drag-move', onDragMove);
+    gridElement.removeEventListener('egg:drag-end', onDragEnd);
+    gridElement.removeEventListener('egg:drag-cancel', onDragCancel);
   };
 }
 ```
@@ -256,8 +256,8 @@ For items that span multiple columns/rows:
 ```typescript
 function getItemDimensions(item: HTMLElement) {
   return {
-    colspan: parseInt(item.dataset.gridiotColspan || '1'),
-    rowspan: parseInt(item.dataset.gridiotRowspan || '1'),
+    colspan: parseInt(item.dataset.eg-gridColspan || '1'),
+    rowspan: parseInt(item.dataset.eg-gridRowspan || '1'),
   };
 }
 
@@ -275,9 +275,9 @@ HTML:
 
 ```html
 <div
-  data-gridiot-item
-  data-gridiot-colspan="2"
-  data-gridiot-rowspan="2"
+  data-egg-item
+  data-egg-colspan="2"
+  data-egg-rowspan="2"
   style="grid-column: 1 / span 2; grid-row: 1 / span 2"
 >
   Large Item

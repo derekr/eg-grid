@@ -94,7 +94,7 @@ export function animateFLIPWithTracking(
 	firstRect: DOMRect,
 	options: FLIPOptions & { attributeName?: string } = {},
 ): Animation | null {
-	const { attributeName = 'data-gridiot-dropping', ...flipOptions } = options;
+	const { attributeName = 'data-egg-dropping', ...flipOptions } = options;
 
 	// Exclude from View Transitions
 	element.style.viewTransitionName = 'none';

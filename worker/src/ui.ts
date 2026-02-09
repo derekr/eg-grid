@@ -74,7 +74,7 @@ export function renderPage(origin: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gridiot CDN</title>
+<title>EG Grid CDN</title>
 <style>
 	*, *::before, *::after { box-sizing: border-box; }
 	body {
@@ -164,8 +164,8 @@ export function renderPage(origin: string): string {
 <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0-RC.7/bundles/datastar.js"></script>
 </head>
 <body>
-	<h1>Gridiot CDN</h1>
-	<p>Custom on-demand bundles for <a href="https://github.com/basedash/gridiot">gridiot</a></p>
+	<h1>EG Grid CDN</h1>
+	<p>Custom on-demand bundles for <a href="https://github.com/basedash/eg-grid">eg-grid</a></p>
 
 	<div
 		data-signals="{plugins: ${allPluginsExpr}}"

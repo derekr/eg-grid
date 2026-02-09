@@ -7,7 +7,7 @@
  * - Detect column count changes via ResizeObserver
  * - Inject CSS for all breakpoints using container queries
  * - Register 'columnCount' provider for other plugins
- * - Emit 'gridiot:column-count-change' events
+ * - Emit 'egg:column-count-change' events
  * - Regenerate CSS when layout model changes
  *
  * CSS is injected once on init and regenerated when the layout model changes.
@@ -16,7 +16,7 @@
 
 import type {
 	ColumnCountChangeDetail,
-	GridiotCore,
+	EggCore,
 	ResponsivePluginOptions,
 	StyleManager,
 } from '../types';
@@ -36,13 +36,13 @@ export interface ResponsiveState {
  *
  * @param gridElement - The grid container element
  * @param options - Configuration options including layout model and style element
- * @param core - Optional GridiotCore for provider registration
+ * @param core - Optional EggCore for provider registration
  * @returns Cleanup function to detach the plugin
  */
 export function attachResponsive(
 	gridElement: HTMLElement,
 	options: ResponsivePluginOptions,
-	core?: GridiotCore,
+	core?: EggCore,
 ): () => void {
 	const { layoutModel } = options;
 	const styles: StyleManager | null = core?.styles ?? null;
@@ -138,7 +138,7 @@ export function attachResponsive(
 			layoutModel.setCurrentColumnCount(newColumnCount);
 
 			gridElement.dispatchEvent(
-				new CustomEvent('gridiot:column-count-change', {
+				new CustomEvent('egg:column-count-change', {
 					bubbles: true,
 					detail: { previousCount, currentCount: newColumnCount },
 				}),

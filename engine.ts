@@ -1,4 +1,4 @@
-import type { GridCell, GridiotCore, InitOptions, StyleManager } from './types';
+import type { GridCell, EggCore, InitOptions, StyleManager } from './types';
 import { createStateMachine } from './state-machine';
 import { attachPointer } from './plugins/pointer';
 import { attachKeyboard } from './plugins/keyboard';
@@ -11,12 +11,12 @@ import { attachReorderAlgorithm } from './plugins/algorithm-reorder';
 import { attachResponsive } from './plugins/responsive';
 
 /**
- * Initialize Gridiot on a CSS Grid element
+ * Initialize EG Grid on a CSS Grid element
  *
  * @param element - The CSS Grid container element
  * @param options - Configuration options
  */
-export function init(element: HTMLElement, options: InitOptions = {}): GridiotCore {
+export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 	const {
 		layoutModel,
 		styleElement,
@@ -71,7 +71,7 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 		},
 	};
 
-	const core: GridiotCore = {
+	const core: EggCore = {
 		element,
 		stateMachine,
 		styles,
@@ -92,15 +92,15 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 
 			// Remove selection from previous item
 			if (previousItem) {
-				previousItem.removeAttribute('data-gridiot-selected');
+				previousItem.removeAttribute('data-egg-selected');
 			}
 
 			// Update state machine and local element reference
 			if (item) {
-				const itemId = item.id || item.getAttribute('data-gridiot-item') || '';
+				const itemId = item.id || item.getAttribute('data-egg-item') || '';
 				stateMachine.transition({ type: 'SELECT', itemId, element: item });
 				selectedElement = item;
-				item.setAttribute('data-gridiot-selected', '');
+				item.setAttribute('data-egg-selected', '');
 				this.emit('select', { item });
 			} else {
 				stateMachine.transition({ type: 'DESELECT' });
@@ -138,7 +138,7 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 
 		emit<T>(event: string, detail: T): void {
 			element.dispatchEvent(
-				new CustomEvent(`gridiot:${event}`, {
+				new CustomEvent(`egg:${event}`, {
 					bubbles: true,
 					detail,
 				}),
@@ -263,8 +263,8 @@ export function getItemCell(item: HTMLElement): GridCell {
  */
 export function getItemSize(item: HTMLElement): { colspan: number; rowspan: number } {
 	return {
-		colspan: parseInt(item.getAttribute('data-gridiot-colspan') || '1', 10) || 1,
-		rowspan: parseInt(item.getAttribute('data-gridiot-rowspan') || '1', 10) || 1,
+		colspan: parseInt(item.getAttribute('data-egg-colspan') || '1', 10) || 1,
+		rowspan: parseInt(item.getAttribute('data-egg-rowspan') || '1', 10) || 1,
 	};
 }
 

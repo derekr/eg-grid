@@ -1,5 +1,5 @@
 /**
- * Camera plugin for Gridiot
+ * Camera plugin for EG Grid
  *
  * Handles viewport scrolling to keep the active item visible:
  * - Auto-scroll when dragging near viewport edges
@@ -15,7 +15,7 @@ import type {
 	DragEndDetail,
 	DragCancelDetail,
 	SelectDetail,
-	GridiotCore,
+	EggCore,
 } from '../types';
 
 export type CameraMode = 'contain' | 'center' | 'off';
@@ -79,10 +79,10 @@ export interface CameraOptions {
 	settleDelay?: number;
 
 	/**
-	 * Gridiot core instance for provider registration.
+	 * EG Grid core instance for provider registration.
 	 * If provided, registers a 'camera' provider.
 	 */
-	core?: GridiotCore;
+	core?: EggCore;
 }
 
 /**
@@ -158,7 +158,7 @@ function getViewportRect(
 }
 
 /**
- * Attach camera behavior to a Gridiot grid element.
+ * Attach camera behavior to a EG Grid grid element.
  */
 export function attachCamera(
 	gridElement: HTMLElement,
@@ -212,7 +212,7 @@ export function attachCamera(
 				settleTimeoutId = null;
 				// Emit settle event so algorithm can recalculate
 				gridElement.dispatchEvent(
-					new CustomEvent('gridiot:camera-settled', { bubbles: true })
+					new CustomEvent('egg:camera-settled', { bubbles: true })
 				);
 			}, settleDelay);
 		}
@@ -442,11 +442,11 @@ export function attachCamera(
 	}
 
 	const removeListeners = listenEvents(gridElement, {
-		'gridiot:drag-start': onDragStart as EventListener,
-		'gridiot:drag-move': onDragMove as EventListener,
-		'gridiot:drag-end': onDragEnd as EventListener,
-		'gridiot:drag-cancel': onDragCancel as EventListener,
-		'gridiot:select': onSelect as EventListener,
+		'egg:drag-start': onDragStart as EventListener,
+		'egg:drag-move': onDragMove as EventListener,
+		'egg:drag-end': onDragEnd as EventListener,
+		'egg:drag-cancel': onDragCancel as EventListener,
+		'egg:select': onSelect as EventListener,
 	});
 
 	function destroy(): void {

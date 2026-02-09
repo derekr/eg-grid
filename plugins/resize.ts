@@ -1,15 +1,15 @@
 /**
- * Resize plugin for Gridiot
+ * Resize plugin for EG Grid
  *
  * Pure input plugin — detects resize gestures on grid item corners/edges
  * and emits resize-start/move/end/cancel events. Does NOT persist layout.
  * A behavior plugin (e.g., Algorithm) listens for resize-end and handles persistence.
  *
  * Usage:
- *   import { attachResize } from 'gridiot/resize';
+ *   import { attachResize } from 'eg-grid/resize';
  *
  *   const detach = attachResize(gridElement, {
- *     core,                 // GridiotCore instance (required)
+ *     core,                 // EggCore instance (required)
  *     handles: 'corners',   // 'corners' | 'edges' | 'all'
  *     handleSize: 12,
  *     minSize: { colspan: 1, rowspan: 1 },
@@ -20,7 +20,7 @@
 import { getItemSize } from '../engine';
 import type {
 	GridCell,
-	GridiotCore,
+	EggCore,
 	ResizeCancelDetail,
 	ResizeEndDetail,
 	ResizeHandle,
@@ -30,8 +30,8 @@ import type {
 
 
 export interface ResizeOptions {
-	/** GridiotCore instance (required) */
-	core: GridiotCore;
+	/** EggCore instance (required) */
+	core: EggCore;
 	/** Which handles to show: 'corners' | 'edges' | 'all' (default: 'corners') */
 	handles?: 'corners' | 'edges' | 'all';
 	/** Size of the hit zone for handles in pixels (default: 12) */
@@ -114,7 +114,7 @@ const CURSOR: Record<string, string> = {
  */
 function createSizeLabel(): HTMLElement {
 	const label = document.createElement('div');
-	label.className = 'gridiot-resize-label';
+	label.className = 'egg-resize-label';
 	label.style.cssText = `
 		position: absolute;
 		top: 50%;
@@ -160,7 +160,7 @@ export function attachResize(
 
 	function emit<T>(event: string, detail: T): void {
 		gridElement.dispatchEvent(
-			new CustomEvent(`gridiot:${event}`, {
+			new CustomEvent(`egg:${event}`, {
 				bubbles: true,
 				detail,
 			}),
@@ -200,9 +200,9 @@ export function attachResize(
 			startPointerY: e.clientY,
 		};
 
-		item.setAttribute('data-gridiot-resizing', '');
-		item.setAttribute('data-gridiot-handle-active', handle);
-		item.removeAttribute('data-gridiot-handle-hover'); // Clear hover state
+		item.setAttribute('data-egg-resizing', '');
+		item.setAttribute('data-egg-handle-active', handle);
+		item.removeAttribute('data-egg-handle-hover'); // Clear hover state
 		item.setPointerCapture(e.pointerId);
 
 		// Add event listeners to item (pointer capture sends events to this element)
@@ -211,7 +211,7 @@ export function attachResize(
 		item.addEventListener('pointercancel', onItemPointerCancel);
 
 		// Transition state machine to interacting
-		const itemId = item.id || item.getAttribute('data-gridiot-item') || '';
+		const itemId = item.id || item.getAttribute('data-egg-item') || '';
 		core.stateMachine.transition({
 			type: 'START_INTERACTION',
 			context: { type: 'resize', mode: 'pointer', itemId, element: item, columnCount: core.getGridInfo().columns.length },
@@ -396,15 +396,15 @@ export function attachResize(
 		item.style.zIndex = '';
 		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
 		item.style.viewTransitionName = itemId || '';
-		item.removeAttribute('data-gridiot-resizing');
-		item.removeAttribute('data-gridiot-handle-active');
+		item.removeAttribute('data-egg-resizing');
+		item.removeAttribute('data-egg-handle-active');
 	}
 
 	function finishResize() {
 		if (!activeResize) return;
 		const { item, pointerId, currentSize, currentCell, sizeLabel } = activeResize;
-		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
-		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
+		item.setAttribute('data-egg-colspan', String(currentSize.colspan));
+		item.setAttribute('data-egg-rowspan', String(currentSize.rowspan));
 		core.stateMachine.transition({ type: 'COMMIT_INTERACTION' });
 		emit<ResizeEndDetail>('resize-end', {
 			item, cell: currentCell,
@@ -430,7 +430,7 @@ export function attachResize(
 	// Use capture phase to intercept before pointer plugin
 	const onPointerDown = (e: PointerEvent) => {
 		const item = (e.target as HTMLElement).closest(
-			'[data-gridiot-item]',
+			'[data-egg-item]',
 		) as HTMLElement | null;
 		if (!item) return;
 
@@ -473,7 +473,7 @@ export function attachResize(
 
 		// Handle hover cursor changes
 		const item = (e.target as HTMLElement).closest(
-			'[data-gridiot-item]',
+			'[data-egg-item]',
 		) as HTMLElement | null;
 
 		if (item) {
@@ -483,12 +483,12 @@ export function attachResize(
 				// Clear previous item's hover state
 				if (hoveredItem && hoveredItem !== item) {
 					hoveredItem.style.cursor = '';
-					hoveredItem.removeAttribute('data-gridiot-handle-hover');
+					hoveredItem.removeAttribute('data-egg-handle-hover');
 				}
 
 				// Clear hover attribute if handle changed on same item
 				if (hoveredItem === item && hoveredHandle && !handle) {
-					item.removeAttribute('data-gridiot-handle-hover');
+					item.removeAttribute('data-egg-handle-hover');
 				}
 
 				hoveredItem = item;
@@ -497,14 +497,14 @@ export function attachResize(
 				// Set cursor and hover attribute based on handle
 				item.style.cursor = (handle ? CURSOR[handle] : '') || '';
 				if (handle) {
-					item.setAttribute('data-gridiot-handle-hover', handle);
+					item.setAttribute('data-egg-handle-hover', handle);
 				} else {
-					item.removeAttribute('data-gridiot-handle-hover');
+					item.removeAttribute('data-egg-handle-hover');
 				}
 			}
 		} else if (hoveredItem) {
 			hoveredItem.style.cursor = '';
-			hoveredItem.removeAttribute('data-gridiot-handle-hover');
+			hoveredItem.removeAttribute('data-egg-handle-hover');
 			hoveredItem = null;
 			hoveredHandle = null;
 		}

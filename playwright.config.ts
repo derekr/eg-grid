@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright config for gridiot standalone tests.
+ * Playwright config for eg-grid standalone tests.
  * These tests serve static HTML files directly without needing the main app.
  */
 export default defineConfig({

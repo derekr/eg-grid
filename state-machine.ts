@@ -1,5 +1,5 @@
 /**
- * Centralized State Machine for Gridiot
+ * Centralized State Machine for EG Grid
  *
  * Single source of truth for interaction state.
  *
@@ -17,7 +17,7 @@ export type InteractionMode = 'pointer' | 'keyboard';
 
 export type InteractionType = 'drag' | 'resize';
 
-export type GridiotPhase =
+export type EggPhase =
 	| 'idle'
 	| 'selected'
 	| 'interacting'  // Active drag or resize
@@ -36,8 +36,8 @@ export interface InteractionContext {
 	columnCount: number;
 }
 
-export interface GridiotState {
-	phase: GridiotPhase;
+export interface EggState {
+	phase: EggPhase;
 	selectedItemId: string | null;
 	interaction: InteractionContext | null;
 }
@@ -54,12 +54,12 @@ export type StateTransition =
 	| { type: 'CANCEL_INTERACTION' }
 	| { type: 'FINISH_COMMIT' };
 
-export interface GridiotStateMachine {
-	getState(): GridiotState;
-	transition(action: StateTransition): GridiotState;
+export interface EggStateMachine {
+	getState(): EggState;
+	transition(action: StateTransition): EggState;
 }
 
-function reducer(state: GridiotState, action: StateTransition): GridiotState {
+function reducer(state: EggState, action: StateTransition): EggState {
 	switch (action.type) {
 		case 'SELECT': {
 			if (state.phase !== 'idle' && state.phase !== 'selected') {
@@ -134,8 +134,8 @@ function reducer(state: GridiotState, action: StateTransition): GridiotState {
 /**
  * Create a state machine instance
  */
-export function createStateMachine(): GridiotStateMachine {
-	let state: GridiotState = {
+export function createStateMachine(): EggStateMachine {
+	let state: EggState = {
 		phase: 'idle',
 		selectedItemId: null,
 		interaction: null,
@@ -156,10 +156,10 @@ export function createStateMachine(): GridiotStateMachine {
 	};
 }
 
-export function isDragging(state: GridiotState): boolean {
+export function isDragging(state: EggState): boolean {
 	return (state.phase === 'interacting' || state.phase === 'committing') && state.interaction?.type === 'drag';
 }
 
-export function isResizing(state: GridiotState): boolean {
+export function isResizing(state: EggState): boolean {
 	return (state.phase === 'interacting' || state.phase === 'committing') && state.interaction?.type === 'resize';
 }

@@ -1,6 +1,6 @@
 # View Transitions Guide
 
-View Transitions provide smooth, native animations when grid items move. This guide covers how Gridiot integrates with the View Transitions API.
+View Transitions provide smooth, native animations when grid items move. This guide covers how EG Grid integrates with the View Transitions API.
 
 ## How It Works
 
@@ -73,7 +73,7 @@ function moveItem(item, newCell) {
 }
 ```
 
-## Gridiot-Specific Patterns
+## EG Grid-Specific Patterns
 
 ### Exclude the Dragged Item
 
@@ -137,7 +137,7 @@ Now only position animates, not opacity.
 
 ## FLIP Animation on Drop
 
-When the user releases, the dragged item needs to animate from its cursor position to its final grid position. Gridiot's pointer plugin uses FLIP:
+When the user releases, the dragged item needs to animate from its cursor position to its final grid position. EG Grid's pointer plugin uses FLIP:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -158,7 +158,7 @@ When the user releases, the dragged item needs to animate from its cursor positi
 The pointer plugin handles this automatically. Your algorithm just needs to apply positions synchronously on `drag-end`:
 
 ```javascript
-grid.addEventListener('gridiot:drag-end', (e) => {
+grid.addEventListener('egg:drag-end', (e) => {
   const { item, cell } = e.detail;
 
   // Apply synchronously (don't use View Transition here)
@@ -342,13 +342,13 @@ if ('startViewTransition' in document) {
 </head>
 <body>
   <div class="grid" id="grid">
-    <div class="item" data-gridiot-item style="--item-id: a; grid-column: 1">A</div>
-    <div class="item" data-gridiot-item style="--item-id: b; grid-column: 2">B</div>
-    <div class="item" data-gridiot-item style="--item-id: c; grid-column: 3">C</div>
+    <div class="item" data-egg-item style="--item-id: a; grid-column: 1">A</div>
+    <div class="item" data-egg-item style="--item-id: b; grid-column: 2">B</div>
+    <div class="item" data-egg-item style="--item-id: c; grid-column: 3">C</div>
   </div>
 
   <script type="module">
-    import { init } from './gridiot.js';
+    import { init } from './eg-grid.js';
     import { attachPushAlgorithm } from './algorithm-push.js';
 
     const grid = init(document.getElementById('grid'));

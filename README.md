@@ -1,4 +1,4 @@
-# Gridiot
+# EG Grid
 
 Zero-dependency CSS Grid drag-and-drop library with View Transitions support.
 
@@ -14,7 +14,7 @@ Zero-dependency CSS Grid drag-and-drop library with View Transitions support.
 
 ## Architecture
 
-Gridiot separates **input handling** (how you drag) from **layout logic** (what happens when you drag). The core engine provides grid-aware primitives, while plugins handle the rest.
+EG Grid separates **input handling** (how you drag) from **layout logic** (what happens when you drag). The core engine provides grid-aware primitives, while plugins handle the rest.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -22,7 +22,7 @@ Gridiot separates **input handling** (how you drag) from **layout logic** (what 
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │   ┌─────────────┐    Events     ┌─────────────────────────┐    │
-│   │   Gridiot   │ ────────────► │   Your Event Handlers   │    │
+│   │   EG Grid   │ ────────────► │   Your Event Handlers   │    │
 │   │    Core     │               │   (Layout Algorithm)    │    │
 │   └─────────────┘               └─────────────────────────┘    │
 │          │                                                      │
@@ -42,7 +42,7 @@ Gridiot separates **input handling** (how you drag) from **layout logic** (what 
 
 ```
 ┌─────────────────────────────────────────┐
-│            Gridiot Core                 │
+│            EG Grid Core                 │
 ├─────────────────────────────────────────┤
 │  • Parse CSS Grid layout (columns/rows) │
 │  • Convert point → cell coordinates     │
@@ -100,13 +100,13 @@ Gridiot separates **input handling** (how you drag) from **layout logic** (what 
 - Kanban: Insert at position, shift others
 - Gallery: Simple swap
 
-By keeping algorithms in userland, Gridiot stays small and flexible. Use the built-in algorithm plugins or write your own.
+By keeping algorithms in userland, EG Grid stays small and flexible. Use the built-in algorithm plugins or write your own.
 
 **Input methods are universal.** Pointer, keyboard, and accessibility handling are the same regardless of layout algorithm. These ship as plugins you can mix and match.
 
 ### Architecture Philosophy: CSS-First, JS for Coordination
 
-Gridiot maximizes use of modern CSS and browser APIs. JavaScript handles orchestration and user input, not layout calculations.
+EG Grid maximizes use of modern CSS and browser APIs. JavaScript handles orchestration and user input, not layout calculations.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -128,7 +128,7 @@ Gridiot maximizes use of modern CSS and browser APIs. JavaScript handles orchest
 │    • scroll-behavior: smooth for native smooth scrolling                    │
 │                                                                              │
 │  VISUAL STATES:                                                              │
-│    • [data-gridiot-dragging], [data-gridiot-selected] selectors             │
+│    • [data-egg-dragging], [data-egg-selected] selectors             │
 │    • body.is-dragging for global drag state                                 │
 └─────────────────────────────────────────────────────────────────────────────┘
 
@@ -141,7 +141,7 @@ Gridiot maximizes use of modern CSS and browser APIs. JavaScript handles orchest
 │    • Cell calculation from pointer coordinates                              │
 │                                                                              │
 │  EVENT EMISSION:                                                             │
-│    • Custom events (gridiot:drag-start, gridiot:select, etc.)               │
+│    • Custom events (egg:drag-start, egg:select, etc.)               │
 │    • Event detail with item, cell, dimensions                               │
 │                                                                              │
 │  PLUGIN COORDINATION:                                                        │
@@ -166,7 +166,7 @@ Gridiot maximizes use of modern CSS and browser APIs. JavaScript handles orchest
 ### Bundle Architecture
 
 ```
-gridiot.js (full)
+eg-grid.js (full)
 ├── Core engine (grid measurement, state machine, events)
 ├── Pointer plugin (visual drag, hysteresis, FLIP)
 ├── Keyboard plugin (arrow keys, enter/space)
@@ -186,20 +186,20 @@ Individual plugins also available as separate bundles:
 
 ```bash
 # Copy the dist files to your project
-cp gridiot/dist/gridiot.js your-project/
+cp eg-grid/dist/eg-grid.js your-project/
 ```
 
 ## Quick Start
 
 ```html
 <div class="grid" id="grid">
-  <div data-gridiot-item style="grid-column: 1; grid-row: 1">A</div>
-  <div data-gridiot-item style="grid-column: 2; grid-row: 1">B</div>
-  <div data-gridiot-item style="grid-column: 3; grid-row: 1">C</div>
+  <div data-egg-item style="grid-column: 1; grid-row: 1">A</div>
+  <div data-egg-item style="grid-column: 2; grid-row: 1">B</div>
+  <div data-egg-item style="grid-column: 3; grid-row: 1">C</div>
 </div>
 
 <script type="module">
-  import { init } from './gridiot.js';
+  import { init } from './eg-grid.js';
 
   // All plugins enabled by default, including push algorithm
   const grid = init(document.getElementById('grid'));
@@ -210,13 +210,13 @@ cp gridiot/dist/gridiot.js your-project/
 
 | Bundle | Includes |
 |--------|----------|
-| `gridiot.js` | All plugins (pointer, keyboard, accessibility, algorithm, camera, resize, placeholder, responsive) |
+| `eg-grid.js` | All plugins (pointer, keyboard, accessibility, algorithm, camera, resize, placeholder, responsive) |
 
 ## API
 
-### `init(element: HTMLElement, options?: InitOptions): GridiotCore`
+### `init(element: HTMLElement, options?: InitOptions): EggCore`
 
-Initialize Gridiot on a CSS Grid container.
+Initialize EG Grid on a CSS Grid container.
 
 ```js
 // All plugins with defaults
@@ -280,12 +280,12 @@ const cell = getItemCell(item);
 // { column: 2, row: 1 }
 ```
 
-### `GridiotCore`
+### `EggCore`
 
 The core instance returned by `init()`:
 
 ```ts
-interface GridiotCore {
+interface EggCore {
   element: HTMLElement;
   stateMachine: StateMachine;
   styles: StyleManager;
@@ -303,12 +303,12 @@ interface GridiotCore {
 
 All events bubble and are dispatched on the grid element.
 
-### `gridiot:drag-start`
+### `egg:drag-start`
 
 Fired when dragging begins.
 
 ```ts
-grid.element.addEventListener('gridiot:drag-start', (e) => {
+grid.element.addEventListener('egg:drag-start', (e) => {
   const { item, cell, colspan, rowspan } = e.detail;
   // item: HTMLElement being dragged
   // cell: { column, row } starting position
@@ -316,12 +316,12 @@ grid.element.addEventListener('gridiot:drag-start', (e) => {
 });
 ```
 
-### `gridiot:drag-move`
+### `egg:drag-move`
 
 Fired continuously as the drag target moves over cells.
 
 ```ts
-grid.element.addEventListener('gridiot:drag-move', (e) => {
+grid.element.addEventListener('egg:drag-move', (e) => {
   const { item, cell, x, y, colspan, rowspan } = e.detail;
   // cell: current cell under pointer
   // x, y: pointer coordinates (0 for keyboard)
@@ -329,44 +329,44 @@ grid.element.addEventListener('gridiot:drag-move', (e) => {
 });
 ```
 
-### `gridiot:drag-end`
+### `egg:drag-end`
 
 Fired when dragging ends successfully (within grid bounds).
 
 ```ts
-grid.element.addEventListener('gridiot:drag-end', (e) => {
+grid.element.addEventListener('egg:drag-end', (e) => {
   const { item, cell, colspan, rowspan } = e.detail;
   // cell: final drop position
   // colspan, rowspan: item dimensions
 });
 ```
 
-### `gridiot:drag-cancel`
+### `egg:drag-cancel`
 
 Fired when dragging is cancelled (Escape key, pointer leaves grid, etc.).
 
 ```ts
-grid.element.addEventListener('gridiot:drag-cancel', (e) => {
+grid.element.addEventListener('egg:drag-cancel', (e) => {
   const { item } = e.detail;
 });
 ```
 
-### `gridiot:select`
+### `egg:select`
 
 Fired when an item is selected (clicked or focused).
 
 ```ts
-grid.element.addEventListener('gridiot:select', (e) => {
+grid.element.addEventListener('egg:select', (e) => {
   const { item } = e.detail;
 });
 ```
 
-### `gridiot:deselect`
+### `egg:deselect`
 
 Fired when selection is cleared (Escape, click outside, etc.).
 
 ```ts
-grid.element.addEventListener('gridiot:deselect', (e) => {
+grid.element.addEventListener('egg:deselect', (e) => {
   const { item } = e.detail; // Previously selected item, or null
 });
 ```
@@ -375,28 +375,28 @@ grid.element.addEventListener('gridiot:deselect', (e) => {
 
 ### Item Attributes
 
-- `data-gridiot-item` - Mark elements as draggable grid items
-- `data-gridiot-colspan` - Number of columns the item spans (default: 1)
-- `data-gridiot-rowspan` - Number of rows the item spans (default: 1)
-- `data-gridiot-dragging` - Added automatically during pointer drag
-- `data-gridiot-dropping` - Added during FLIP animation after drop
-- `data-gridiot-selected` - Added when item is selected
-- `data-gridiot-resizing` - Added during resize operation
-- `data-gridiot-handle-hover` - Set to handle name (`se`, `nw`, etc.) when hovering a resize handle
-- `data-gridiot-handle-active` - Set to handle name during active resize
+- `data-egg-item` - Mark elements as draggable grid items
+- `data-egg-colspan` - Number of columns the item spans (default: 1)
+- `data-egg-rowspan` - Number of rows the item spans (default: 1)
+- `data-egg-dragging` - Added automatically during pointer drag
+- `data-egg-dropping` - Added during FLIP animation after drop
+- `data-egg-selected` - Added when item is selected
+- `data-egg-resizing` - Added during resize operation
+- `data-egg-handle-hover` - Set to handle name (`se`, `nw`, etc.) when hovering a resize handle
+- `data-egg-handle-active` - Set to handle name during active resize
 
 ```css
-[data-gridiot-item] {
+[data-egg-item] {
   cursor: grab;
 }
 
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   cursor: grabbing;
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-[data-gridiot-selected] {
+[data-egg-selected] {
   outline: 3px solid #fbbf24;
   outline-offset: 2px;
 }
@@ -408,7 +408,7 @@ Use CSS pseudo-elements to create visible resize handles based on the data attri
 
 ```css
 /* Base handle style - hidden by default */
-[data-gridiot-item]::after {
+[data-egg-item]::after {
   content: '';
   position: absolute;
   width: 12px;
@@ -419,7 +419,7 @@ Use CSS pseudo-elements to create visible resize handles based on the data attri
 }
 
 /* Position handle at bottom-right corner */
-[data-gridiot-item]::after {
+[data-egg-item]::after {
   bottom: 4px;
   right: 4px;
   background: rgba(59, 130, 246, 0.6);
@@ -427,15 +427,15 @@ Use CSS pseudo-elements to create visible resize handles based on the data attri
 }
 
 /* Show handle on hover */
-[data-gridiot-item][data-gridiot-handle-hover="se"]::after,
-[data-gridiot-item][data-gridiot-handle-hover="sw"]::after,
-[data-gridiot-item][data-gridiot-handle-hover="ne"]::after,
-[data-gridiot-item][data-gridiot-handle-hover="nw"]::after {
+[data-egg-item][data-egg-handle-hover="se"]::after,
+[data-egg-item][data-egg-handle-hover="sw"]::after,
+[data-egg-item][data-egg-handle-hover="ne"]::after,
+[data-egg-item][data-egg-handle-hover="nw"]::after {
   opacity: 1;
 }
 
 /* Highlight during active resize */
-[data-gridiot-item][data-gridiot-handle-active]::after {
+[data-egg-item][data-egg-handle-active]::after {
   opacity: 1;
   background: rgba(59, 130, 246, 0.9);
 }
@@ -456,10 +456,10 @@ body.is-dragging {
 
 ### Grid Attributes
 
-- `data-gridiot-keyboard-mode` - Added to grid when keyboard mode is active (Shift+G)
+- `data-egg-keyboard-mode` - Added to grid when keyboard mode is active (Shift+G)
 
 ```css
-.grid[data-gridiot-keyboard-mode] {
+.grid[data-egg-keyboard-mode] {
   outline: 2px solid rgba(251, 191, 36, 0.3);
   outline-offset: 4px;
 }
@@ -480,13 +480,13 @@ For smooth animated movement, use CSS View Transitions:
 ```
 
 ```html
-<div data-gridiot-item style="--item-id: item-1">A</div>
+<div data-egg-item style="--item-id: item-1">A</div>
 ```
 
 The built-in algorithm plugins already use View Transitions automatically. For custom algorithms, wrap position changes:
 
 ```js
-grid.element.addEventListener('gridiot:drag-move', (e) => {
+grid.element.addEventListener('egg:drag-move', (e) => {
   const { item, cell } = e.detail;
   const apply = () => {
     item.style.gridColumn = String(cell.column);
@@ -503,7 +503,7 @@ grid.element.addEventListener('gridiot:drag-move', (e) => {
 
 ## Keyboard Support
 
-When using the full bundle (`gridiot.js`), keyboard navigation is included:
+When using the full bundle (`eg-grid.js`), keyboard navigation is included:
 
 ### Keyboard Mode
 
@@ -535,7 +535,7 @@ Without picking up, arrow keys perform instant nudge (drag-start + drag-end in o
 Items should have `tabindex="0"` to be focusable:
 
 ```html
-<div data-gridiot-item tabindex="0">A</div>
+<div data-egg-item tabindex="0">A</div>
 ```
 
 ## Accessibility
@@ -549,10 +549,10 @@ The full bundle includes screen reader support via ARIA live announcements. The 
 
 ### Labeling Items
 
-Use `data-gridiot-label` to provide a human-readable name for items:
+Use `data-egg-label` to provide a human-readable name for items:
 
 ```html
-<div data-gridiot-item data-gridiot-label="Revenue Chart">...</div>
+<div data-egg-item data-egg-label="Revenue Chart">...</div>
 ```
 
 Falls back to `aria-label`, then `id`, then "Item".
@@ -564,10 +564,10 @@ Override default announcements with template attributes. Use `{label}`, `{row}`,
 ```html
 <!-- Per-item override -->
 <div
-  data-gridiot-item
-  data-gridiot-label="Sales Chart"
-  data-gridiot-announce-grab="{label} selected at {row}, {column}."
-  data-gridiot-announce-drop="Placed {label}."
+  data-egg-item
+  data-egg-label="Sales Chart"
+  data-egg-announce-grab="{label} selected at {row}, {column}."
+  data-egg-announce-drop="Placed {label}."
 >
   ...
 </div>
@@ -575,23 +575,23 @@ Override default announcements with template attributes. Use `{label}`, `{row}`,
 <!-- Grid-wide default -->
 <div
   id="grid"
-  data-gridiot-announce-move="Now at row {row}, column {column}."
+  data-egg-announce-move="Now at row {row}, column {column}."
 >
   ...
 </div>
 ```
 
 **Available attributes:**
-- `data-gridiot-announce-grab` - When item is picked up
-- `data-gridiot-announce-move` - When item moves to a new cell
-- `data-gridiot-announce-drop` - When item is dropped
-- `data-gridiot-announce-cancel` - When drag is cancelled
+- `data-egg-announce-grab` - When item is picked up
+- `data-egg-announce-move` - When item moves to a new cell
+- `data-egg-announce-drop` - When item is dropped
+- `data-egg-announce-cancel` - When drag is cancelled
 
 **Attribute precedence:** Item attribute > Grid attribute > Default
 
 ## Layout Algorithms
 
-Gridiot doesn't enforce a specific layout algorithm. You can use a built-in algorithm plugin or implement your own.
+EG Grid doesn't enforce a specific layout algorithm. You can use a built-in algorithm plugin or implement your own.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -615,7 +615,7 @@ Gridiot doesn't enforce a specific layout algorithm. You can use a built-in algo
 The push algorithm is included by default in `init()`. Items push down on collision and compact up when space opens.
 
 ```js
-import { init } from './gridiot.js';
+import { init } from './eg-grid.js';
 
 // Push algorithm is the default
 const grid = init(document.getElementById('grid'));
@@ -635,7 +635,7 @@ The algorithm injects CSS via `core.styles` (the StyleManager). This works with 
 
 ```js
 function swap(draggedItem, targetCell) {
-  const items = [...document.querySelectorAll('[data-gridiot-item]')];
+  const items = [...document.querySelectorAll('[data-egg-item]')];
   const draggedCell = getItemCell(draggedItem);
 
   const targetItem = items.find(item => {
@@ -657,10 +657,10 @@ function swap(draggedItem, targetCell) {
 ## Building
 
 ```bash
-npx tsx gridiot/build.ts
+npx tsx eg-grid/build.ts
 ```
 
-Outputs to `gridiot/dist/`.
+Outputs to `eg-grid/dist/`.
 
 ## Browser Support
 
@@ -675,7 +675,7 @@ The placeholder plugin shows a visual indicator where the dragged item will land
 The placeholder plugin is included by default in `init()`. Style it with CSS:
 
 ```css
-.gridiot-placeholder {
+.egg-placeholder {
   background: rgba(255, 255, 255, 0.1);
   border: 2px dashed rgba(255, 255, 255, 0.4);
   border-radius: 8px;
@@ -777,7 +777,7 @@ node --experimental-strip-types build.ts
 ```
 
 Outputs to `dist/`:
-- `gridiot.js` - Full bundle with all plugins
+- `eg-grid.js` - Full bundle with all plugins
 - `algorithm-push.js` - Push-down layout algorithm (standalone)
 - `algorithm-reorder.js` - Reorder layout algorithm (standalone)
 - `dev-overlay.js` - Debug/config overlay (standalone)

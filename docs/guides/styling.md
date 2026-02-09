@@ -1,29 +1,29 @@
 # Styling Guide
 
-This guide covers how to customize the visual appearance of dragging, dropping, and layout transitions in Gridiot.
+This guide covers how to customize the visual appearance of dragging, dropping, and layout transitions in EG Grid.
 
 ## Data Attributes
 
-Gridiot adds these attributes during drag operations:
+EG Grid adds these attributes during drag operations:
 
 | Attribute | When Applied | Use For |
 |-----------|--------------|---------|
-| `data-gridiot-item` | Always (you add this) | Base item styles |
-| `data-gridiot-dragging` | While item is being dragged | Drag state styles |
-| `data-gridiot-dropping` | During FLIP animation after drop | Drop animation styles |
+| `data-egg-item` | Always (you add this) | Base item styles |
+| `data-egg-dragging` | While item is being dragged | Drag state styles |
+| `data-egg-dropping` | During FLIP animation after drop | Drop animation styles |
 
 ## Basic Drag Styles
 
 ```css
 /* Base item appearance */
-[data-gridiot-item] {
+[data-egg-item] {
   cursor: grab;
   user-select: none;
   transition: box-shadow 0.2s, transform 0.2s;
 }
 
 /* While dragging */
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   cursor: grabbing;
   transform: scale(1.05);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
@@ -31,7 +31,7 @@ Gridiot adds these attributes during drag operations:
 }
 
 /* During drop animation */
-[data-gridiot-dropping] {
+[data-egg-dropping] {
   z-index: 100;
 }
 ```
@@ -40,13 +40,13 @@ Gridiot adds these attributes during drag operations:
 
 ```css
 /* Keyboard focus indicator */
-[data-gridiot-item]:focus {
+[data-egg-item]:focus {
   outline: 3px solid #0066ff;
   outline-offset: 2px;
 }
 
 /* Optional: different style when grabbed via keyboard */
-[data-gridiot-item]:focus[data-gridiot-dragging] {
+[data-egg-item]:focus[data-egg-dragging] {
   outline: 3px solid #00cc66;
 }
 ```
@@ -87,12 +87,12 @@ function hidePlaceholder() {
 }
 
 // In your event handlers
-grid.addEventListener('gridiot:drag-move', (e) => {
+grid.addEventListener('egg:drag-move', (e) => {
   showPlaceholder(grid, e.detail.cell);
 });
 
-grid.addEventListener('gridiot:drag-end', hidePlaceholder);
-grid.addEventListener('gridiot:drag-cancel', hidePlaceholder);
+grid.addEventListener('egg:drag-end', hidePlaceholder);
+grid.addEventListener('egg:drag-cancel', hidePlaceholder);
 ```
 
 ## View Transition Styles
@@ -113,8 +113,8 @@ grid.addEventListener('gridiot:drag-cancel', hidePlaceholder);
 ```
 
 ```html
-<div class="item" data-gridiot-item style="--item-id: item-1">A</div>
-<div class="item" data-gridiot-item style="--item-id: item-2">B</div>
+<div class="item" data-egg-item style="--item-id: item-1">A</div>
+<div class="item" data-egg-item style="--item-id: item-2">B</div>
 ```
 
 ### Prevent Ghosting
@@ -158,7 +158,7 @@ During drag, multiple layers may overlap:
 
 ```css
 /* Dragged item on top */
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   z-index: 100;
 }
 
@@ -168,7 +168,7 @@ During drag, multiple layers may overlap:
 }
 
 /* Drop animation */
-[data-gridiot-dropping] {
+[data-egg-dropping] {
   z-index: 100;
 }
 ```
@@ -178,12 +178,12 @@ During drag, multiple layers may overlap:
 ### Light Theme
 
 ```css
-[data-gridiot-item] {
+[data-egg-item] {
   background: white;
   border: 1px solid #e0e0e0;
 }
 
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
 }
 
@@ -196,12 +196,12 @@ During drag, multiple layers may overlap:
 ### Dark Theme
 
 ```css
-[data-gridiot-item] {
+[data-egg-item] {
   background: #2a2a2a;
   border: 1px solid #404040;
 }
 
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
@@ -225,12 +225,12 @@ Respect user preferences:
   }
 
   /* Disable transform effects */
-  [data-gridiot-dragging] {
+  [data-egg-dragging] {
     transform: none;
   }
 
   /* Simpler visual feedback */
-  [data-gridiot-item] {
+  [data-egg-item] {
     transition: none;
   }
 }
@@ -242,7 +242,7 @@ By default, the actual item is dragged. For a custom preview:
 
 ```javascript
 // In your drag-start handler
-grid.addEventListener('gridiot:drag-start', (e) => {
+grid.addEventListener('egg:drag-start', (e) => {
   const { item } = e.detail;
 
   // Create custom preview
@@ -292,14 +292,14 @@ grid.addEventListener('gridiot:drag-start', (e) => {
 }
 
 /* Drag states */
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   cursor: grabbing;
   transform: scale(1.05);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
   z-index: 100;
 }
 
-[data-gridiot-dropping] {
+[data-egg-dropping] {
   z-index: 100;
 }
 
@@ -347,7 +347,7 @@ grid.addEventListener('gridiot:drag-start', (e) => {
     animation: none !important;
   }
 
-  [data-gridiot-dragging] {
+  [data-egg-dragging] {
     transform: none;
   }
 }

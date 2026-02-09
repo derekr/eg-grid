@@ -1,6 +1,6 @@
-# Gridiot Guides
+# EG Grid Guides
 
-Welcome to the Gridiot documentation. These guides cover everything from basic setup to advanced customization.
+Welcome to the EG Grid documentation. These guides cover everything from basic setup to advanced customization.
 
 ## Getting Started
 
@@ -24,9 +24,9 @@ Welcome to the Gridiot documentation. These guides cover everything from basic s
 
 | Bundle | Size | Includes |
 |--------|------|----------|
-| `gridiot.js` | Full | Pointer + keyboard + accessibility |
-| `gridiot-minimal.js` | Minimal | Pointer only |
-| `gridiot-core.js` | Core | No plugins (BYO) |
+| `eg-grid.js` | Full | Pointer + keyboard + accessibility |
+| `eg-grid-minimal.js` | Minimal | Pointer only |
+| `eg-grid-core.js` | Core | No plugins (BYO) |
 | `algorithm-push.js` | Add-on | Push-down layout algorithm |
 | `algorithm-reorder.js` | Add-on | Reorder/reflow layout algorithm |
 
@@ -34,36 +34,36 @@ Welcome to the Gridiot documentation. These guides cover everything from basic s
 
 | Event | Detail | When |
 |-------|--------|------|
-| `gridiot:drag-start` | `{ item, cell }` | Drag begins |
-| `gridiot:drag-move` | `{ item, cell, x, y }` | Cell changes during drag |
-| `gridiot:drag-end` | `{ item, cell }` | Drop within grid |
-| `gridiot:drag-cancel` | `{ item }` | Escape or drop outside |
+| `egg:drag-start` | `{ item, cell }` | Drag begins |
+| `egg:drag-move` | `{ item, cell, x, y }` | Cell changes during drag |
+| `egg:drag-end` | `{ item, cell }` | Drop within grid |
+| `egg:drag-cancel` | `{ item }` | Escape or drop outside |
 
 ### Data Attributes
 
 | Attribute | Purpose |
 |-----------|---------|
-| `data-gridiot-item` | Mark as draggable |
-| `data-gridiot-label` | Screen reader label |
-| `data-gridiot-colspan` | Column span (default: 1) |
-| `data-gridiot-rowspan` | Row span (default: 1) |
-| `data-gridiot-dragging` | Added during drag (auto) |
-| `data-gridiot-dropping` | Added during drop animation (auto) |
+| `data-egg-item` | Mark as draggable |
+| `data-egg-label` | Screen reader label |
+| `data-egg-colspan` | Column span (default: 1) |
+| `data-egg-rowspan` | Row span (default: 1) |
+| `data-egg-dragging` | Added during drag (auto) |
+| `data-egg-dropping` | Added during drop animation (auto) |
 
 ### CSS Selectors
 
 ```css
 /* Base item */
-[data-gridiot-item] { }
+[data-egg-item] { }
 
 /* While dragging */
-[data-gridiot-dragging] { }
+[data-egg-dragging] { }
 
 /* During drop animation */
-[data-gridiot-dropping] { }
+[data-egg-dropping] { }
 
 /* Keyboard focus */
-[data-gridiot-item]:focus { }
+[data-egg-item]:focus { }
 
 /* View Transitions */
 ::view-transition-group(*) { }
@@ -80,7 +80,7 @@ Welcome to the Gridiot documentation. These guides cover everything from basic s
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │   ┌─────────────┐    Events     ┌─────────────────────────┐    │
-│   │   Gridiot   │ ────────────► │   Your Event Handlers   │    │
+│   │   EG Grid   │ ────────────► │   Your Event Handlers   │    │
 │   │    Core     │               │   (Layout Algorithm)    │    │
 │   └─────────────┘               └─────────────────────────┘    │
 │          │                                                      │

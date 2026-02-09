@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gridiot - Advanced Multi-Cell Example</title>
+  <title>EG Grid - Advanced Multi-Cell Example</title>
   <style>
     * {
       box-sizing: border-box;
@@ -72,26 +72,26 @@
     }
 
     /* Drag states */
-    .item[data-gridiot-dragging] {
+    .item[data-egg-dragging] {
       cursor: grabbing;
       transform: scale(1.02);
       filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
       z-index: 100;
     }
 
-    .item[data-gridiot-dropping] {
+    .item[data-egg-dropping] {
       z-index: 100;
     }
 
     /* Selected state */
-    .item[data-gridiot-selected] {
+    .item[data-egg-selected] {
       outline: 3px solid #fbbf24;
       outline-offset: 2px;
       z-index: 50;
     }
 
     /* Resizing state */
-    .item[data-gridiot-resizing] {
+    .item[data-egg-resizing] {
       z-index: 100;
       outline: 2px solid rgba(251, 191, 36, 0.5);
       outline-offset: 2px;
@@ -113,7 +113,7 @@
     }
 
     /* Corner handles - small squares */
-    .item[data-gridiot-handle-hover="se"]::after {
+    .item[data-egg-handle-hover="se"]::after {
       opacity: 1;
       width: 14px;
       height: 14px;
@@ -121,7 +121,7 @@
       right: 4px;
     }
 
-    .item[data-gridiot-handle-hover="sw"]::after {
+    .item[data-egg-handle-hover="sw"]::after {
       opacity: 1;
       width: 14px;
       height: 14px;
@@ -129,7 +129,7 @@
       left: 4px;
     }
 
-    .item[data-gridiot-handle-hover="ne"]::after {
+    .item[data-egg-handle-hover="ne"]::after {
       opacity: 1;
       width: 14px;
       height: 14px;
@@ -137,7 +137,7 @@
       right: 4px;
     }
 
-    .item[data-gridiot-handle-hover="nw"]::after {
+    .item[data-egg-handle-hover="nw"]::after {
       opacity: 1;
       width: 14px;
       height: 14px;
@@ -146,7 +146,7 @@
     }
 
     /* Edge handles - thin bars */
-    .item[data-gridiot-handle-hover="n"]::after {
+    .item[data-egg-handle-hover="n"]::after {
       opacity: 1;
       height: 4px;
       top: 4px;
@@ -154,7 +154,7 @@
       right: 20px;
     }
 
-    .item[data-gridiot-handle-hover="s"]::after {
+    .item[data-egg-handle-hover="s"]::after {
       opacity: 1;
       height: 4px;
       bottom: 4px;
@@ -162,7 +162,7 @@
       right: 20px;
     }
 
-    .item[data-gridiot-handle-hover="e"]::after {
+    .item[data-egg-handle-hover="e"]::after {
       opacity: 1;
       width: 4px;
       right: 4px;
@@ -170,7 +170,7 @@
       bottom: 20px;
     }
 
-    .item[data-gridiot-handle-hover="w"]::after {
+    .item[data-egg-handle-hover="w"]::after {
       opacity: 1;
       width: 4px;
       left: 4px;
@@ -179,24 +179,24 @@
     }
 
     /* Active state - brighter with glow */
-    .item[data-gridiot-handle-active]::after {
+    .item[data-egg-handle-active]::after {
       opacity: 1;
       background: rgba(59, 130, 246, 0.95);
       box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
     }
 
     /* Reposition for active state too */
-    .item[data-gridiot-handle-active="se"]::after { width: 14px; height: 14px; bottom: 4px; right: 4px; top: auto; left: auto; }
-    .item[data-gridiot-handle-active="sw"]::after { width: 14px; height: 14px; bottom: 4px; left: 4px; top: auto; right: auto; }
-    .item[data-gridiot-handle-active="ne"]::after { width: 14px; height: 14px; top: 4px; right: 4px; bottom: auto; left: auto; }
-    .item[data-gridiot-handle-active="nw"]::after { width: 14px; height: 14px; top: 4px; left: 4px; bottom: auto; right: auto; }
-    .item[data-gridiot-handle-active="n"]::after { height: 4px; top: 4px; left: 20px; right: 20px; bottom: auto; width: auto; }
-    .item[data-gridiot-handle-active="s"]::after { height: 4px; bottom: 4px; left: 20px; right: 20px; top: auto; width: auto; }
-    .item[data-gridiot-handle-active="e"]::after { width: 4px; right: 4px; top: 20px; bottom: 20px; left: auto; height: auto; }
-    .item[data-gridiot-handle-active="w"]::after { width: 4px; left: 4px; top: 20px; bottom: 20px; right: auto; height: auto; }
+    .item[data-egg-handle-active="se"]::after { width: 14px; height: 14px; bottom: 4px; right: 4px; top: auto; left: auto; }
+    .item[data-egg-handle-active="sw"]::after { width: 14px; height: 14px; bottom: 4px; left: 4px; top: auto; right: auto; }
+    .item[data-egg-handle-active="ne"]::after { width: 14px; height: 14px; top: 4px; right: 4px; bottom: auto; left: auto; }
+    .item[data-egg-handle-active="nw"]::after { width: 14px; height: 14px; top: 4px; left: 4px; bottom: auto; right: auto; }
+    .item[data-egg-handle-active="n"]::after { height: 4px; top: 4px; left: 20px; right: 20px; bottom: auto; width: auto; }
+    .item[data-egg-handle-active="s"]::after { height: 4px; bottom: 4px; left: 20px; right: 20px; top: auto; width: auto; }
+    .item[data-egg-handle-active="e"]::after { width: 4px; right: 4px; top: 20px; bottom: 20px; left: auto; height: auto; }
+    .item[data-egg-handle-active="w"]::after { width: 4px; left: 4px; top: 20px; bottom: 20px; right: auto; height: auto; }
 
     /* Keyboard mode indicator */
-    .grid[data-gridiot-keyboard-mode] {
+    .grid[data-egg-keyboard-mode] {
       outline: 2px solid rgba(251, 191, 36, 0.3);
       outline-offset: 4px;
     }
@@ -256,7 +256,7 @@
         animation: none !important;
       }
 
-      .item[data-gridiot-dragging] {
+      .item[data-egg-dragging] {
         transform: none;
       }
     }
@@ -458,10 +458,10 @@
     <div
       id="item-1"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart A"
-      data-gridiot-colspan="2"
-      data-gridiot-rowspan="2"
+      data-egg-item
+      data-egg-label="Chart A"
+      data-egg-colspan="2"
+      data-egg-rowspan="2"
       data-id="item-1"
       data-color="1"
       data-column="1"
@@ -473,9 +473,9 @@
     <div
       id="item-2"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart B"
-      data-gridiot-colspan="2"
+      data-egg-item
+      data-egg-label="Chart B"
+      data-egg-colspan="2"
       data-id="item-2"
       data-color="2"
       data-column="3"
@@ -487,9 +487,9 @@
     <div
       id="item-3"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart C"
-      data-gridiot-colspan="2"
+      data-egg-item
+      data-egg-label="Chart C"
+      data-egg-colspan="2"
       data-id="item-3"
       data-color="3"
       data-column="5"
@@ -501,9 +501,9 @@
     <div
       id="item-4"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart D"
-      data-gridiot-rowspan="2"
+      data-egg-item
+      data-egg-label="Chart D"
+      data-egg-rowspan="2"
       data-id="item-4"
       data-color="4"
       data-column="3"
@@ -515,8 +515,8 @@
     <div
       id="item-5"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart E"
+      data-egg-item
+      data-egg-label="Chart E"
       data-id="item-5"
       data-color="5"
       data-column="4"
@@ -528,10 +528,10 @@
     <div
       id="item-6"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart F"
-      data-gridiot-colspan="2"
-      data-gridiot-rowspan="2"
+      data-egg-item
+      data-egg-label="Chart F"
+      data-egg-colspan="2"
+      data-egg-rowspan="2"
       data-id="item-6"
       data-color="6"
       data-column="5"
@@ -543,9 +543,9 @@
     <div
       id="item-7"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart G"
-      data-gridiot-colspan="3"
+      data-egg-item
+      data-egg-label="Chart G"
+      data-egg-colspan="3"
       data-id="item-7"
       data-color="1"
       data-column="1"
@@ -557,8 +557,8 @@
     <div
       id="item-8"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart H"
+      data-egg-item
+      data-egg-label="Chart H"
       data-id="item-8"
       data-color="2"
       data-column="4"
@@ -570,9 +570,9 @@
     <div
       id="item-9"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart I"
-      data-gridiot-colspan="2"
+      data-egg-item
+      data-egg-label="Chart I"
+      data-egg-colspan="2"
       data-id="item-9"
       data-color="3"
       data-column="1"
@@ -584,10 +584,10 @@
     <div
       id="item-10"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart J"
-      data-gridiot-colspan="2"
-      data-gridiot-rowspan="2"
+      data-egg-item
+      data-egg-label="Chart J"
+      data-egg-colspan="2"
+      data-egg-rowspan="2"
       data-id="item-10"
       data-color="4"
       data-column="3"
@@ -598,9 +598,9 @@
     <div
       id="item-11"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart K"
-      data-gridiot-colspan="2"
+      data-egg-item
+      data-egg-label="Chart K"
+      data-egg-colspan="2"
       data-id="item-11"
       data-color="5"
       data-column="5"
@@ -611,8 +611,8 @@
     <div
       id="item-12"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart L"
+      data-egg-item
+      data-egg-label="Chart L"
       data-id="item-12"
       data-color="6"
       data-column="5"
@@ -623,8 +623,8 @@
     <div
       id="item-13"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart M"
+      data-egg-item
+      data-egg-label="Chart M"
       data-id="item-13"
       data-color="1"
       data-column="6"
@@ -635,9 +635,9 @@
     <div
       id="item-14"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart N"
-      data-gridiot-colspan="2"
+      data-egg-item
+      data-egg-label="Chart N"
+      data-egg-colspan="2"
       data-id="item-14"
       data-color="2"
       data-column="1"
@@ -648,9 +648,9 @@
     <div
       id="item-15"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart O"
-      data-gridiot-colspan="4"
+      data-egg-item
+      data-egg-label="Chart O"
+      data-egg-colspan="4"
       data-id="item-15"
       data-color="3"
       data-column="1"
@@ -661,10 +661,10 @@
     <div
       id="item-16"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart P"
-      data-gridiot-colspan="2"
-      data-gridiot-rowspan="2"
+      data-egg-item
+      data-egg-label="Chart P"
+      data-egg-colspan="2"
+      data-egg-rowspan="2"
       data-id="item-16"
       data-color="4"
       data-column="5"
@@ -675,9 +675,9 @@
     <div
       id="item-17"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart Q"
-      data-gridiot-colspan="2"
+      data-egg-item
+      data-egg-label="Chart Q"
+      data-egg-colspan="2"
       data-id="item-17"
       data-color="5"
       data-column="1"
@@ -688,9 +688,9 @@
     <div
       id="item-18"
       class="item"
-      data-gridiot-item
-      data-gridiot-label="Chart R"
-      data-gridiot-colspan="2"
+      data-egg-item
+      data-egg-label="Chart R"
+      data-egg-colspan="2"
       data-id="item-18"
       data-color="6"
       data-column="3"
@@ -701,7 +701,7 @@
   </div><!-- .grid-wrapper -->
 
   <div class="instructions">
-    <h3>Gridiot Advanced Example</h3>
+    <h3>EG Grid Advanced Example</h3>
     <ul>
       <li><b>Mouse:</b> Click to select, drag to move</li>
       <li><b>Shift+G:</b> Toggle keyboard mode</li>
@@ -734,14 +734,14 @@
     // Uses data attributes for initial positions (data-column, data-row)
     // Falls back to computed styles if data attributes not present
     function readItemDefinitions() {
-      const elements = gridElement.querySelectorAll('[data-gridiot-item]');
+      const elements = gridElement.querySelectorAll('[data-egg-item]');
       const items = [];
       const positions = new Map();
 
       for (const el of elements) {
         const id = el.dataset.id || el.id;
-        const width = parseInt(el.getAttribute('data-gridiot-colspan') || '1', 10) || 1;
-        const height = parseInt(el.getAttribute('data-gridiot-rowspan') || '1', 10) || 1;
+        const width = parseInt(el.getAttribute('data-egg-colspan') || '1', 10) || 1;
+        const height = parseInt(el.getAttribute('data-egg-rowspan') || '1', 10) || 1;
 
         // Prefer data attributes for initial position (cleaner than inline styles)
         let column = parseInt(el.dataset.column, 10);
@@ -770,7 +770,7 @@
       canonicalPositions: positions,
     });
 
-    // Initialize Gridiot
+    // Initialize EG Grid
     // Disable plugins that will be manually attached with custom options
     const grid = init(gridElement, {
       styleElement: layoutStyleElement,
@@ -857,7 +857,7 @@
     // Resize - drag corners/edges to resize items
     // The push algorithm now handles resize events automatically (resize-start, resize-move, resize-end)
     // so items shift in real-time during resize just like during drag
-    // Handles are now visible via CSS (data-gridiot-handle-hover attribute)
+    // Handles are now visible via CSS (data-egg-handle-hover attribute)
     const resize = attachResize(gridElement, {
       handles: 'all',  // 'corners' | 'edges' | 'all'
       handleSize: 16,
@@ -867,7 +867,7 @@
       core: grid
     });
 
-    console.log('Gridiot initialized with push algorithm + responsive layout');
+    console.log('EG Grid initialized with push algorithm + responsive layout');
     console.log('Resize window to see responsive column reflow');
     console.log('Press Shift+D to toggle dev overlay');
   </script>

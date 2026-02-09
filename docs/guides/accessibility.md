@@ -1,10 +1,10 @@
 # Accessibility Guide
 
-Gridiot includes built-in accessibility support for keyboard navigation and screen readers. This guide covers how to use and customize these features.
+EG Grid includes built-in accessibility support for keyboard navigation and screen readers. This guide covers how to use and customize these features.
 
 ## What's Included
 
-The full bundle (`gridiot.js`) includes:
+The full bundle (`eg-grid.js`) includes:
 
 - **Keyboard plugin**: Navigate and drag items with keyboard
 - **Accessibility plugin**: ARIA live announcements for screen readers
@@ -16,8 +16,8 @@ The full bundle (`gridiot.js`) includes:
 Make items focusable with `tabindex`:
 
 ```html
-<div data-gridiot-item tabindex="0">A</div>
-<div data-gridiot-item tabindex="0">B</div>
+<div data-egg-item tabindex="0">A</div>
+<div data-egg-item tabindex="0">B</div>
 ```
 
 ### Controls
@@ -32,13 +32,13 @@ Make items focusable with `tabindex`:
 ### Focus Styles
 
 ```css
-[data-gridiot-item]:focus {
+[data-egg-item]:focus {
   outline: 3px solid #0066ff;
   outline-offset: 2px;
 }
 
 /* Different style when item is grabbed */
-[data-gridiot-item]:focus[data-gridiot-dragging] {
+[data-egg-item]:focus[data-egg-dragging] {
   outline-color: #00cc66;
 }
 ```
@@ -47,7 +47,7 @@ Make items focusable with `tabindex`:
 
 ### How It Works
 
-Gridiot creates an ARIA live region that announces:
+EG Grid creates an ARIA live region that announces:
 - When an item is grabbed
 - When an item moves to a new cell
 - When an item is dropped
@@ -68,8 +68,8 @@ Provide meaningful names for screen readers:
 
 ```html
 <div
-  data-gridiot-item
-  data-gridiot-label="Revenue Chart"
+  data-egg-item
+  data-egg-label="Revenue Chart"
   tabindex="0"
 >
   ...
@@ -77,7 +77,7 @@ Provide meaningful names for screen readers:
 ```
 
 Label precedence:
-1. `data-gridiot-label`
+1. `data-egg-label`
 2. `aria-label`
 3. `id`
 4. Fallback: "Item"
@@ -89,10 +89,10 @@ Override default messages with template attributes:
 ```html
 <!-- Per-item override -->
 <div
-  data-gridiot-item
-  data-gridiot-label="Sales Chart"
-  data-gridiot-announce-grab="{label} selected. Use arrow keys to move."
-  data-gridiot-announce-drop="{label} placed at position {row}, {column}."
+  data-egg-item
+  data-egg-label="Sales Chart"
+  data-egg-announce-grab="{label} selected. Use arrow keys to move."
+  data-egg-announce-drop="{label} placed at position {row}, {column}."
   tabindex="0"
 >
   ...
@@ -111,20 +111,20 @@ Set default announcements for all items in a grid:
 ```html
 <div
   id="my-grid"
-  data-gridiot-announce-grab="{label} picked up from {row}, {column}."
-  data-gridiot-announce-move="Now at row {row}, column {column}."
-  data-gridiot-announce-drop="{label} placed."
-  data-gridiot-announce-cancel="Cancelled. {label} back at {row}, {column}."
+  data-egg-announce-grab="{label} picked up from {row}, {column}."
+  data-egg-announce-move="Now at row {row}, column {column}."
+  data-egg-announce-drop="{label} placed."
+  data-egg-announce-cancel="Cancelled. {label} back at {row}, {column}."
 >
-  <div data-gridiot-item data-gridiot-label="Chart A">...</div>
-  <div data-gridiot-item data-gridiot-label="Chart B">...</div>
+  <div data-egg-item data-egg-label="Chart A">...</div>
+  <div data-egg-item data-egg-label="Chart B">...</div>
 </div>
 ```
 
 ### Precedence
 
-1. Item-level attribute (`data-gridiot-announce-*` on item)
-2. Grid-level attribute (`data-gridiot-announce-*` on grid)
+1. Item-level attribute (`data-egg-announce-*` on item)
+2. Grid-level attribute (`data-egg-announce-*` on grid)
 3. Default message
 
 ## ARIA Roles and Attributes
@@ -138,10 +138,10 @@ Set default announcements for all items in a grid:
   id="my-grid"
 >
   <div
-    data-gridiot-item
+    data-egg-item
     role="listitem"
     aria-label="Revenue Chart"
-    data-gridiot-label="Revenue Chart"
+    data-egg-label="Revenue Chart"
     tabindex="0"
   >
     ...
@@ -151,7 +151,7 @@ Set default announcements for all items in a grid:
 
 ### During Drag
 
-Gridiot automatically sets:
+EG Grid automatically sets:
 - `aria-grabbed="true"` on dragged item (deprecated but still useful)
 - Announces state changes via live region
 
@@ -193,7 +193,7 @@ Respect user preferences:
     animation: none !important;
   }
 
-  [data-gridiot-dragging] {
+  [data-egg-dragging] {
     transform: none;
     transition: none;
   }
@@ -210,10 +210,10 @@ For non-English announcements, use custom messages:
 <!-- German -->
 <div
   id="grid"
-  data-gridiot-announce-grab="{label} aufgenommen von Zeile {row}, Spalte {column}."
-  data-gridiot-announce-move="Bewegt zu Zeile {row}, Spalte {column}."
-  data-gridiot-announce-drop="{label} abgelegt bei Zeile {row}, Spalte {column}."
-  data-gridiot-announce-cancel="{label} zurück zu Zeile {row}, Spalte {column}."
+  data-egg-announce-grab="{label} aufgenommen von Zeile {row}, Spalte {column}."
+  data-egg-announce-move="Bewegt zu Zeile {row}, Spalte {column}."
+  data-egg-announce-drop="{label} abgelegt bei Zeile {row}, Spalte {column}."
+  data-egg-announce-cancel="{label} zurück zu Zeile {row}, Spalte {column}."
 >
   ...
 </div>
@@ -225,10 +225,10 @@ Or set dynamically:
 const grid = document.getElementById('grid');
 const messages = getLocalizedMessages(userLocale);
 
-grid.dataset.gridiotAnnounceGrab = messages.grab;
-grid.dataset.gridiotAnnounceMove = messages.move;
-grid.dataset.gridiotAnnounceDrop = messages.drop;
-grid.dataset.gridiotAnnounceCancel = messages.cancel;
+grid.dataset.eggAnnounceGrab = messages.grab;
+grid.dataset.eggAnnounceMove = messages.move;
+grid.dataset.eggAnnounceDrop = messages.drop;
+grid.dataset.eggAnnounceCancel = messages.cancel;
 ```
 
 ## Custom Accessibility Plugin
@@ -253,16 +253,16 @@ function attachCustomAccessibility(gridElement) {
 
   const onDragStart = (e) => {
     const { item } = e.detail;
-    const label = item.getAttribute('data-gridiot-label') || 'Item';
+    const label = item.getAttribute('data-egg-label') || 'Item';
     announce(`Started dragging ${label}`);
   };
 
   // ... other event handlers
 
-  gridElement.addEventListener('gridiot:drag-start', onDragStart);
+  gridElement.addEventListener('egg:drag-start', onDragStart);
 
   return () => {
-    gridElement.removeEventListener('gridiot:drag-start', onDragStart);
+    gridElement.removeEventListener('egg:drag-start', onDragStart);
     liveRegion.remove();
   };
 }
@@ -271,7 +271,7 @@ function attachCustomAccessibility(gridElement) {
 ## Accessibility Checklist
 
 - [ ] All items have `tabindex="0"`
-- [ ] All items have `data-gridiot-label` or `aria-label`
+- [ ] All items have `data-egg-label` or `aria-label`
 - [ ] Focus styles are visible
 - [ ] Keyboard controls work (Enter/Space, arrows, Escape)
 - [ ] Screen reader announces grab/move/drop/cancel

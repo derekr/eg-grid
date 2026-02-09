@@ -1,6 +1,6 @@
 # Animation Patterns
 
-Animation techniques used in Gridiot for smooth grid interactions.
+Animation techniques used in EG Grid for smooth grid interactions.
 
 ---
 

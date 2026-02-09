@@ -1,5 +1,5 @@
 import { getItemCell, getItemSize } from '../engine';
-import type { GridCell, GridiotCore } from '../types';
+import type { GridCell, EggCore } from '../types';
 import { animateFLIPWithTracking } from '../utils/flip';
 
 // Hysteresis: distance in grid units before changing target cell
@@ -41,10 +41,10 @@ interface DragState {
 }
 
 /**
- * Attach pointer (mouse/touch) drag handling to a GridiotCore instance.
+ * Attach pointer (mouse/touch) drag handling to a EggCore instance.
  * @returns Cleanup function
  */
-export function attachPointer(core: GridiotCore): () => void {
+export function attachPointer(core: EggCore): () => void {
 	let pendingDrag: PendingDrag | null = null;
 	let dragState: DragState | null = null;
 
@@ -66,11 +66,11 @@ export function attachPointer(core: GridiotCore): () => void {
 			dragStartY: e.clientY,
 		};
 
-		item.setAttribute('data-gridiot-dragging', '');
+		item.setAttribute('data-egg-dragging', '');
 		document.body.classList.add('is-dragging');
 
 		// Transition state machine to interacting
-		const itemId = item.id || item.getAttribute('data-gridiot-item') || '';
+		const itemId = item.id || item.getAttribute('data-egg-item') || '';
 		core.stateMachine.transition({
 			type: 'START_INTERACTION',
 			context: { type: 'drag', mode: 'pointer', itemId, element: item, columnCount: core.getGridInfo().columns.length },
@@ -93,7 +93,7 @@ export function attachPointer(core: GridiotCore): () => void {
 
 	const onPointerDown = (e: PointerEvent) => {
 		const item = (e.target as HTMLElement).closest(
-			'[data-gridiot-item]',
+			'[data-egg-item]',
 		) as HTMLElement | null;
 		if (!item) return;
 
@@ -323,7 +323,7 @@ export function attachPointer(core: GridiotCore): () => void {
 		if (dragState) {
 			const { item, pointerId } = dragState;
 
-			item.removeAttribute('data-gridiot-dragging');
+			item.removeAttribute('data-egg-dragging');
 			document.body.classList.remove('is-dragging');
 			item.style.position = '';
 			item.style.left = '';

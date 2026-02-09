@@ -5,7 +5,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 /**
- * Gridiot resize functionality tests.
+ * EG Grid resize functionality tests.
  *
  * These tests verify:
  * 1. Placeholder appears during resize
@@ -21,11 +21,11 @@ let server: http.Server;
 let serverPort: number;
 
 test.beforeAll(async () => {
-	// Create a simple static file server for the gridiot directory
-	const gridiotDir = path.resolve(__dirname);
+	// Create a simple static file server for the eg-grid directory
+	const projectDir = path.resolve(__dirname);
 
 	server = http.createServer((req, res) => {
-		let filePath = path.join(gridiotDir, req.url === '/' ? 'example-advanced.html' : req.url || '');
+		let filePath = path.join(projectDir, req.url === '/' ? 'example-advanced.html' : req.url || '');
 
 		// Handle directory index
 		if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
@@ -74,7 +74,7 @@ test.afterAll(async () => {
 	}
 });
 
-test.describe('Gridiot Resize', () => {
+test.describe('EG Grid Resize', () => {
 	test.beforeEach(async ({ page }) => {
 		await page.goto(`http://localhost:${serverPort}/example-advanced.html`);
 		// Wait for the grid to be initialized
@@ -132,7 +132,7 @@ test.describe('Gridiot Resize', () => {
 		await page.waitForTimeout(50);
 
 		// Check that resizing state is applied
-		const isResizing = await item5.evaluate((el) => el.hasAttribute('data-gridiot-resizing'));
+		const isResizing = await item5.evaluate((el) => el.hasAttribute('data-egg-resizing'));
 		expect(isResizing).toBe(true);
 
 		// Continue dragging to target size (2x2)
@@ -145,7 +145,7 @@ test.describe('Gridiot Resize', () => {
 		console.log('Placeholder visible during resize:', placeholderVisible);
 
 		// Check if a size label appears (showSizeLabel: true in config)
-		const sizeLabel = page.locator('.gridiot-resize-label');
+		const sizeLabel = page.locator('.egg-resize-label');
 		const sizeLabelVisible = await sizeLabel.isVisible().catch(() => false);
 		if (sizeLabelVisible) {
 			const labelText = await sizeLabel.textContent();
@@ -160,7 +160,7 @@ test.describe('Gridiot Resize', () => {
 		await page.waitForTimeout(300);
 
 		// Verify the resize state is removed
-		const stillResizing = await item5.evaluate((el) => el.hasAttribute('data-gridiot-resizing'));
+		const stillResizing = await item5.evaluate((el) => el.hasAttribute('data-egg-resizing'));
 		expect(stillResizing).toBe(false);
 
 		// Get final grid position

@@ -1,5 +1,5 @@
 /**
- * Reads gridiot source files and writes them to worker/src/sources.ts
+ * Reads eg-grid source files and writes them to worker/src/sources.ts
  * as a Record<string, string> map for the virtual filesystem.
  *
  * Run: node --experimental-strip-types scripts/sync-sources.ts

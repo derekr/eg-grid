@@ -1,6 +1,6 @@
 # Persisting Layout State
 
-Gridiot computes layout in the browser but doesn't prescribe how you store it. This guide covers persistence strategies for both built-in algorithms, and how to choose between them.
+EG Grid computes layout in the browser but doesn't prescribe how you store it. This guide covers persistence strategies for both built-in algorithms, and how to choose between them.
 
 ## Two models, two mental models
 
@@ -115,8 +115,8 @@ await db.update("items", { id: "item-c", order_key: "a0V" });
 Simplest option. Good for prototypes and single-user apps.
 
 ```typescript
-import { attachReorderAlgorithm, reflowItems, getItemOrder } from "gridiot";
-import { readItemsFromDOM } from "gridiot/algorithm-push";
+import { attachReorderAlgorithm, reflowItems, getItemOrder } from "eg-grid";
+import { readItemsFromDOM } from "eg-grid/algorithm-push";
 
 // Load
 const saved = JSON.parse(localStorage.getItem("grid-order") || "null");
@@ -127,7 +127,7 @@ if (saved) {
 }
 
 // Save on drag-end
-gridElement.addEventListener("gridiot:drag-end", () => {
+gridElement.addEventListener("egg:drag-end", () => {
   // Read current layout, extract order
   const items = readItemsFromDOM(gridElement);
   const ordered = getItemOrder(items);
@@ -144,7 +144,7 @@ gridElement.addEventListener("gridiot:drag-end", () => {
 Save order to your API. The key insight: you only need to send the changed item's new position in the sequence, not the full layout.
 
 ```typescript
-gridElement.addEventListener("gridiot:drag-end", async (e) => {
+gridElement.addEventListener("egg:drag-end", async (e) => {
   const items = readItemsFromDOM(gridElement);
   const ordered = getItemOrder(items);
   const movedId = e.detail.item.dataset.id;
@@ -172,9 +172,9 @@ gridElement.addEventListener("gridiot:drag-end", async (e) => {
 The existing `ResponsiveLayoutModel` is designed for push-style persistence. It stores positions per column count and generates container query CSS.
 
 ```typescript
-import { createLayoutModel } from "gridiot";
-import { attachPushAlgorithm } from "gridiot/algorithm-push";
-import { attachResponsive } from "gridiot/responsive";
+import { createLayoutModel } from "eg-grid";
+import { attachPushAlgorithm } from "eg-grid/algorithm-push";
+import { attachResponsive } from "eg-grid/responsive";
 
 const layoutModel = createLayoutModel({
   maxColumns: 6,
@@ -205,8 +205,8 @@ const positions = await loadPositions(currentColumnCount);
 
 for (const [id, pos] of positions) {
   const el = document.getElementById(id);
-  const colspan = parseInt(el.dataset.gridiotColspan || "1");
-  const rowspan = parseInt(el.dataset.gridiotRowspan || "1");
+  const colspan = parseInt(el.dataset.eg-gridColspan || "1");
+  const rowspan = parseInt(el.dataset.eg-gridRowspan || "1");
   el.style.gridColumn = `${pos.column} / span ${colspan}`;
   el.style.gridRow = `${pos.row} / span ${rowspan}`;
 }
@@ -217,7 +217,7 @@ for (const [id, pos] of positions) {
 Reconstruct positions by reflowing the saved order at the current column count.
 
 ```typescript
-import { reflowItems } from "gridiot/algorithm-reorder";
+import { reflowItems } from "eg-grid/algorithm-reorder";
 
 // From DB: ["item-a", "item-c", "item-b", ...]
 const order = await loadOrder();

@@ -93,12 +93,12 @@ const grid = init(document.querySelector('.grid'), {
 ```ts
 interface Plugin<T = unknown> {
   name: string;
-  init(core: GridiotCore, options?: T): (() => void) | void;
+  init(core: EggCore, options?: T): (() => void) | void;
 }
 ```
 
 Plugins receive:
-- `core`: The GridiotCore instance with element, event emission, cell calculation
+- `core`: The EggCore instance with element, event emission, cell calculation
 - `options`: Plugin-specific options merged with shared resources (layoutModel, styleElement)
 
 ### Self-Registering Plugins

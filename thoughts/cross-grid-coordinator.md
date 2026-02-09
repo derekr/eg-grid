@@ -2,7 +2,7 @@
 
 ## Context
 
-Gridiot's core engine currently supports one grid at a time. This document explores how to support dragging items between multiple grids while staying dependency-free and maintaining the plugin architecture.
+EG Grid's core engine currently supports one grid at a time. This document explores how to support dragging items between multiple grids while staying dependency-free and maintaining the plugin architecture.
 
 ## Design Principles
 
@@ -12,9 +12,9 @@ Gridiot's core engine currently supports one grid at a time. This document explo
 4. **DOM move on drop** - opinionated default behavior
 5. **Explicit registration** - grids must be registered with coordinator (open to auto-detect later)
 
-## When to Use Gridiot vs Pragmatic Drag and Drop
+## When to Use EG Grid vs Pragmatic Drag and Drop
 
-**Gridiot is compelling for:**
+**EG Grid is compelling for:**
 - Grid-to-grid of same/similar structure (dashboard rearrangement)
 - Zero dependencies matters (embedded widgets, library authors)
 - Full control over the layout algorithm
@@ -26,15 +26,15 @@ Gridiot's core engine currently supports one grid at a time. This document explo
 - Need their accessibility story out of the box
 - Non-grid layouts
 
-**Interop story:** Gridiot's DOM events integrate cleanly with PDD monitors. Users can write a small adapter if they need to bridge the two systems.
+**Interop story:** EG Grid's DOM events integrate cleanly with PDD monitors. Users can write a small adapter if they need to bridge the two systems.
 
 ## Coordinator API
 
 ```typescript
-import { init } from 'gridiot';
-import { attachPushAlgorithm } from 'gridiot/algorithm-push';
-import { attachSwapAlgorithm } from 'gridiot/algorithm-swap';
-import { createCoordinator } from 'gridiot/coordinator';
+import { init } from 'eg-grid';
+import { attachPushAlgorithm } from 'eg-grid/algorithm-push';
+import { attachSwapAlgorithm } from 'eg-grid/algorithm-swap';
+import { createCoordinator } from 'eg-grid/coordinator';
 
 const grid1 = init(document.getElementById('grid1'));
 const grid2 = init(document.getElementById('grid2'));
@@ -55,11 +55,11 @@ coordinator.register(grid2.element);
 
 | Event | When | Who handles |
 |-------|------|-------------|
-| `gridiot:item-enter` | Foreign item enters grid | Target algorithm |
-| `gridiot:item-move` | Foreign item moves within grid | Target algorithm |
-| `gridiot:item-leave` | Item leaves grid (no drop) | Algorithm resets |
-| `gridiot:item-transferred` | Item dropped on other grid | Source algorithm (cleanup) |
-| `gridiot:item-received` | Item dropped here from other grid | Target algorithm (finalize) |
+| `egg:item-enter` | Foreign item enters grid | Target algorithm |
+| `egg:item-move` | Foreign item moves within grid | Target algorithm |
+| `egg:item-leave` | Item leaves grid (no drop) | Algorithm resets |
+| `egg:item-transferred` | Item dropped on other grid | Source algorithm (cleanup) |
+| `egg:item-received` | Item dropped here from other grid | Target algorithm (finalize) |
 
 ### Event Details
 
@@ -98,7 +98,7 @@ interface ItemReceivedDetail {
 ## Coordinator Implementation
 
 ```typescript
-// gridiot/plugins/coordinator.ts
+// eg-grid/plugins/coordinator.ts
 
 export function createCoordinator() {
   const grids = new Set<HTMLElement>();
@@ -131,24 +131,24 @@ export function createCoordinator() {
 
     if (gridUnderPoint !== currentGrid) {
       // Leaving current grid
-      currentGrid?.dispatchEvent(new CustomEvent('gridiot:item-leave', {
+      currentGrid?.dispatchEvent(new CustomEvent('egg:item-leave', {
         bubbles: true,
         detail: {
           item: draggedItem,
-          colspan: parseInt(draggedItem.dataset.gridiotColspan || '1'),
-          rowspan: parseInt(draggedItem.dataset.gridiotRowspan || '1'),
+          colspan: parseInt(draggedItem.dataset.eg-gridColspan || '1'),
+          rowspan: parseInt(draggedItem.dataset.eg-gridRowspan || '1'),
         }
       }));
 
       // Entering new grid (or null if outside all grids)
       if (gridUnderPoint) {
-        gridUnderPoint.dispatchEvent(new CustomEvent('gridiot:item-enter', {
+        gridUnderPoint.dispatchEvent(new CustomEvent('egg:item-enter', {
           bubbles: true,
           detail: {
             item: draggedItem,
             cell,
-            colspan: parseInt(draggedItem.dataset.gridiotColspan || '1'),
-            rowspan: parseInt(draggedItem.dataset.gridiotRowspan || '1'),
+            colspan: parseInt(draggedItem.dataset.eg-gridColspan || '1'),
+            rowspan: parseInt(draggedItem.dataset.eg-gridRowspan || '1'),
             sourceGrid,
           }
         }));
@@ -159,7 +159,7 @@ export function createCoordinator() {
 
     // Forward move events to current grid if it's not the source
     if (currentGrid && currentGrid !== sourceGrid) {
-      currentGrid.dispatchEvent(new CustomEvent('gridiot:item-move', {
+      currentGrid.dispatchEvent(new CustomEvent('egg:item-move', {
         bubbles: true,
         detail: { item: draggedItem, cell, x, y }
       }));
@@ -174,14 +174,14 @@ export function createCoordinator() {
       const { cell } = e.detail;
 
       // Notify source grid item is gone
-      sourceGrid?.dispatchEvent(new CustomEvent('gridiot:item-transferred', {
+      sourceGrid?.dispatchEvent(new CustomEvent('egg:item-transferred', {
         bubbles: true,
         detail: { item: draggedItem, toGrid: currentGrid }
       }));
 
       // Move DOM and notify target
       currentGrid.appendChild(draggedItem);
-      currentGrid.dispatchEvent(new CustomEvent('gridiot:item-received', {
+      currentGrid.dispatchEvent(new CustomEvent('egg:item-received', {
         bubbles: true,
         detail: { item: draggedItem, cell, fromGrid: sourceGrid }
       }));
@@ -194,7 +194,7 @@ export function createCoordinator() {
 
   function handleDragCancel() {
     if (currentGrid && currentGrid !== sourceGrid) {
-      currentGrid.dispatchEvent(new CustomEvent('gridiot:item-leave', {
+      currentGrid.dispatchEvent(new CustomEvent('egg:item-leave', {
         bubbles: true,
         detail: { item: draggedItem }
       }));
@@ -207,17 +207,17 @@ export function createCoordinator() {
   return {
     register(grid: HTMLElement) {
       grids.add(grid);
-      grid.addEventListener('gridiot:drag-start', handleDragStart as EventListener);
-      grid.addEventListener('gridiot:drag-move', handleDragMove as EventListener);
-      grid.addEventListener('gridiot:drag-end', handleDragEnd as EventListener);
-      grid.addEventListener('gridiot:drag-cancel', handleDragCancel);
+      grid.addEventListener('egg:drag-start', handleDragStart as EventListener);
+      grid.addEventListener('egg:drag-move', handleDragMove as EventListener);
+      grid.addEventListener('egg:drag-end', handleDragEnd as EventListener);
+      grid.addEventListener('egg:drag-cancel', handleDragCancel);
     },
     unregister(grid: HTMLElement) {
       grids.delete(grid);
-      grid.removeEventListener('gridiot:drag-start', handleDragStart as EventListener);
-      grid.removeEventListener('gridiot:drag-move', handleDragMove as EventListener);
-      grid.removeEventListener('gridiot:drag-end', handleDragEnd as EventListener);
-      grid.removeEventListener('gridiot:drag-cancel', handleDragCancel);
+      grid.removeEventListener('egg:drag-start', handleDragStart as EventListener);
+      grid.removeEventListener('egg:drag-move', handleDragMove as EventListener);
+      grid.removeEventListener('egg:drag-end', handleDragEnd as EventListener);
+      grid.removeEventListener('egg:drag-cancel', handleDragCancel);
     },
   };
 }
@@ -270,16 +270,16 @@ const onItemLeave = () => {
 const onItemReceived = (e: CustomEvent) => {
   // Item was dropped here - finalize position
   const { item, cell } = e.detail;
-  item.dataset.gridiotItem = ''; // Mark as gridiot item
+  item.dataset.eg-gridItem = ''; // Mark as eg-grid item
   setItemCell(item, cell);
   foreignItem = null;
 };
 
 // Register these handlers
-gridElement.addEventListener('gridiot:item-enter', onItemEnter);
-gridElement.addEventListener('gridiot:item-move', onItemMove);
-gridElement.addEventListener('gridiot:item-leave', onItemLeave);
-gridElement.addEventListener('gridiot:item-received', onItemReceived);
+gridElement.addEventListener('egg:item-enter', onItemEnter);
+gridElement.addEventListener('egg:item-move', onItemMove);
+gridElement.addEventListener('egg:item-leave', onItemLeave);
+gridElement.addEventListener('egg:item-received', onItemReceived);
 ```
 
 ## Simpler API: Cross-Grid as Just Another Plugin
@@ -288,13 +288,13 @@ The coordinator concept adds complexity. Instead, cross-grid can just be a plugi
 
 ```typescript
 // Just another plugin, not a "coordinator"
-import { init } from 'gridiot';
-import { enableCrossGrid } from 'gridiot/plugins/cross-grid';
+import { init } from 'eg-grid';
+import { enableCrossGrid } from 'eg-grid/plugins/cross-grid';
 
 const grid1 = init(el1);
 const grid2 = init(el2);
 
-// Plugin auto-detects other gridiot instances
+// Plugin auto-detects other eg-grid instances
 enableCrossGrid(grid1);
 enableCrossGrid(grid2);
 ```
@@ -325,7 +325,7 @@ PDD is intentionally **unopinionated about animations**:
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Capability Comparison                        │
 ├────────────────────────────┬────────────────────────────────────┤
-│     Pragmatic DnD          │          Gridiot                   │
+│     Pragmatic DnD          │          EG Grid                   │
 ├────────────────────────────┼────────────────────────────────────┤
 │ ✓ Cross-container drag     │ ✗ Grid-to-grid only (for now)     │
 │ ✓ External files/text      │ ✗ Not supported                   │
@@ -338,64 +338,64 @@ PDD is intentionally **unopinionated about animations**:
 └────────────────────────────┴────────────────────────────────────┘
 ```
 
-**Key differentiator:** View Transitions support. PDD has an open issue requesting it with no solution. Gridiot provides this out of the box.
+**Key differentiator:** View Transitions support. PDD has an open issue requesting it with no solution. EG Grid provides this out of the box.
 
 ### Integration Options
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Option A: PDD as optional Gridiot enhancement                   │
+│ Option A: PDD as optional EG Grid enhancement                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  gridiot (zero-dep)                                             │
-│    └── gridiot/plugins/pdd-bridge.ts (optional, peer dep)       │
+│  eg-grid (zero-dep)                                             │
+│    └── eg-grid/plugins/pdd-bridge.ts (optional, peer dep)       │
 │          - Uses PDD for cross-container to non-grid targets     │
-│          - Gridiot handles grid-to-grid natively                │
+│          - EG Grid handles grid-to-grid natively                │
 │                                                                 │
 │  User imports bridge only if they need PDD interop              │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ Option B: Gridiot utilities for PDD ecosystem                   │
+│ Option B: EG Grid utilities for PDD ecosystem                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  @atlaskit/pragmatic-drag-and-drop (user's choice)              │
-│    └── gridiot-pdd (separate package)                           │
+│    └── eg-grid-pdd (separate package)                           │
 │          - Adds CSS Grid cell detection to PDD                  │
 │          - Provides grid-aware drop target utilities            │
 │          - Layout algorithms as PDD-compatible functions        │
 │                                                                 │
-│  gridiot core remains independent, zero-dep                     │
+│  eg-grid core remains independent, zero-dep                     │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Recommendation
 
-**For cross-grid (grid-to-grid):** Keep it as a simple Gridiot plugin. No new concepts, just enable on each grid.
+**For cross-grid (grid-to-grid):** Keep it as a simple EG Grid plugin. No new concepts, just enable on each grid.
 
 **For grid-to-list/tree (heterogeneous):** That's PDD territory. Users can bridge with ~10 lines:
 
 ```typescript
 // User writes simple bridge if needed
-grid.element.addEventListener('gridiot:drag-end', (e) => {
+grid.element.addEventListener('egg:drag-end', (e) => {
   // Check if dropped outside grid, trigger PDD logic
 });
 ```
 
-**Philosophy:** Keep Gridiot focused on CSS Grid. Document the escape hatch to PDD. Don't build PDD adapters unless there's clear demand.
+**Philosophy:** Keep EG Grid focused on CSS Grid. Document the escape hatch to PDD. Don't build PDD adapters unless there's clear demand.
 
 ### Interop: PDD Users Who Want View Transitions
 
-PDD users can use Gridiot utilities to add View Transition animations:
+PDD users can use EG Grid utilities to add View Transition animations:
 
 ```typescript
 // PDD user wants View Transition animations for their grid
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { getGridCell, applyWithViewTransition } from 'gridiot/utilities';
+import { getGridCell, applyWithViewTransition } from 'eg-grid/utilities';
 
-// Use Gridiot's View Transition wrapper with PDD's events
+// Use EG Grid's View Transition wrapper with PDD's events
 monitorForElements({
   onDrop({ source, location }) {
     const grid = document.getElementById('grid');
@@ -413,16 +413,16 @@ monitorForElements({
 
 | Use Case | What to Bundle |
 |----------|----------------|
-| Standalone grid DnD | `gridiot.js` + algorithm plugin |
-| PDD project, want View Transitions | `gridiot/utilities` (cell detection + VT wrapper) |
-| PDD project, want grid accessibility | `gridiot/accessibility` |
-| PDD project, want both | `gridiot/utilities` + `gridiot/accessibility` |
+| Standalone grid DnD | `eg-grid.js` + algorithm plugin |
+| PDD project, want View Transitions | `eg-grid/utilities` (cell detection + VT wrapper) |
+| PDD project, want grid accessibility | `eg-grid/accessibility` |
+| PDD project, want both | `eg-grid/utilities` + `eg-grid/accessibility` |
 
-This allows PDD users to cherry-pick Gridiot's unique capabilities without pulling in redundant drag handling.
+This allows PDD users to cherry-pick EG Grid's unique capabilities without pulling in redundant drag handling.
 
 ## Open Questions
 
-1. **Auto-detect grids?** - Could query `[data-gridiot]` instead of explicit registration
+1. **Auto-detect grids?** - Could query `[data-eg-grid]` instead of explicit registration
 2. **Transfer control?** - Should users be able to prevent/customize DOM transfer?
 3. **Different cell sizes?** - How to handle grids with different column/row sizes?
 4. **Animation on transfer?** - Should FLIP animate across grids?

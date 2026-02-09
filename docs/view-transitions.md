@@ -2,7 +2,7 @@
 
 > Source: https://www.w3.org/TR/css-view-transitions-1/
 
-This document captures critical View Transitions concepts for Gridiot development. The library uses View Transitions to animate grid layout changes.
+This document captures critical View Transitions concepts for EG Grid development. The library uses View Transitions to animate grid layout changes.
 
 ## Core Principle
 
@@ -138,7 +138,7 @@ Old/new images crossfade automatically.
 
 ---
 
-## Gridiot-Specific Patterns
+## EG Grid-Specific Patterns
 
 ### Animating Grid Layout Changes
 
@@ -154,7 +154,7 @@ document.startViewTransition(() => {
 During drag, the dragged item should not participate:
 
 ```css
-[data-gridiot-dragging] {
+[data-egg-dragging] {
   view-transition-name: none;  /* Exclude from transition */
 }
 ```
