@@ -9,7 +9,8 @@
  */
 
 import { getItemCell } from '../engine';
-import type { DragState, GridInfo, GridiotCore, LayoutState } from '../types';
+import { isDragging, isResizing } from '../state-machine';
+import type { GridInfo, GridiotCore } from '../types';
 
 export interface DevOverlayOptions {
 	/** Initial tab to show ('debug' | 'config') */
@@ -384,32 +385,34 @@ export function attachDevOverlay(
 
 	function renderDebugTab(gridInfo: GridInfo | undefined, items: HTMLElement[]): string {
 		if (!gridInfo) return '<div class="gridiot-dev-section">No core available</div>';
-		// Query providers for live state
-		const dragState = core?.providers.get<DragState>('drag');
-		const layoutState = core?.providers.get<LayoutState>('layout');
+		// Query state machine for live state
+		const smState = core?.stateMachine.getState();
+		const dragging = smState && isDragging(smState);
+		const resizing = smState && isResizing(smState);
+		const interaction = smState?.interaction;
 
 		return `
 			${core ? `
 			<div class="gridiot-dev-section">
-				<div class="gridiot-dev-section-title">Providers</div>
+				<div class="gridiot-dev-section-title">State</div>
 				<div class="gridiot-dev-grid-info">
 					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">drag</span>
-						<span class="gridiot-dev-info-value">${dragState ? `dragging ${dragState.item.dataset.id || dragState.item.id || '?'}` : 'idle'}</span>
-					</div>
-					${dragState ? `
-					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">cell</span>
-						<span class="gridiot-dev-info-value">(${dragState.cell.column}, ${dragState.cell.row})</span>
+						<span class="gridiot-dev-info-label">phase</span>
+						<span class="gridiot-dev-info-value">${smState?.phase ?? 'unknown'}</span>
 					</div>
 					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">start</span>
-						<span class="gridiot-dev-info-value">(${dragState.startCell.column}, ${dragState.startCell.row})</span>
+						<span class="gridiot-dev-info-label">interaction</span>
+						<span class="gridiot-dev-info-value">${dragging ? 'dragging' : resizing ? 'resizing' : 'none'}${interaction ? ` (${interaction.mode})` : ''}</span>
+					</div>
+					${interaction ? `
+					<div class="gridiot-dev-info-item">
+						<span class="gridiot-dev-info-label">item</span>
+						<span class="gridiot-dev-info-value">${interaction.itemId || '?'}</span>
 					</div>
 					` : ''}
 					<div class="gridiot-dev-info-item">
-						<span class="gridiot-dev-info-label">layout</span>
-						<span class="gridiot-dev-info-value">${layoutState ? `${layoutState.items.length} items, ${layoutState.columns} cols` : 'none'}</span>
+						<span class="gridiot-dev-info-label">selected</span>
+						<span class="gridiot-dev-info-value">${smState?.selectedItemId ?? 'none'}</span>
 					</div>
 				</div>
 			</div>

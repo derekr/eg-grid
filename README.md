@@ -8,7 +8,7 @@ Zero-dependency CSS Grid drag-and-drop library with View Transitions support.
 - Pointer (mouse/touch) and keyboard support
 - Screen reader accessibility with ARIA live announcements
 - View Transitions API for smooth animations
-- Plugin architecture for custom input handling
+- Pluggable layout algorithms (push, reorder, or custom)
 - TypeScript-first with type-safe events
 - Tree-shakeable bundles
 
@@ -26,7 +26,7 @@ Gridiot separates **input handling** (how you drag) from **layout logic** (what 
 │   │    Core     │               │   (Layout Algorithm)    │    │
 │   └─────────────┘               └─────────────────────────┘    │
 │          │                                                      │
-│          │ Plugins auto-register                                │
+│          │
 │          ▼                                                      │
 │   ┌─────────────────────────────────────────────┐              │
 │   │              Input Plugins                   │              │
@@ -47,7 +47,7 @@ Gridiot separates **input handling** (how you drag) from **layout logic** (what 
 │  • Parse CSS Grid layout (columns/rows) │
 │  • Convert point → cell coordinates     │
 │  • Emit drag events on grid element     │
-│  • Manage plugin lifecycle              │
+│  • Coordinate interaction state machine │
 │  • Provide grid measurement utilities   │
 └─────────────────────────────────────────┘
          │
@@ -145,7 +145,7 @@ Gridiot maximizes use of modern CSS and browser APIs. JavaScript handles orchest
 │    • Event detail with item, cell, dimensions                               │
 │                                                                              │
 │  PLUGIN COORDINATION:                                                        │
-│    • Provider registry for cross-plugin state                               │
+│    • State machine for interaction lifecycle                                │
 │    • Timing/settle delays for scroll-layout coordination                    │
 │                                                                              │
 │  ALGORITHM EXECUTION:                                                        │
@@ -167,29 +167,19 @@ Gridiot maximizes use of modern CSS and browser APIs. JavaScript handles orchest
 
 ```
 gridiot.js (full)
-├── Core engine
+├── Core engine (grid measurement, state machine, events)
 ├── Pointer plugin (visual drag, hysteresis, FLIP)
 ├── Keyboard plugin (arrow keys, enter/space)
-└── Accessibility plugin (ARIA live regions)
+├── Accessibility plugin (ARIA live regions)
+├── Algorithm: push (default) or reorder
+├── Camera (auto-scroll near edges)
+├── Resize (item handle detection)
+├── Placeholder (drop target indicator)
+└── Responsive (container query CSS injection)
 
-gridiot-minimal.js
-├── Core engine
-└── Pointer plugin
-
-gridiot-core.js
-└── Core engine only (bring your own plugins)
-
-algorithm-push.js (optional add-on)
-└── Push-down layout algorithm with compact-up
-
-camera.js (optional add-on)
-└── Auto-scroll when dragging near edges or navigating off-screen
-
-placeholder.js (optional add-on)
-└── Visual drop target indicator
-
-dev-overlay.js (optional add-on)
-└── Debug/config overlay (Shift+D)
+Individual plugins also available as separate bundles:
+  algorithm-push.js, algorithm-reorder.js,
+  camera.js, resize.js, placeholder.js, dev-overlay.js
 ```
 
 ## Installation
@@ -209,27 +199,18 @@ cp gridiot/dist/gridiot.js your-project/
 </div>
 
 <script type="module">
-  import { init, getItemCell, setItemCell } from './gridiot.js';
+  import { init } from './gridiot.js';
 
+  // All plugins enabled by default, including push algorithm
   const grid = init(document.getElementById('grid'));
-
-  grid.element.addEventListener('gridiot:drag-move', (e) => {
-    const { item, cell } = e.detail;
-    // Move item to new cell
-    setItemCell(item, cell);
-  });
 </script>
 ```
 
 ## Bundles
 
-Three bundle sizes available:
-
-| Bundle | Size | Includes |
-|--------|------|----------|
-| `gridiot.js` | Full | Pointer + keyboard + accessibility plugins |
-| `gridiot-minimal.js` | Minimal | Pointer plugin only |
-| `gridiot-core.js` | Core | No plugins (bring your own) |
+| Bundle | Includes |
+|--------|----------|
+| `gridiot.js` | All plugins (pointer, keyboard, accessibility, algorithm, camera, resize, placeholder, responsive) |
 
 ## API
 
@@ -238,28 +219,26 @@ Three bundle sizes available:
 Initialize Gridiot on a CSS Grid container.
 
 ```js
-// Simple - all plugins with defaults
+// All plugins with defaults
 const grid = init(document.getElementById('grid'));
 
-// With responsive layout support
+// With responsive layout + custom options
 const grid = init(document.getElementById('grid'), {
   layoutModel,
   styleElement,
-});
-
-// With plugin-specific options
-const grid = init(document.getElementById('grid'), {
-  layoutModel,
-  styleElement,
-  plugins: {
-    camera: { mode: 'center', edgeSize: 80 },
-    resize: { handles: 'corners', minSize: { colspan: 1, rowspan: 1 } },
-  },
+  resize: { handles: 'corners', minSize: { colspan: 1, rowspan: 1 } },
+  responsive: { layoutModel, cellSize: 120, gap: 8 },
 });
 
 // Disable specific plugins
 const grid = init(document.getElementById('grid'), {
-  disablePlugins: ['camera', 'resize'],
+  camera: false,
+  resize: false,
+});
+
+// Use reorder algorithm instead of push (default)
+const grid = init(document.getElementById('grid'), {
+  algorithm: 'reorder',
 });
 ```
 
@@ -269,18 +248,26 @@ const grid = init(document.getElementById('grid'), {
 interface InitOptions {
   /** Layout model for multi-breakpoint responsive support */
   layoutModel?: ResponsiveLayoutModel;
-  /** Style element for CSS injection (used by responsive + algorithm plugins) */
+  /** Style element for CSS injection (created automatically if not provided) */
   styleElement?: HTMLStyleElement;
-  /** Plugin-specific configuration */
-  plugins?: {
-    camera?: CameraPluginOptions;
-    resize?: ResizePluginOptions;
-    placeholder?: PlaceholderPluginOptions;
-    'algorithm-push'?: AlgorithmPushPluginOptions;
-    responsive?: ResponsivePluginOptions;
-  };
-  /** List of plugin names to disable */
-  disablePlugins?: string[];
+  /** Pointer plugin: false to disable */
+  pointer?: false;
+  /** Keyboard plugin: false to disable */
+  keyboard?: false;
+  /** Accessibility plugin: false to disable */
+  accessibility?: false;
+  /** Resize plugin: false to disable, or ResizeOptions */
+  resize?: false | ResizeOptions;
+  /** Camera plugin: false to disable, or CameraOptions */
+  camera?: false | CameraOptions;
+  /** Placeholder plugin: false to disable, or PlaceholderOptions */
+  placeholder?: false | PlaceholderOptions;
+  /** Algorithm: false to disable, 'reorder' for reorder, or default push */
+  algorithm?: false | 'reorder';
+  /** Algorithm-specific options */
+  algorithmOptions?: object;
+  /** Responsive plugin config (omit to disable) */
+  responsive?: ResponsiveOptions;
 }
 ```
 
@@ -293,43 +280,6 @@ const cell = getItemCell(item);
 // { column: 2, row: 1 }
 ```
 
-### `setItemCell(item: HTMLElement, cell: GridCell): void`
-
-Set an item's grid position.
-
-```js
-setItemCell(item, { column: 3, row: 2 });
-```
-
-### `registerPlugin(plugin: Plugin): void`
-
-Register a custom input plugin. Plugins auto-register via side-effect imports, so this is mainly for custom plugins.
-
-```ts
-registerPlugin({
-  name: 'touch-gesture',
-  init(core, options) {
-    // options includes plugin-specific config + shared resources
-    const { layoutModel, styleElement, ...pluginOptions } = options ?? {};
-
-    // Set up listeners
-    return () => {
-      // Cleanup
-    };
-  }
-});
-```
-
-Built-in plugins also export `attach*` functions for manual usage when you need more control:
-
-```js
-import { attachCamera, attachResize, attachPlaceholder, attachPushAlgorithm, attachResponsive } from 'gridiot';
-
-// Manual plugin attachment (bypasses auto-init)
-const camera = attachCamera(grid.element, { mode: 'center', core: grid });
-const resize = attachResize(grid.element, { handles: 'corners', core: grid });
-```
-
 ### `GridiotCore`
 
 The core instance returned by `init()`:
@@ -337,7 +287,13 @@ The core instance returned by `init()`:
 ```ts
 interface GridiotCore {
   element: HTMLElement;
+  stateMachine: StateMachine;
+  styles: StyleManager;
+  selectedItem: HTMLElement | null;
+  select(item: HTMLElement | null): void;
+  deselect(): void;
   getCellFromPoint(x: number, y: number): GridCell | null;
+  getGridInfo(): GridInfo;
   emit<T>(event: string, detail: T): void;
   destroy(): void;
 }
@@ -527,18 +483,20 @@ For smooth animated movement, use CSS View Transitions:
 <div data-gridiot-item style="--item-id: item-1">A</div>
 ```
 
-Then wrap position changes in a View Transition:
+The built-in algorithm plugins already use View Transitions automatically. For custom algorithms, wrap position changes:
 
 ```js
 grid.element.addEventListener('gridiot:drag-move', (e) => {
   const { item, cell } = e.detail;
+  const apply = () => {
+    item.style.gridColumn = String(cell.column);
+    item.style.gridRow = String(cell.row);
+  };
 
   if ('startViewTransition' in document) {
-    document.startViewTransition(() => {
-      setItemCell(item, cell);
-    });
+    document.startViewTransition(apply);
   } else {
-    setItemCell(item, cell);
+    apply();
   }
 });
 ```
@@ -652,40 +610,26 @@ Gridiot doesn't enforce a specific layout algorithm. You can use a built-in algo
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Using the Push Algorithm Plugin
+### Using the Push Algorithm
+
+The push algorithm is included by default in `init()`. Items push down on collision and compact up when space opens.
 
 ```js
 import { init } from './gridiot.js';
-import { attachPushAlgorithm } from './algorithm-push.js';
 
+// Push algorithm is the default
 const grid = init(document.getElementById('grid'));
-attachPushAlgorithm(grid.element);
-
-// That's it! Items push down on collision, compact up when space opens.
 ```
 
-### Push Algorithm Options
+To use the reorder algorithm instead:
 
 ```js
-attachPushAlgorithm(grid.element, {
-  // Inject CSS into a <style> element (recommended for View Transitions)
-  styleElement: document.getElementById('layout-styles'),
-
-  // CSS selector prefix for generated rules (default: '#')
-  selectorPrefix: '#',
-
-  // Whether to compact items upward after collisions (default: true)
-  compaction: true,
+const grid = init(document.getElementById('grid'), {
+  algorithm: 'reorder',
 });
 ```
 
-**CSS Injection Mode:** When `styleElement` is provided, the algorithm generates CSS rules instead of setting inline styles. This works better with View Transitions because the browser can animate between stylesheet states.
-
-```html
-<style id="layout-styles"></style>
-```
-
-**Compaction:** When `true`, items float upward to fill gaps after collisions are resolved. Set to `false` if you want items to stay where they're pushed.
+The algorithm injects CSS via `core.styles` (the StyleManager). This works with View Transitions because the browser can animate between stylesheet states.
 
 ### Custom: Swap
 
@@ -700,19 +644,13 @@ function swap(draggedItem, targetCell) {
     return cell.column === targetCell.column && cell.row === targetCell.row;
   });
 
-  setItemCell(draggedItem, targetCell);
+  // Update positions via CSS injection (or inline styles for simple cases)
+  draggedItem.style.gridColumn = String(targetCell.column);
+  draggedItem.style.gridRow = String(targetCell.row);
   if (targetItem) {
-    setItemCell(targetItem, draggedCell);
+    targetItem.style.gridColumn = String(draggedCell.column);
+    targetItem.style.gridRow = String(draggedCell.row);
   }
-}
-```
-
-### Custom: Insert (shift items)
-
-```js
-function insert(draggedItem, targetCell) {
-  // Shift items between old and new position
-  // Implementation depends on your grid structure
 }
 ```
 
@@ -734,36 +672,23 @@ Outputs to `gridiot/dist/`.
 
 The placeholder plugin shows a visual indicator where the dragged item will land.
 
-```js
-import { init } from './gridiot.js';
-import { attachPlaceholder } from './placeholder.js';
-
-const grid = init(document.getElementById('grid'));
-const placeholder = attachPlaceholder(grid.element, {
-  className: 'drop-placeholder', // CSS class (default: 'gridiot-placeholder')
-});
-
-// Optional: inject default styles
-import { attachPlaceholderStyles } from './placeholder.js';
-attachPlaceholderStyles();
-
-// Later, to clean up:
-placeholder.destroy();
-```
-
-### Styling
-
-Add CSS for your placeholder class:
+The placeholder plugin is included by default in `init()`. Style it with CSS:
 
 ```css
-.drop-placeholder {
+.gridiot-placeholder {
   background: rgba(255, 255, 255, 0.1);
   border: 2px dashed rgba(255, 255, 255, 0.4);
   border-radius: 8px;
 }
 ```
 
-Or use the built-in styles with `attachPlaceholderStyles()`.
+Or pass a custom class name:
+
+```js
+const grid = init(document.getElementById('grid'), {
+  placeholder: { className: 'drop-placeholder' },
+});
+```
 
 ### API
 
@@ -848,19 +773,14 @@ devOverlay.destroy(); // Remove and clean up
 ## Building
 
 ```bash
-npx tsx gridiot/build.ts
+node --experimental-strip-types build.ts
 ```
 
-Outputs to `gridiot/dist/`:
-- `gridiot.js` - Full bundle with all input plugins
-- `gridiot-minimal.js` - Pointer plugin only
-- `gridiot-core.js` - Core engine only
-- `algorithm-push.js` - Push-down layout algorithm
-- `dev-overlay.js` - Debug/config overlay
-- `placeholder.js` - Drop placeholder indicator
-
-## Browser Support
-
-- Chrome 111+ (View Transitions)
-- Safari 18+ (View Transitions)
-- Firefox (works without View Transitions, falls back gracefully)
+Outputs to `dist/`:
+- `gridiot.js` - Full bundle with all plugins
+- `algorithm-push.js` - Push-down layout algorithm (standalone)
+- `algorithm-reorder.js` - Reorder layout algorithm (standalone)
+- `dev-overlay.js` - Debug/config overlay (standalone)
+- `placeholder.js` - Drop placeholder (standalone)
+- `camera.js` - Viewport auto-scroll (standalone)
+- `resize.js` - Item resize handles (standalone)

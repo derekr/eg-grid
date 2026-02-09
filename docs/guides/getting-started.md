@@ -79,14 +79,17 @@ That's it! You now have drag-and-drop enabled. But items won't move yet—you ne
 Gridiot emits events but doesn't move items automatically. You decide what happens:
 
 ```javascript
-import { init, setItemCell, getItemCell } from './gridiot.js';
+import { init } from './gridiot.js';
 
 const grid = init(document.getElementById('my-grid'));
 
-// Simple: move item to wherever it's dropped
+// The push algorithm is included by default and handles drag events.
+// For a custom handler without the built-in algorithm:
+const grid = init(document.getElementById('my-grid'), { algorithm: false });
 grid.element.addEventListener('gridiot:drag-end', (e) => {
   const { item, cell } = e.detail;
-  setItemCell(item, cell);
+  item.style.gridColumn = String(cell.column);
+  item.style.gridRow = String(cell.row);
 });
 ```
 

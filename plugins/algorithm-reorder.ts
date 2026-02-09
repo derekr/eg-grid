@@ -12,10 +12,7 @@
  *   const detach = attachReorderAlgorithm(grid.element, { core });
  */
 
-import { registerPlugin } from '../engine';
-
 import type {
-	AlgorithmReorderPluginOptions,
 	GridCell,
 	GridiotCore,
 	ResponsiveLayoutModel,
@@ -258,19 +255,3 @@ export function attachReorderAlgorithm(
 	return attachAlgorithm(gridElement, strategy, options);
 }
 
-// Register as a plugin for auto-initialization via init()
-registerPlugin({
-	name: 'algorithm-reorder',
-	init(
-		core,
-		options?: AlgorithmReorderPluginOptions & {
-			core?: GridiotCore;
-			layoutModel?: ResponsiveLayoutModel;
-		},
-	) {
-		return attachReorderAlgorithm(core.element, {
-			...options,
-			core: options?.core ?? core,
-		});
-	},
-});

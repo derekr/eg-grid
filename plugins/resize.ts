@@ -17,7 +17,7 @@
  *   });
  */
 
-import { getItemSize, registerPlugin } from '../engine';
+import { getItemSize } from '../engine';
 import type {
 	GridCell,
 	GridiotCore,
@@ -25,9 +25,7 @@ import type {
 	ResizeEndDetail,
 	ResizeHandle,
 	ResizeMoveDetail,
-	ResizePluginOptions,
 	ResizeStartDetail,
-	ResizeState,
 } from '../types';
 
 
@@ -160,17 +158,6 @@ export function attachResize(
 	let hoveredItem: HTMLElement | null = null;
 	let hoveredHandle: ResizeHandle | null = null;
 
-	// Register provider for inter-plugin state access
-	core.providers.register<ResizeState | null>('resize', () => {
-		if (!activeResize) return null;
-		return {
-			item: activeResize.item,
-			originalSize: activeResize.originalSize,
-			currentSize: activeResize.currentSize,
-			handle: activeResize.handle,
-		};
-	});
-
 	function emit<T>(event: string, detail: T): void {
 		gridElement.dispatchEvent(
 			new CustomEvent(`gridiot:${event}`, {
@@ -222,6 +209,13 @@ export function attachResize(
 		item.addEventListener('pointermove', onItemPointerMove);
 		item.addEventListener('pointerup', onItemPointerUp);
 		item.addEventListener('pointercancel', onItemPointerCancel);
+
+		// Transition state machine to interacting
+		const itemId = item.id || item.getAttribute('data-gridiot-item') || '';
+		core.stateMachine.transition({
+			type: 'START_INTERACTION',
+			context: { type: 'resize', mode: 'pointer', itemId, element: item, columnCount: core.getGridInfo().columns.length },
+		});
 
 		// Emit resize-start BEFORE changing grid styles so originalPositions captures correct layout
 		emit<ResizeStartDetail>('resize-start', {
@@ -411,6 +405,7 @@ export function attachResize(
 		const { item, pointerId, currentSize, currentCell, sizeLabel } = activeResize;
 		item.setAttribute('data-gridiot-colspan', String(currentSize.colspan));
 		item.setAttribute('data-gridiot-rowspan', String(currentSize.rowspan));
+		core.stateMachine.transition({ type: 'COMMIT_INTERACTION' });
 		emit<ResizeEndDetail>('resize-end', {
 			item, cell: currentCell,
 			colspan: currentSize.colspan, rowspan: currentSize.rowspan,
@@ -418,12 +413,14 @@ export function attachResize(
 		});
 		resetItem(item, pointerId, sizeLabel);
 		activeResize = null;
+		core.stateMachine.transition({ type: 'FINISH_COMMIT' });
 	}
 
 	function cancelResize() {
 		if (!activeResize) return;
 		const { item, pointerId, sizeLabel } = activeResize;
 		emit<ResizeCancelDetail>('resize-cancel', { item, source: 'pointer' });
+		core.stateMachine.transition({ type: 'CANCEL_INTERACTION' });
 		resetItem(item, pointerId, sizeLabel);
 		activeResize = null;
 	}
@@ -443,6 +440,9 @@ export function attachResize(
 		// Stop event from reaching pointer plugin
 		e.stopPropagation();
 		e.preventDefault();
+
+		// Select the item (resize captures before pointer plugin, so pointer's select never fires)
+		core.select(item);
 
 		startResize(item, handle, e);
 	};
@@ -535,17 +535,5 @@ export function attachResize(
 
 	return { destroy };
 }
-
-// Register as a plugin for auto-initialization via init()
-registerPlugin({
-	name: 'resize',
-	init(core, options?: ResizePluginOptions & { core?: GridiotCore }) {
-		const instance = attachResize(core.element, {
-			...options,
-			core: options?.core ?? core,
-		});
-		return () => instance.destroy();
-	},
-});
 
 export type { ResizeHandle };

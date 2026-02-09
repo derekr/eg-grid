@@ -14,11 +14,9 @@
  * The actual responsive layout switching is handled by CSS container queries.
  */
 
-import { registerPlugin } from '../engine';
 import type {
 	ColumnCountChangeDetail,
 	GridiotCore,
-	ResponsiveLayoutModel,
 	ResponsivePluginOptions,
 	StyleManager,
 } from '../types';
@@ -110,16 +108,6 @@ export function attachResponsive(
 		styles.commit();
 	}
 
-	// Register provider if core is provided
-	if (core) {
-		core.providers.register<ResponsiveState>('responsive', () => ({
-			columnCount: layoutModel.currentColumnCount,
-			maxColumns: layoutModel.maxColumns,
-			minColumns: layoutModel.minColumns,
-			hasOverride: layoutModel.hasOverride(layoutModel.currentColumnCount),
-		}));
-	}
-
 	// Track if server-rendered CSS was detected
 	// When true, we only inject CSS for explicit user overrides, not derived layouts
 	const hasServerRenderedCSS = !!(styles?.get('base')?.trim());
@@ -167,30 +155,3 @@ export function attachResponsive(
 	};
 }
 
-// Register as a plugin for auto-initialization via init()
-registerPlugin({
-	name: 'responsive',
-	init(
-		core,
-		options?: ResponsivePluginOptions & {
-			core?: GridiotCore;
-			layoutModel?: ResponsiveLayoutModel;
-		},
-	) {
-		// Responsive requires layoutModel
-		if (!options?.layoutModel) {
-			// Skip silently - responsive is optional and requires layoutModel
-			return;
-		}
-
-		return attachResponsive(
-			core.element,
-			{
-				layoutModel: options.layoutModel,
-				cellSize: options.cellSize,
-				gap: options.gap,
-			},
-			options.core ?? core,
-		);
-	},
-});

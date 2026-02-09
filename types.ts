@@ -86,16 +86,6 @@ export interface ResizeCancelDetail {
 	source: DragSource;
 }
 
-/**
- * Resize state exposed by the resize plugin
- */
-export interface ResizeState {
-	item: HTMLElement;
-	originalSize: { colspan: number; rowspan: number };
-	currentSize: { colspan: number; rowspan: number };
-	handle: ResizeHandle;
-}
-
 export interface SelectDetail {
 	item: HTMLElement;
 }
@@ -114,57 +104,6 @@ export interface GridInfo {
 	cellHeight: number;
 }
 
-/**
- * Provider registry - allows plugins to share state without tight coupling.
- *
- * Plugins register providers for specific capabilities (e.g., 'layout', 'drag').
- * Other plugins can query these providers through the core without directly
- * depending on each other.
- */
-export interface ProviderRegistry {
-	/**
-	 * Register a provider for a capability.
-	 * Only one provider per capability is allowed.
-	 */
-	register<T>(capability: string, provider: () => T): void;
-
-	/**
-	 * Get a provider's current value.
-	 * Returns undefined if no provider is registered.
-	 */
-	get<T>(capability: string): T | undefined;
-
-	/**
-	 * Check if a capability has a registered provider.
-	 */
-	has(capability: string): boolean;
-}
-
-/**
- * Drag state exposed by the pointer plugin
- */
-export interface DragState {
-	item: HTMLElement;
-	cell: GridCell;
-	startCell: GridCell;
-	colspan: number;
-	rowspan: number;
-}
-
-/**
- * Layout state exposed by algorithm plugins
- */
-export interface LayoutState {
-	items: Array<{
-		id: string;
-		column: number;
-		row: number;
-		colspan: number;
-		rowspan: number;
-	}>;
-	columns: number;
-}
-
 // Re-export state machine types for convenience
 import type { GridiotStateMachine, GridiotState, StateTransition } from './state-machine';
 export type { GridiotStateMachine, GridiotState, StateTransition };
@@ -175,7 +114,7 @@ export type { GridiotStateMachine, GridiotState, StateTransition };
  * Plugins register named layers (e.g. 'base', 'preview') and the manager
  * concatenates them in registration order into a single <style> element.
  * This ensures correct cascade: base (responsive/container queries) first,
- * preview (algorithm) second — later rules override same-specificity earlier ones.
+ * preview (algorithm) second -- later rules override same-specificity earlier ones.
  */
 export interface StyleManager {
 	/** Set CSS for a named layer. First call for a layer establishes its order. */
@@ -195,24 +134,20 @@ export interface GridiotCore {
 	emit<T>(event: string, detail: T): void;
 	destroy(): void;
 
-	// Selection state (legacy, backed by state machine)
+	// Selection state (backed by state machine)
 	selectedItem: HTMLElement | null;
 	select(item: HTMLElement | null): void;
 	deselect(): void;
-
-	// Provider registry for plugin communication
-	providers: ProviderRegistry;
 
 	// Centralized state machine for interaction management
 	stateMachine: GridiotStateMachine;
 
 	// Centralized CSS injection
 	styles: StyleManager;
-}
 
-export interface Plugin<T = unknown> {
-	name: string;
-	init(core: GridiotCore, options?: T): (() => void) | void;
+	// Direct state (replaces providers)
+	/** Whether the camera is actively auto-scrolling (set by camera plugin) */
+	cameraScrolling: boolean;
 }
 
 // ============================================================================
@@ -273,26 +208,13 @@ export interface AlgorithmReorderPluginOptions {
 	layoutModel?: ResponsiveLayoutModel;
 }
 
-
-/**
- * Plugin-specific options map for init()
- */
-export interface PluginOptions {
-	camera?: CameraPluginOptions;
-	resize?: ResizePluginOptions;
-	placeholder?: PlaceholderPluginOptions;
-	'algorithm-push'?: AlgorithmPushPluginOptions;
-	'algorithm-reorder'?: AlgorithmReorderPluginOptions;
-	responsive?: ResponsivePluginOptions;
-}
-
 /**
  * Options for init()
  */
 export interface InitOptions {
 	/**
 	 * Responsive layout model for multi-breakpoint support.
-	 * Passed to responsive and algorithm-push plugins automatically.
+	 * Passed to responsive and algorithm plugins automatically.
 	 */
 	layoutModel?: ResponsiveLayoutModel;
 
@@ -303,16 +225,34 @@ export interface InitOptions {
 	styleElement?: HTMLStyleElement;
 
 	/**
-	 * Plugin-specific options.
-	 * Keys are plugin names, values are plugin-specific option objects.
+	 * Algorithm to use: 'push' (default) or 'reorder'.
+	 * Set to false to disable algorithm entirely.
 	 */
-	plugins?: Partial<PluginOptions>;
+	algorithm?: 'push' | 'reorder' | false;
 
-	/**
-	 * List of plugin names to disable.
-	 * These plugins won't be initialized even if registered.
-	 */
-	disablePlugins?: string[];
+	/** Options for the algorithm plugin */
+	algorithmOptions?: AlgorithmPushPluginOptions | AlgorithmReorderPluginOptions;
+
+	/** Set to false to disable the resize plugin */
+	resize?: ResizePluginOptions | false;
+
+	/** Set to false to disable the camera plugin */
+	camera?: CameraPluginOptions | false;
+
+	/** Set to false to disable the placeholder plugin */
+	placeholder?: PlaceholderPluginOptions | false;
+
+	/** Responsive plugin options. Omit to disable responsive. */
+	responsive?: ResponsivePluginOptions;
+
+	/** Set to false to disable the accessibility plugin */
+	accessibility?: false;
+
+	/** Set to false to disable the pointer plugin */
+	pointer?: false;
+
+	/** Set to false to disable the keyboard plugin */
+	keyboard?: false;
 }
 
 // ============================================================================

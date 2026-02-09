@@ -1,29 +1,25 @@
-import type { GridCell, GridiotCore, InitOptions, Plugin, PluginOptions, ProviderRegistry, StyleManager } from './types';
-import { createStateMachine, type GridiotStateMachine } from './state-machine';
-
-// Global plugin registry
-const plugins = new Map<string, Plugin>();
-
-export function registerPlugin(plugin: Plugin): void {
-	plugins.set(plugin.name, plugin);
-}
-
-export function getPlugin(name: string): Plugin | undefined {
-	return plugins.get(name);
-}
+import type { GridCell, GridiotCore, InitOptions, StyleManager } from './types';
+import { createStateMachine } from './state-machine';
+import { attachPointer } from './plugins/pointer';
+import { attachKeyboard } from './plugins/keyboard';
+import { attachAccessibility } from './plugins/accessibility';
+import { attachResize } from './plugins/resize';
+import { attachCamera } from './plugins/camera';
+import { attachPlaceholder } from './plugins/placeholder';
+import { attachPushAlgorithm } from './plugins/algorithm-push';
+import { attachReorderAlgorithm } from './plugins/algorithm-reorder';
+import { attachResponsive } from './plugins/responsive';
 
 /**
  * Initialize Gridiot on a CSS Grid element
  *
  * @param element - The CSS Grid container element
- * @param options - Configuration options including layoutModel, styleElement, and plugin options
+ * @param options - Configuration options
  */
 export function init(element: HTMLElement, options: InitOptions = {}): GridiotCore {
 	const {
 		layoutModel,
 		styleElement,
-		plugins: pluginOptions = {},
-		disablePlugins = [],
 	} = options;
 
 	const cleanups: (() => void)[] = [];
@@ -33,19 +29,6 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 
 	// Track selected element (state machine stores itemId, we need the element)
 	let selectedElement: HTMLElement | null = null;
-
-	// Provider registry for inter-plugin communication
-	const providerMap = new Map<string, () => unknown>();
-	const providers: ProviderRegistry = {
-		register<T>(capability: string, provider: () => T): void {
-			providerMap.set(capability, provider);
-		},
-
-		get<T>(capability: string): T | undefined {
-			const provider = providerMap.get(capability);
-			return provider ? (provider() as T) : undefined;
-		},
-	};
 
 	// StyleManager: single style element, multiple named layers
 	const styleLayers = new Map<string, string>(); // layer name → CSS
@@ -74,7 +57,9 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 			return styleLayers.get(layer) ?? '';
 		},
 		clear(layer: string): void {
-			styleLayers.set(layer, '');
+			if (styleLayers.has(layer)) {
+				styleLayers.set(layer, '');
+			}
 		},
 		commit(): void {
 			const parts: string[] = [];
@@ -88,9 +73,9 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 
 	const core: GridiotCore = {
 		element,
-		providers,
 		stateMachine,
 		styles,
+		cameraScrolling: false,
 
 		// Selection state (backed by state machine)
 		get selectedItem() {
@@ -183,29 +168,47 @@ export function init(element: HTMLElement, options: InitOptions = {}): GridiotCo
 		},
 	};
 
-	// Register state machine provider for plugin access
-	providers.register('state', () => stateMachine.getState());
+	// Direct initialization — no registry, no loop
+	if (options.pointer !== false) {
+		cleanups.push(attachPointer(core));
+	}
+	if (options.keyboard !== false) {
+		cleanups.push(attachKeyboard(core));
+	}
+	if (options.accessibility !== false) {
+		cleanups.push(attachAccessibility(core));
+	}
 
-	// Initialize all registered plugins with options
-	for (const plugin of plugins.values()) {
-		// Skip disabled plugins
-		if (disablePlugins.includes(plugin.name)) {
-			continue;
+	if (options.resize !== false) {
+		const resizeOpts = typeof options.resize === 'object' ? options.resize : {};
+		const inst = attachResize(element, { ...resizeOpts, core });
+		cleanups.push(() => inst.destroy());
+	}
+
+	if (options.camera !== false) {
+		const cameraOpts = typeof options.camera === 'object' ? options.camera : {};
+		const inst = attachCamera(element, { ...cameraOpts, core });
+		cleanups.push(() => inst.destroy());
+	}
+
+	if (options.placeholder !== false) {
+		const placeholderOpts = typeof options.placeholder === 'object' ? options.placeholder : {};
+		const inst = attachPlaceholder(element, placeholderOpts);
+		cleanups.push(() => inst.destroy());
+	}
+
+	// Algorithm: push (default) or reorder
+	if (options.algorithm !== false) {
+		const algoOpts = options.algorithmOptions ?? {};
+		if (options.algorithm === 'reorder') {
+			cleanups.push(attachReorderAlgorithm(element, { ...algoOpts, core, layoutModel }));
+		} else {
+			cleanups.push(attachPushAlgorithm(element, { ...algoOpts, core, layoutModel }));
 		}
+	}
 
-		// Build options for this plugin
-		const pluginSpecificOptions = pluginOptions[plugin.name as keyof PluginOptions] ?? {};
-		const opts = {
-			...pluginSpecificOptions,
-			// Pass shared resources to all plugins that might need them
-			layoutModel,
-			core,
-		};
-
-		const cleanup = plugin.init(core, opts);
-		if (cleanup) {
-			cleanups.push(cleanup);
-		}
+	if (options.responsive) {
+		cleanups.push(attachResponsive(element, options.responsive, core));
 	}
 
 	return core;
@@ -281,4 +284,3 @@ export function listenEvents(
 		}
 	};
 }
-

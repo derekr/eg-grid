@@ -5,6 +5,6 @@ export default defineConfig({
   root: '.',
   // Dev server settings
   server: {
-    open: '/examples/',  // Auto-open examples index
+    open: '/examples/',
   },
 });

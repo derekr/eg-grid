@@ -17,18 +17,6 @@ await Promise.all([
 		entryPoints: ['bundles/index.ts'],
 		outfile: 'dist/gridiot.js',
 	}),
-	// Minimal bundle (pointer only)
-	esbuild.build({
-		...common,
-		entryPoints: ['bundles/minimal.ts'],
-		outfile: 'dist/gridiot-minimal.js',
-	}),
-	// Core only (no plugins)
-	esbuild.build({
-		...common,
-		entryPoints: ['bundles/core.ts'],
-		outfile: 'dist/gridiot-core.js',
-	}),
 	// Algorithm plugins (optional add-ons)
 	esbuild.build({
 		...common,
@@ -68,8 +56,6 @@ await Promise.all([
 
 console.log('Built gridiot bundles:');
 console.log('  - dist/gridiot.js (full)');
-console.log('  - dist/gridiot-minimal.js (pointer only)');
-console.log('  - dist/gridiot-core.js (no plugins)');
 console.log('  - dist/algorithm-push.js (push layout algorithm)');
 console.log('  - dist/algorithm-reorder.js (reorder layout algorithm)');
 console.log('  - dist/dev-overlay.js (debug/config overlay)');

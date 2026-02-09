@@ -105,9 +105,11 @@ function calculateSwapLayout(draggedItem, targetCell, items) {
   });
 
   // Swap positions
-  setItemCell(draggedItem, targetCell);
+  draggedItem.style.gridColumn = String(targetCell.column);
+  draggedItem.style.gridRow = String(targetCell.row);
   if (targetItem) {
-    setItemCell(targetItem, draggedCell);
+    targetItem.style.gridColumn = String(draggedCell.column);
+    targetItem.style.gridRow = String(draggedCell.row);
   }
 }
 ```
@@ -143,7 +145,8 @@ function calculateInsertLayout(draggedItem, targetCell, items) {
   const columns = 4; // Your grid column count
 
   sortedItems.forEach(item => {
-    setItemCell(item, { column: col, row });
+    item.style.gridColumn = String(col);
+    item.style.gridRow = String(row);
     col++;
     if (col > columns) {
       col = 1;

@@ -19,10 +19,7 @@
  *   const detach = attachPushAlgorithm(grid.element);
  */
 
-import { registerPlugin } from '../engine';
-
 import type {
-	AlgorithmPushPluginOptions,
 	GridCell,
 	GridiotCore,
 	ResponsiveLayoutModel,
@@ -219,19 +216,3 @@ export function attachPushAlgorithm(
 	return attachAlgorithm(gridElement, strategy, harnessOptions);
 }
 
-// Register as a plugin for auto-initialization via init()
-registerPlugin({
-	name: 'algorithm-push',
-	init(
-		core,
-		options?: AlgorithmPushPluginOptions & {
-			core?: GridiotCore;
-			layoutModel?: ResponsiveLayoutModel;
-		},
-	) {
-		return attachPushAlgorithm(core.element, {
-			...options,
-			core: options?.core ?? core,
-		});
-	},
-});

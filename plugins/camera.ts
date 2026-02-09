@@ -8,16 +8,14 @@
  * The "active item" is: the dragged item during drag, or the selected item otherwise.
  */
 
-import { listenEvents, registerPlugin } from '../engine';
+import { listenEvents } from '../engine';
 import type {
 	DragStartDetail,
 	DragMoveDetail,
 	DragEndDetail,
 	DragCancelDetail,
 	SelectDetail,
-	DragState,
 	GridiotCore,
-	CameraPluginOptions,
 } from '../types';
 
 export type CameraMode = 'contain' | 'center' | 'off';
@@ -189,12 +187,9 @@ export function attachCamera(
 	let isScrolling = false;
 	let settleTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-	// Register provider if core is provided
+	// Expose scrolling state on core
 	if (core) {
-		core.providers.register<CameraState>('camera', () => ({
-			isScrolling,
-			mode,
-		}));
+		core.cameraScrolling = false;
 	}
 
 	/**
@@ -203,6 +198,7 @@ export function attachCamera(
 	function setScrolling(active: boolean): void {
 		if (active) {
 			isScrolling = true;
+			if (core) core.cameraScrolling = true;
 			if (settleTimeoutId) {
 				clearTimeout(settleTimeoutId);
 				settleTimeoutId = null;
@@ -212,6 +208,7 @@ export function attachCamera(
 			if (settleTimeoutId) clearTimeout(settleTimeoutId);
 			settleTimeoutId = setTimeout(() => {
 				isScrolling = false;
+				if (core) core.cameraScrolling = false;
 				settleTimeoutId = null;
 				// Emit settle event so algorithm can recalculate
 				gridElement.dispatchEvent(
@@ -473,14 +470,3 @@ export function attachCamera(
 	};
 }
 
-// Register as a plugin for auto-initialization via init()
-registerPlugin({
-	name: 'camera',
-	init(core, options?: CameraPluginOptions & { core?: GridiotCore }) {
-		const instance = attachCamera(core.element, {
-			...options,
-			core: options?.core ?? core,
-		});
-		return () => instance.destroy();
-	},
-});

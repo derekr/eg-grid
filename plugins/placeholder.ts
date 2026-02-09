@@ -5,14 +5,13 @@
  * Handles creation, positioning, and cleanup automatically.
  */
 
-import { listenEvents, registerPlugin } from '../engine';
+import { listenEvents } from '../engine';
 import type {
 	DragStartDetail,
 	DragMoveDetail,
 	DragEndDetail,
 	DragCancelDetail,
 	DropPreviewDetail,
-	PlaceholderPluginOptions,
 	ResizeStartDetail,
 	ResizeMoveDetail,
 	ResizeEndDetail,
@@ -229,11 +228,3 @@ export function attachPlaceholder(
 	};
 }
 
-// Register as a plugin for auto-initialization via init()
-registerPlugin({
-	name: 'placeholder',
-	init(core, options?: PlaceholderPluginOptions) {
-		const instance = attachPlaceholder(core.element, options);
-		return () => instance.destroy();
-	},
-});

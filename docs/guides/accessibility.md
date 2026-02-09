@@ -236,36 +236,36 @@ grid.dataset.gridiotAnnounceCancel = messages.cancel;
 For advanced needs, create your own accessibility handling:
 
 ```javascript
-import { registerPlugin } from 'gridiot';
+// Custom accessibility plugin — listen to drag events on the grid element
+function attachCustomAccessibility(gridElement) {
+  const liveRegion = document.createElement('div');
+  liveRegion.setAttribute('aria-live', 'assertive'); // More urgent
+  liveRegion.setAttribute('aria-atomic', 'true');
+  liveRegion.className = 'sr-only';
+  document.body.appendChild(liveRegion);
 
-registerPlugin({
-  name: 'custom-accessibility',
-  init(core) {
-    const liveRegion = document.createElement('div');
-    liveRegion.setAttribute('aria-live', 'assertive'); // More urgent
-    liveRegion.setAttribute('aria-atomic', 'true');
-    liveRegion.className = 'sr-only';
-    document.body.appendChild(liveRegion);
-
-    function announce(message) {
-      liveRegion.textContent = '';
-      requestAnimationFrame(() => {
-        liveRegion.textContent = message;
-      });
-    }
-
-    core.element.addEventListener('gridiot:drag-start', (e) => {
-      const { item, cell } = e.detail;
-      announce(`Started dragging ${getLabel(item)}`);
+  function announce(message) {
+    liveRegion.textContent = '';
+    requestAnimationFrame(() => {
+      liveRegion.textContent = message;
     });
-
-    // ... other event handlers
-
-    return () => {
-      liveRegion.remove();
-    };
   }
-});
+
+  const onDragStart = (e) => {
+    const { item } = e.detail;
+    const label = item.getAttribute('data-gridiot-label') || 'Item';
+    announce(`Started dragging ${label}`);
+  };
+
+  // ... other event handlers
+
+  gridElement.addEventListener('gridiot:drag-start', onDragStart);
+
+  return () => {
+    gridElement.removeEventListener('gridiot:drag-start', onDragStart);
+    liveRegion.remove();
+  };
+}
 ```
 
 ## Accessibility Checklist

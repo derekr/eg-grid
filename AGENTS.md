@@ -23,9 +23,7 @@ These docs distill the W3C specs ([CSS Grid Level 1](https://www.w3.org/TR/css-g
 - To serve – `pnpx vite .`
 
 Outputs to `dist/`:
-- `gridiot.js` - Full bundle
-- `gridiot-minimal.js` - Pointer only
-- `gridiot-core.js` - Core only
+- `gridiot.js` - Full bundle (all plugins)
 - Individual plugins for add-on use
 
 
@@ -39,24 +37,14 @@ Outputs to `dist/`:
 - **No dependencies** - Zero runtime dependencies. Avoid dev dependencies too; prefer built-in Node/browser APIs.
 - **Platform-first** - Maximize use of browser features, minimize JavaScript.
 
-### Inspiration
+### Plugin Architecture
 
-The engine+plugin architecture is inspired by [Datastar](https://github.com/starfederation/datastar/tree/develop/library/src). Plugins auto-register on import via side effects, enabling custom builds by importing only needed plugins:
-
-```ts
-// Custom build: just import what you need
-import './engine.ts';
-import './plugins/pointer.ts';    // auto-registers
-import './plugins/keyboard.ts';   // auto-registers
-// Other plugins excluded from bundle
-```
-
-Tooling for generating custom builds is not yet built, but the pattern supports it.
+Plugins are separate files with `attach*()` functions. `init()` in `engine.ts` wires them up directly based on options. Each plugin returns a cleanup function. Individual plugins can also be imported and attached manually for custom builds.
 
 ### Architecture
 
 ```
-engine.ts           - Core (grid measurement, events, plugin registry)
+engine.ts           - Core (grid measurement, events, state machine)
 layout-model.ts     - Responsive layout state management
 types.ts            - TypeScript type definitions
 
@@ -74,8 +62,6 @@ plugins/
 
 bundles/
   index.ts          - Full bundle (all plugins)
-  minimal.ts        - Pointer only
-  core.ts           - Core only (bring your own plugins)
 ```
 
 ## Core Principles
@@ -180,14 +166,15 @@ element.addEventListener('gridiot:drag-move', (e) => {
 });
 ```
 
-For shared state between plugins, use the Provider Registry:
+For shared state between plugins, use the state machine or direct properties on core:
 
 ```ts
-// Register
-core.providers.register('drag', () => dragState);
+// Check interaction state
+const state = core.stateMachine.getState();
+if (state.phase === 'interacting') { /* ... */ }
 
-// Query (no direct import needed)
-const dragState = core.providers.get('drag');
+// Camera scrolling flag (set by camera.ts, read by algorithm-harness.ts)
+core.cameraScrolling // boolean
 ```
 
 ## Implementation Patterns
@@ -204,7 +191,7 @@ item.style.left = `${rect.left}px`;
 
 // Drag end
 item.style.position = '';
-setItemCell(item, targetCell);
+// Algorithm plugin sets final position via CSS injection
 // Item rejoins grid flow
 ```
 
@@ -215,11 +202,12 @@ Always use View Transitions when available:
 ```ts
 if (document.startViewTransition) {
   document.startViewTransition(() => {
-    setItemCell(item, cell);
+    // Update CSS via core.styles or inline styles
+    updateLayout(item, cell);
   });
 } else {
   // FLIP fallback
-  setItemCell(item, cell);
+  updateLayout(item, cell);
 }
 ```
 
@@ -280,6 +268,6 @@ If something worked in the prototype, understand how before reimplementing.
 1. **Calculating pixel positions** - Let CSS Grid do it
 2. **Using inline styles for layout** - Breaks View Transitions
 3. **DOM access in algorithm code** - Keep algorithms pure
-4. **Direct plugin-to-plugin calls** - Use events or providers
+4. **Direct plugin-to-plugin calls** - Use events or state machine
 5. **Media queries instead of container queries** - Container queries are more flexible
 6. **Reimplementing without checking prototype** - Prototype has working patterns

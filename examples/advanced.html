@@ -448,9 +448,8 @@
 </head>
 <body>
   <nav>
-    <a href="index.html">Basic</a>
+    <a href="index.html">Architecture</a>
     <a href="advanced.html" class="active">Advanced</a>
-    <a href="architecture.html">Architecture</a>
   </nav>
 
   <div class="grid-wrapper">
@@ -775,7 +774,10 @@
     // Disable plugins that will be manually attached with custom options
     const grid = init(gridElement, {
       styleElement: layoutStyleElement,
-      disablePlugins: ['algorithm-push', 'placeholder', 'camera', 'resize'],
+      algorithm: false,
+      placeholder: false,
+      camera: false,
+      resize: false,
     });
 
     // Attach responsive plugin - handles CSS for all breakpoints
@@ -789,7 +791,7 @@
     let algorithmOptions = {
       layoutModel,  // Save to layout model on drag-end
       compaction: true,
-      core: grid  // Pass core for provider registration and style injection
+      core: grid
     };
     let detachAlgorithm = null;
 
