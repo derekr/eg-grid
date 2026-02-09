@@ -1,786 +1,387 @@
 # EG Grid
 
-Zero-dependency CSS Grid drag-and-drop library with View Transitions support.
+Zero-dependency CSS Grid drag-and-drop library.
 
-## Features
-
-- Works with native CSS Grid layouts
-- Pointer (mouse/touch) and keyboard support
-- Screen reader accessibility with ARIA live announcements
-- View Transitions API for smooth animations
-- Pluggable layout algorithms (push, reorder, or custom)
-- TypeScript-first with type-safe events
-- Tree-shakeable bundles
-
-## Architecture
-
-EG Grid separates **input handling** (how you drag) from **layout logic** (what happens when you drag). The core engine provides grid-aware primitives, while plugins handle the rest.
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Your App                                │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   ┌─────────────┐    Events     ┌─────────────────────────┐    │
-│   │   EG Grid   │ ────────────► │   Your Event Handlers   │    │
-│   │    Core     │               │   (Layout Algorithm)    │    │
-│   └─────────────┘               └─────────────────────────┘    │
-│          │                                                      │
-│          │
-│          ▼                                                      │
-│   ┌─────────────────────────────────────────────┐              │
-│   │              Input Plugins                   │              │
-│   ├───────────────┬───────────────┬─────────────┤              │
-│   │    Pointer    │   Keyboard    │ Accessibility│              │
-│   │  (mouse/touch)│  (arrows/tab) │ (ARIA live) │              │
-│   └───────────────┴───────────────┴─────────────┘              │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Core Engine Responsibilities
-
-```
-┌─────────────────────────────────────────┐
-│            EG Grid Core                 │
-├─────────────────────────────────────────┤
-│  • Parse CSS Grid layout (columns/rows) │
-│  • Convert point → cell coordinates     │
-│  • Emit drag events on grid element     │
-│  • Coordinate interaction state machine │
-│  • Provide grid measurement utilities   │
-└─────────────────────────────────────────┘
-         │
-         │ Does NOT handle:
-         │  • Visual dragging (that's pointer plugin)
-         │  • Layout algorithms (that's your code)
-         │  • Multi-cell items (read data attributes)
-         │
-         ▼
-┌─────────────────────────────────────────┐
-│         What You Implement              │
-├─────────────────────────────────────────┤
-│  • Layout algorithm (swap/push/insert)  │
-│  • Visual feedback (placeholders, etc)  │
-│  • Data model updates                   │
-│  • Persistence                          │
-└─────────────────────────────────────────┘
-```
-
-### Event Flow
-
-```
-  User drags item                Your drag-move handler
-        │                                │
-        ▼                                ▼
-┌───────────────┐  drag-start   ┌───────────────────┐
-│    Pointer    │ ───────────►  │  Save original    │
-│    Plugin     │               │  positions        │
-└───────────────┘               └───────────────────┘
-        │
-        │  drag-move (cell changed)
-        ▼
-┌───────────────┐  drag-move    ┌───────────────────┐
-│  Core emits   │ ───────────►  │  Calculate new    │
-│  with cell    │               │  layout, apply    │
-└───────────────┘               │  with View Trans. │
-        │                       └───────────────────┘
-        │  drag-end
-        ▼
-┌───────────────┐  drag-end     ┌───────────────────┐
-│  Core emits   │ ───────────►  │  Finalize layout  │
-│  final cell   │               │  Update data      │
-└───────────────┘               └───────────────────┘
-```
-
-### Why This Design?
-
-**Algorithms are opinionated.** Different apps need different behaviors:
-- Dashboard: Push items down, compact up
-- Kanban: Insert at position, shift others
-- Gallery: Simple swap
-
-By keeping algorithms in userland, EG Grid stays small and flexible. Use the built-in algorithm plugins or write your own.
-
-**Input methods are universal.** Pointer, keyboard, and accessibility handling are the same regardless of layout algorithm. These ship as plugins you can mix and match.
-
-### Architecture Philosophy: CSS-First, JS for Coordination
-
-EG Grid maximizes use of modern CSS and browser APIs. JavaScript handles orchestration and user input, not layout calculations.
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CSS HANDLES                                     │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  LAYOUT:                                                                     │
-│    • CSS Grid (grid-template-columns, grid-auto-rows, gap)                  │
-│    • Item positioning (grid-column, grid-row)                               │
-│    • Responsive layouts (container queries, media queries)                  │
-│                                                                              │
-│  ANIMATIONS:                                                                 │
-│    • View Transitions API (view-transition-name per item)                   │
-│    • ::view-transition-group for z-index during animations                  │
-│    • CSS transitions for hover/focus states                                 │
-│                                                                              │
-│  SCROLL POSITIONING:                                                         │
-│    • scroll-margin on items (e.g., scroll-margin: 25vh)                     │
-│    • scrollIntoView() with block: 'nearest' lets browser handle math        │
-│    • scroll-behavior: smooth for native smooth scrolling                    │
-│                                                                              │
-│  VISUAL STATES:                                                              │
-│    • [data-egg-dragging], [data-egg-selected] selectors             │
-│    • body.is-dragging for global drag state                                 │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           JAVASCRIPT HANDLES                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  INPUT ORCHESTRATION:                                                        │
-│    • Pointer event capture and normalization                                │
-│    • Keyboard event handling (Shift+G mode, arrows, etc.)                   │
-│    • Cell calculation from pointer coordinates                              │
-│                                                                              │
-│  EVENT EMISSION:                                                             │
-│    • Custom events (egg:drag-start, egg:select, etc.)               │
-│    • Event detail with item, cell, dimensions                               │
-│                                                                              │
-│  PLUGIN COORDINATION:                                                        │
-│    • State machine for interaction lifecycle                                │
-│    • Timing/settle delays for scroll-layout coordination                    │
-│                                                                              │
-│  ALGORITHM EXECUTION:                                                        │
-│    • Collision detection and layout calculation                             │
-│    • CSS string generation (layoutToCSS → inject into <style>)              │
-│    • Triggering View Transitions (document.startViewTransition)             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-**Guiding Principles:**
-
-1. **Use Baseline features** - Only use CSS/JS features with broad browser support ([Baseline](https://web.dev/baseline/))
-2. **Delegate to the browser** - If CSS can handle it, don't write JS for it
-3. **CSS for positioning math** - `scroll-margin`, `scrollIntoView()`, Grid layout
-4. **JS for orchestration** - Event handling, state coordination, algorithm logic
-5. **Animations via View Transitions** - No manual FLIP or JavaScript animation
-
-### Bundle Architecture
-
-```
-eg-grid.js (full)
-├── Core engine (grid measurement, state machine, events)
-├── Pointer plugin (visual drag, hysteresis, FLIP)
-├── Keyboard plugin (arrow keys, enter/space)
-├── Accessibility plugin (ARIA live regions)
-├── Algorithm: push (default) or reorder
-├── Camera (auto-scroll near edges)
-├── Resize (item handle detection)
-├── Placeholder (drop target indicator)
-└── Responsive (container query CSS injection)
-
-Individual plugins also available as separate bundles:
-  algorithm-push.js, algorithm-reorder.js,
-  camera.js, resize.js, placeholder.js, dev-overlay.js
-```
-
-## Installation
-
-```bash
-# Copy the dist files to your project
-cp eg-grid/dist/eg-grid.js your-project/
-```
+CSS handles layout and animation. JavaScript orchestrates user input. View Transitions make it feel alive.
 
 ## Quick Start
 
+### Web Component
+
+No JS setup required. Include the script, write HTML:
+
 ```html
+<script type="module" src="eg-grid-element.js"></script>
+
+<eg-grid columns="4" gap="8" algorithm="push" resize-handles="all">
+  <div data-egg-item="a">A</div>
+  <div data-egg-item="b">B</div>
+  <div data-egg-item="c">C</div>
+</eg-grid>
+```
+
+### Programmatic
+
+For full control, use `init()` directly:
+
+```html
+<style>
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  [data-egg-item="a"] { grid-column: 1 / span 2; grid-row: 1; }
+  [data-egg-item="b"] { grid-column: 3; grid-row: 1; }
+</style>
+
 <div class="grid" id="grid">
-  <div data-egg-item style="grid-column: 1; grid-row: 1">A</div>
-  <div data-egg-item style="grid-column: 2; grid-row: 1">B</div>
-  <div data-egg-item style="grid-column: 3; grid-row: 1">C</div>
+  <div data-egg-item="a">A</div>
+  <div data-egg-item="b">B</div>
 </div>
 
 <script type="module">
   import { init } from './eg-grid.js';
-
-  // All plugins enabled by default, including push algorithm
-  const grid = init(document.getElementById('grid'));
+  const core = init(document.getElementById('grid'));
 </script>
 ```
 
-## Bundles
+## How It Works
 
-| Bundle | Includes |
-|--------|----------|
-| `eg-grid.js` | All plugins (pointer, keyboard, accessibility, algorithm, camera, resize, placeholder, responsive) |
+```
+                              ┌──────────────────────┐
+                              │     State Machine     │
+                              │                       │
+                              │  idle → selected →    │
+                              │  interacting →        │
+                              │  committing → selected│
+                              └──────────┬───────────┘
+                                         │ orchestrates
+                  ┌──────────────────────┼──────────────────────┐
+                  │                      │                      │
+          ┌───────▼───────┐    ┌────────▼────────┐    ┌───────▼───────┐
+          │    Input       │    │   Algorithm      │    │    Output     │
+          │                │    │                  │    │               │
+          │  Pointer       │    │  Push (default)  │    │  CSS inject   │
+          │  Keyboard      │    │  Reorder         │    │  View Trans.  │
+          │  Resize        │    │  Server-side     │    │  ARIA live    │
+          └───────┬───────┘    └────────┬────────┘    └───────┬───────┘
+                  │                      │                      │
+                  │     egg-drag-move    │   new layout CSS     │
+                  │ ──────────────────►  │ ──────────────────►  │
+                  │                      │                      │
+                  └──────────────────────┴──────────────────────┘
+                                         │
+                                   CSS Grid does
+                                   the actual layout
+```
 
-## API
+The core engine measures the grid, converts pointer coordinates to cell positions, and emits events. Plugins handle discrete responsibilities — input capture, layout calculation, visual feedback — but all coordinate through the engine's state machine and event system.
 
-### `init(element: HTMLElement, options?: InitOptions): EggCore`
+**The browser does the heavy lifting.** JavaScript never calculates pixel positions. It figures out *which cell* an item should occupy, generates CSS, and lets the browser handle positioning, animation, and responsive reflow.
 
-Initialize EG Grid on a CSS Grid container.
+### State Machine
+
+One interaction at a time. Column count is captured at interaction start and held constant until commit.
+
+```
+              SELECT              START_INTERACTION
+  ┌──────┐ ──────────► ┌──────────┐ ──────────────► ┌──────────────┐
+  │ idle │              │ selected │                  │ interacting  │
+  └──────┘ ◄────────── └──────────┘ ◄────────────── └──────┬───────┘
+              DESELECT     ▲  CANCEL_INTERACTION           │
+                           │                    COMMIT_INTERACTION
+                           │  FINISH_COMMIT          │
+                           │                   ┌─────▼──────┐
+                           └─────────────────  │ committing  │
+                                               └────────────┘
+```
+
+### What Handles What
+
+| Responsibility | Handled by |
+|---|---|
+| Item positioning | CSS Grid (`grid-column`, `grid-row`) |
+| Responsive reflow | CSS container queries |
+| Drop animations | View Transitions API |
+| Visual states | CSS attribute selectors (`[data-egg-dragging]`) |
+| Scroll into view | `scrollIntoView()` + `scroll-margin` |
+| Pointer tracking | Pointer plugin (JS) |
+| Cell calculation | Core engine (JS) |
+| Layout algorithm | Algorithm plugin (JS) — or your server |
+| CSS generation | Algorithm harness → `<style>` injection |
+| State coordination | State machine (JS) |
+| Accessibility | ARIA live region announcements (JS) |
+
+### Plugins
+
+Plugins are internal modules with discrete responsibilities. They're not registered at runtime — `init()` wires them up based on options. Each returns a cleanup function.
+
+```
+eg-grid.js
+├── Core engine        Grid measurement, cell detection, state machine, events
+├── Pointer            Mouse/touch drag with hysteresis and fixed positioning
+├── Keyboard           Arrow keys, hjkl, Enter/Space pick-up/drop, Shift+G mode
+├── Accessibility      ARIA live announcements for drag and resize
+├── Algorithm: Push    Collision → push down, compact up (dashboard-style)
+├── Algorithm: Reorder Reflow items around dragged item (list-style)
+├── Algorithm harness  Shared logic: DOM reads, CSS generation, View Transitions
+├── Camera             Auto-scroll viewport when dragging near edges
+├── Resize             Handle detection on edges/corners, resize events
+├── Placeholder        Visual drop target indicator
+└── Responsive         Container query CSS injection for breakpoints
+```
+
+Disable any plugin by passing `false`:
 
 ```js
-// All plugins with defaults
-const grid = init(document.getElementById('grid'));
-
-// With responsive layout + custom options
-const grid = init(document.getElementById('grid'), {
-  layoutModel,
-  styleElement,
-  resize: { handles: 'corners', minSize: { colspan: 1, rowspan: 1 } },
-  responsive: { layoutModel, cellSize: 120, gap: 8 },
-});
-
-// Disable specific plugins
-const grid = init(document.getElementById('grid'), {
+init(grid, {
   camera: false,
   resize: false,
-});
-
-// Use reorder algorithm instead of push (default)
-const grid = init(document.getElementById('grid'), {
-  algorithm: 'reorder',
+  keyboard: false,
 });
 ```
 
-#### InitOptions
+## Algorithms
 
-```ts
-interface InitOptions {
-  /** Layout model for multi-breakpoint responsive support */
-  layoutModel?: ResponsiveLayoutModel;
-  /** Style element for CSS injection (created automatically if not provided) */
-  styleElement?: HTMLStyleElement;
-  /** Pointer plugin: false to disable */
-  pointer?: false;
-  /** Keyboard plugin: false to disable */
-  keyboard?: false;
-  /** Accessibility plugin: false to disable */
-  accessibility?: false;
-  /** Resize plugin: false to disable, or ResizeOptions */
-  resize?: false | ResizeOptions;
-  /** Camera plugin: false to disable, or CameraOptions */
-  camera?: false | CameraOptions;
-  /** Placeholder plugin: false to disable, or PlaceholderOptions */
-  placeholder?: false | PlaceholderOptions;
-  /** Algorithm: false to disable, 'reorder' for reorder, or default push */
-  algorithm?: false | 'reorder';
-  /** Algorithm-specific options */
-  algorithmOptions?: object;
-  /** Responsive plugin config (omit to disable) */
-  responsive?: ResponsiveOptions;
-}
-```
+Two built-in algorithms handle what happens when items collide during drag:
 
-### `getItemCell(item: HTMLElement): GridCell`
+**Push** (default) — Items push down to make room. Empty space compacts upward. Designed for dashboards and widget layouts.
 
-Get the current grid position of an item.
+**Reorder** — Items reflow around the dragged item, filling gaps naturally. Designed for sortable lists and galleries.
 
 ```js
-const cell = getItemCell(item);
-// { column: 2, row: 1 }
+// Push (default)
+init(grid);
+
+// Reorder
+init(grid, { algorithm: 'reorder' });
+
+// No algorithm — events only, you handle layout
+init(grid, { algorithm: false });
 ```
 
-### `EggCore`
+### Server-Side Layout
 
-The core instance returned by `init()`:
+Set `algorithm: false` to disable client-side layout calculation. Listen for drag/resize events and send them to your backend, which computes the new layout and returns updated CSS. This is useful for:
 
-```ts
-interface EggCore {
-  element: HTMLElement;
-  stateMachine: StateMachine;
-  styles: StyleManager;
-  selectedItem: HTMLElement | null;
-  select(item: HTMLElement | null): void;
-  deselect(): void;
-  getCellFromPoint(x: number, y: number): GridCell | null;
-  getGridInfo(): GridInfo;
-  emit<T>(event: string, detail: T): void;
-  destroy(): void;
-}
+- Real-time multiplayer (server is source of truth)
+- Complex custom algorithms
+- Persisting layout changes server-side
+
+The pure algorithm functions (`calculateLayout`, `compactUp`) have no DOM dependencies and can run in any JS environment.
+
+## Server-Rendered vs Client-Side
+
+EG Grid works in two modes. Both produce the same result — the difference is who provides the initial layout CSS.
+
+### Server-Rendered
+
+You provide CSS that positions items before JavaScript loads. No flash of unstyled content. The library enhances the existing grid with drag/drop.
+
+```html
+<style>
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  [data-egg-item="a"] { grid-column: 1 / span 2; grid-row: 1; }
+  [data-egg-item="b"] { grid-column: 3; grid-row: 1; }
+</style>
+
+<div class="grid" id="grid">
+  <div data-egg-item="a">A</div>
+  <div data-egg-item="b">B</div>
+</div>
 ```
+
+Persist layout changes by listening for `egg-drag-end` or `egg-resize-end` events and updating your server/database.
+
+### Client-Side
+
+The library generates all layout CSS. Simpler setup for SPAs where JavaScript is always available.
+
+```html
+<eg-grid columns="4" gap="8" algorithm="push">
+  <div data-egg-item="a">A</div>
+  <div data-egg-item="b">B</div>
+</eg-grid>
+```
+
+## `<eg-grid>` Web Component
+
+A thin wrapper that calls `init()` for you. No Shadow DOM — items use your CSS, View Transitions work document-wide.
+
+```html
+<eg-grid columns="4" gap="8"
+         algorithm="push"
+         resize-handles="all"
+         placeholder-class="drop-placeholder">
+  <div data-egg-item="a">A</div>
+  <div data-egg-item="b">B</div>
+</eg-grid>
+```
+
+### Attributes
+
+| Attribute | Description |
+|---|---|
+| `columns` | Max column count |
+| `cell-size` | Min cell width in px (enables responsive breakpoints) |
+| `gap` | Grid gap in px |
+| `algorithm` | `push` (default), `reorder`, or `none` |
+| `resize-handles` | `corners`, `edges`, or `all` |
+| `placeholder-class` | CSS class for drop placeholder |
+| `no-camera` | Disable auto-scroll |
+| `no-keyboard` | Disable keyboard navigation |
+| `no-accessibility` | Disable ARIA announcements |
+| `no-placeholder` | Disable placeholder |
+
+### Responsive
+
+Add `cell-size` to auto-generate container query breakpoints that reflow items as the grid container resizes:
+
+```html
+<eg-grid columns="6" cell-size="140" gap="8" algorithm="push">
+```
+
+Without `cell-size`, column count stays fixed. With it, the responsive plugin generates `@container` rules that adjust columns based on available width.
 
 ## Events
 
-All events bubble and are dispatched on the grid element.
+All events use dash-separated names (e.g. `egg-drag-start`) and bubble from the grid element.
 
-### `egg:drag-start`
+| Event | Detail | When |
+|---|---|---|
+| `egg-drag-start` | `{ item, cell, colspan, rowspan, source }` | Drag begins |
+| `egg-drag-move` | `{ item, cell, x, y, colspan, rowspan, source }` | Pointer moves to new cell |
+| `egg-drag-end` | `{ item, cell, colspan, rowspan, source }` | Drop |
+| `egg-drag-cancel` | `{ item, source }` | Escape or pointer leaves grid |
+| `egg-resize-start` | `{ item, handle, colspan, rowspan, source }` | Resize begins |
+| `egg-resize-move` | `{ item, handle, colspan, rowspan, source }` | Size changes |
+| `egg-resize-end` | `{ item, handle, colspan, rowspan, source }` | Resize committed |
+| `egg-resize-cancel` | `{ item, source }` | Resize cancelled |
+| `egg-select` | `{ item }` | Item selected |
+| `egg-deselect` | `{ item }` | Selection cleared |
+| `egg-column-count-change` | `{ columnCount }` | Responsive breakpoint change |
+| `egg-drop-preview` | `{ item, column, row, colspan, rowspan }` | Reorder algorithm preview position |
 
-Fired when dragging begins.
-
-```ts
-grid.element.addEventListener('egg:drag-start', (e) => {
-  const { item, cell, colspan, rowspan } = e.detail;
-  // item: HTMLElement being dragged
-  // cell: { column, row } starting position
-  // colspan, rowspan: item dimensions
-});
-```
-
-### `egg:drag-move`
-
-Fired continuously as the drag target moves over cells.
-
-```ts
-grid.element.addEventListener('egg:drag-move', (e) => {
-  const { item, cell, x, y, colspan, rowspan } = e.detail;
-  // cell: current cell under pointer
-  // x, y: pointer coordinates (0 for keyboard)
-  // colspan, rowspan: item dimensions
-});
-```
-
-### `egg:drag-end`
-
-Fired when dragging ends successfully (within grid bounds).
-
-```ts
-grid.element.addEventListener('egg:drag-end', (e) => {
-  const { item, cell, colspan, rowspan } = e.detail;
-  // cell: final drop position
-  // colspan, rowspan: item dimensions
-});
-```
-
-### `egg:drag-cancel`
-
-Fired when dragging is cancelled (Escape key, pointer leaves grid, etc.).
-
-```ts
-grid.element.addEventListener('egg:drag-cancel', (e) => {
-  const { item } = e.detail;
-});
-```
-
-### `egg:select`
-
-Fired when an item is selected (clicked or focused).
-
-```ts
-grid.element.addEventListener('egg:select', (e) => {
-  const { item } = e.detail;
-});
-```
-
-### `egg:deselect`
-
-Fired when selection is cleared (Escape, click outside, etc.).
-
-```ts
-grid.element.addEventListener('egg:deselect', (e) => {
-  const { item } = e.detail; // Previously selected item, or null
-});
-```
+`source` is `'pointer'` or `'keyboard'`.
 
 ## Styling
 
-### Item Attributes
+### Data Attributes
 
-- `data-egg-item` - Mark elements as draggable grid items
-- `data-egg-colspan` - Number of columns the item spans (default: 1)
-- `data-egg-rowspan` - Number of rows the item spans (default: 1)
-- `data-egg-dragging` - Added automatically during pointer drag
-- `data-egg-dropping` - Added during FLIP animation after drop
-- `data-egg-selected` - Added when item is selected
-- `data-egg-resizing` - Added during resize operation
-- `data-egg-handle-hover` - Set to handle name (`se`, `nw`, etc.) when hovering a resize handle
-- `data-egg-handle-active` - Set to handle name during active resize
+Items are styled via CSS attribute selectors. The library sets these automatically:
 
 ```css
-[data-egg-item] {
-  cursor: grab;
-}
+/* Dragging */
+[data-egg-dragging] { cursor: grabbing; z-index: 100; transform: scale(1.03); }
+[data-egg-dropping] { z-index: 100; }
 
-[data-egg-dragging] {
-  cursor: grabbing;
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
+/* Selection */
+[data-egg-selected] { outline: 2px solid #fbbf24; }
 
-[data-egg-selected] {
-  outline: 3px solid #fbbf24;
-  outline-offset: 2px;
-}
-```
+/* Resize handles */
+[data-egg-handle-hover="se"]::after { /* show SE corner indicator */ }
+[data-egg-handle-active="se"]::after { /* highlight active handle */ }
 
-### Resize Handle Styling
+/* Resizing */
+[data-egg-resizing] { z-index: 100; }
 
-Use CSS pseudo-elements to create visible resize handles based on the data attributes:
-
-```css
-/* Base handle style - hidden by default */
-[data-egg-item]::after {
-  content: '';
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  opacity: 0;
-  transition: opacity 0.15s;
-  pointer-events: none;
-}
-
-/* Position handle at bottom-right corner */
-[data-egg-item]::after {
-  bottom: 4px;
-  right: 4px;
-  background: rgba(59, 130, 246, 0.6);
-  border-radius: 2px;
-}
-
-/* Show handle on hover */
-[data-egg-item][data-egg-handle-hover="se"]::after,
-[data-egg-item][data-egg-handle-hover="sw"]::after,
-[data-egg-item][data-egg-handle-hover="ne"]::after,
-[data-egg-item][data-egg-handle-hover="nw"]::after {
-  opacity: 1;
-}
-
-/* Highlight during active resize */
-[data-egg-item][data-egg-handle-active]::after {
-  opacity: 1;
-  background: rgba(59, 130, 246, 0.9);
-}
-```
-
-Handle names: `n`, `s`, `e`, `w` (edges), `nw`, `ne`, `sw`, `se` (corners).
-
-### Body Class
-
-During pointer drag, `is-dragging` is added to `document.body`. Use this to prevent text selection:
-
-```css
-body.is-dragging {
-  user-select: none;
-  cursor: grabbing;
-}
-```
-
-### Grid Attributes
-
-- `data-egg-keyboard-mode` - Added to grid when keyboard mode is active (Shift+G)
-
-```css
-.grid[data-egg-keyboard-mode] {
-  outline: 2px solid rgba(251, 191, 36, 0.3);
-  outline-offset: 4px;
-}
+/* Keyboard mode */
+[data-egg-keyboard-mode] { outline: 2px solid rgba(251, 191, 36, 0.3); }
 ```
 
 ### View Transitions
 
-For smooth animated movement, use CSS View Transitions:
+For animated layout changes, give items a `view-transition-name`:
 
 ```css
-.item {
-  view-transition-name: var(--item-id);
-}
+.item { view-transition-name: var(--item-id); }
 
 ::view-transition-group(*) {
   animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 ```
 
-```html
-<div data-egg-item style="--item-id: item-1">A</div>
-```
+The `--item-id` custom property is set automatically by the web component, or manually in programmatic use.
 
-The built-in algorithm plugins already use View Transitions automatically. For custom algorithms, wrap position changes:
+### Item Attributes
 
-```js
-grid.element.addEventListener('egg:drag-move', (e) => {
-  const { item, cell } = e.detail;
-  const apply = () => {
-    item.style.gridColumn = String(cell.column);
-    item.style.gridRow = String(cell.row);
-  };
+| Attribute | Purpose |
+|---|---|
+| `data-egg-item` | Mark as grid item (value is the item ID) |
+| `data-egg-colspan` | Column span (default: 1, or derived from CSS) |
+| `data-egg-rowspan` | Row span (default: 1, or derived from CSS) |
+| `data-egg-label` | Human-readable name for accessibility |
 
-  if ('startViewTransition' in document) {
-    document.startViewTransition(apply);
-  } else {
-    apply();
-  }
-});
-```
-
-## Keyboard Support
-
-When using the full bundle (`eg-grid.js`), keyboard navigation is included:
-
-### Keyboard Mode
-
-Press **Shift+G** to toggle keyboard mode. When active, the grid shows a visual indicator and you can navigate without clicking first.
-
-### Navigation Keys
+## Keyboard
 
 | Key | Action |
-|-----|--------|
+|---|---|
 | **Shift+G** | Toggle keyboard mode |
-| **Arrow keys** or **hjkl** | Nudge selected item by 1 cell |
-| **Shift+Arrow** or **Shift+hjkl** | Resize selected item |
-| **Ctrl+Arrow** or **Ctrl+hjkl** | Jump by item size |
-| **Alt+Arrow** or **Alt+hjkl** | Select adjacent item |
-| **Enter** or **Space** | Pick up / drop item |
-| **Escape** | Cancel drag or deselect |
-
-### Pick Up Mode
-
-Press Enter/Space to "pick up" an item. While held:
-- Arrow keys move the item and show preview
-- Enter/Space drops the item
-- Escape cancels and restores original position
-
-### Quick Nudge
-
-Without picking up, arrow keys perform instant nudge (drag-start + drag-end in one action).
-
-Items should have `tabindex="0"` to be focusable:
-
-```html
-<div data-egg-item tabindex="0">A</div>
-```
+| **Arrow keys** / **hjkl** | Nudge item by 1 cell |
+| **Shift+Arrow** / **Shift+hjkl** | Resize item |
+| **Ctrl+Arrow** / **Ctrl+hjkl** | Jump by item size |
+| **Alt+Arrow** / **Alt+hjkl** | Select adjacent item |
+| **Enter** / **Space** | Pick up / drop item |
+| **Escape** | Cancel or deselect |
 
 ## Accessibility
 
-The full bundle includes screen reader support via ARIA live announcements. The accessibility plugin announces:
+The accessibility plugin announces drag and resize actions via an ARIA live region.
 
-- When an item is grabbed
-- When an item moves to a new cell
-- When an item is dropped
-- When a drag is cancelled
-
-### Labeling Items
-
-Use `data-egg-label` to provide a human-readable name for items:
+Label items with `data-egg-label`:
 
 ```html
-<div data-egg-item data-egg-label="Revenue Chart">...</div>
+<div data-egg-item="chart" data-egg-label="Revenue Chart">...</div>
 ```
 
-Falls back to `aria-label`, then `id`, then "Item".
-
-### Custom Announcements
-
-Override default announcements with template attributes. Use `{label}`, `{row}`, and `{column}` placeholders:
+Override announcements with template attributes (`{label}`, `{row}`, `{column}`, `{colspan}`, `{rowspan}`):
 
 ```html
-<!-- Per-item override -->
-<div
-  data-egg-item
-  data-egg-label="Sales Chart"
-  data-egg-announce-grab="{label} selected at {row}, {column}."
-  data-egg-announce-drop="Placed {label}."
->
-  ...
-</div>
-
-<!-- Grid-wide default -->
-<div
-  id="grid"
-  data-egg-announce-move="Now at row {row}, column {column}."
->
-  ...
-</div>
+<div data-egg-item="chart"
+     data-egg-announce-grab="{label} picked up"
+     data-egg-announce-move="Row {row}, column {column}"
+     data-egg-announce-drop="{label} placed">
 ```
 
-**Available attributes:**
-- `data-egg-announce-grab` - When item is picked up
-- `data-egg-announce-move` - When item moves to a new cell
-- `data-egg-announce-drop` - When item is dropped
-- `data-egg-announce-cancel` - When drag is cancelled
-
-**Attribute precedence:** Item attribute > Grid attribute > Default
-
-## Layout Algorithms
-
-EG Grid doesn't enforce a specific layout algorithm. You can use a built-in algorithm plugin or implement your own.
+## Bundles
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Algorithm Options                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Built-in Plugin          Roll Your Own                         │
-│  ┌─────────────────┐      ┌─────────────────────────────────┐  │
-│  │ algorithm-push  │      │  Listen to drag events          │  │
-│  │                 │      │  Calculate new positions        │  │
-│  │ • Push down on  │  OR  │  Apply with View Transitions    │  │
-│  │   collision     │      │                                 │  │
-│  │ • Compact up    │      │  Examples: swap, insert, snap   │  │
-│  └─────────────────┘      └─────────────────────────────────┘  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Using the Push Algorithm
-
-The push algorithm is included by default in `init()`. Items push down on collision and compact up when space opens.
-
-```js
-import { init } from './eg-grid.js';
-
-// Push algorithm is the default
-const grid = init(document.getElementById('grid'));
-```
-
-To use the reorder algorithm instead:
-
-```js
-const grid = init(document.getElementById('grid'), {
-  algorithm: 'reorder',
-});
-```
-
-The algorithm injects CSS via `core.styles` (the StyleManager). This works with View Transitions because the browser can animate between stylesheet states.
-
-### Custom: Swap
-
-```js
-function swap(draggedItem, targetCell) {
-  const items = [...document.querySelectorAll('[data-egg-item]')];
-  const draggedCell = getItemCell(draggedItem);
-
-  const targetItem = items.find(item => {
-    if (item === draggedItem) return false;
-    const cell = getItemCell(item);
-    return cell.column === targetCell.column && cell.row === targetCell.row;
-  });
-
-  // Update positions via CSS injection (or inline styles for simple cases)
-  draggedItem.style.gridColumn = String(targetCell.column);
-  draggedItem.style.gridRow = String(targetCell.row);
-  if (targetItem) {
-    targetItem.style.gridColumn = String(draggedCell.column);
-    targetItem.style.gridRow = String(draggedCell.row);
-  }
-}
+dist/
+  eg-grid.js           Full bundle — all plugins
+  eg-grid-element.js   Web component — <eg-grid> + all plugins
+  algorithm-push.js    Push algorithm (standalone)
+  algorithm-reorder.js Reorder algorithm (standalone)
+  camera.js            Auto-scroll (standalone)
+  resize.js            Resize handles (standalone)
+  placeholder.js       Drop placeholder (standalone)
+  dev-overlay.js       Debug panel (standalone, Shift+D)
 ```
 
 ## Building
 
 ```bash
-npx tsx eg-grid/build.ts
-```
+# Library bundles
+node --experimental-strip-types build.ts
 
-Outputs to `eg-grid/dist/`.
+# Examples site
+pnpm run build:site
+```
 
 ## Browser Support
 
 - Chrome 111+ (View Transitions)
 - Safari 18+ (View Transitions)
-- Firefox (works without View Transitions, falls back gracefully)
+- Firefox 128+ (View Transitions with known issues — see `docs/known-issues.md`)
 
-## Placeholder
+View Transitions degrade gracefully — layout changes still work, they just aren't animated.
 
-The placeholder plugin shows a visual indicator where the dragged item will land.
+## Guiding Principles
 
-The placeholder plugin is included by default in `init()`. Style it with CSS:
+1. **CSS does the layout** — JavaScript figures out which cell, CSS Grid positions the item
+2. **Style injection, not inline styles** — `<style>` elements so View Transitions can animate between states
+3. **Data attributes for state** — `[data-egg-dragging]` not `.dragging` — queryable, debuggable, no class conflicts
+4. **Events for coordination** — plugins communicate via custom events on the grid element
+5. **Algorithms are separate** — input handling is universal, layout logic is pluggable
+6. **Platform first** — `scrollIntoView()` not scroll math, container queries not resize observers, View Transitions not FLIP
 
-```css
-.egg-placeholder {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px dashed rgba(255, 255, 255, 0.4);
-  border-radius: 8px;
-}
-```
+## License
 
-Or pass a custom class name:
-
-```js
-const grid = init(document.getElementById('grid'), {
-  placeholder: { className: 'drop-placeholder' },
-});
-```
-
-### API
-
-```js
-placeholder.show(column, row, colspan, rowspan); // Manually show
-placeholder.hide();     // Manually hide
-placeholder.destroy();  // Remove listeners and clean up
-```
-
-## Dev Overlay
-
-The dev overlay plugin provides a debugging and configuration panel for development.
-
-```js
-import { attachDevOverlay } from './dev-overlay.js';
-
-const devOverlay = attachDevOverlay(gridElement, {
-  visible: false,      // Start hidden
-  initialTab: 'debug', // 'debug' or 'config'
-  toggleKey: 'D',      // Shift+D to toggle
-});
-```
-
-### Keyboard Shortcut
-
-Press **Shift+D** to toggle the overlay.
-
-### Debug Tab
-
-Shows real-time information:
-- **Grid Info:** Columns, rows, cell dimensions, gap
-- **Items:** List of all items with their positions
-- **Event Log:** Live feed of drag events
-
-### Config Tab
-
-Runtime configuration with registered options:
-- Boolean toggles
-- Action buttons
-
-### Registering Config Options
-
-Plugins can register their options with the overlay:
-
-```js
-// Boolean toggle
-devOverlay.registerOption({
-  key: 'compaction',
-  label: 'Compact items upward',
-  type: 'boolean',
-  value: true,
-  onChange: (value) => {
-    // Handle change
-  }
-});
-
-// Action button
-devOverlay.registerOption({
-  key: 'compact-now',
-  label: 'Compact Now',
-  type: 'action',
-  onAction: () => {
-    // Perform action
-  }
-});
-```
-
-### API
-
-```js
-devOverlay.show();    // Show the overlay
-devOverlay.hide();    // Hide the overlay
-devOverlay.toggle();  // Toggle visibility
-devOverlay.destroy(); // Remove and clean up
-```
-
-## Examples
-
-- `example.html` - Basic swap algorithm
-- `example-advanced.html` - Multi-cell items, push algorithm, dev overlay
-
-## Building
-
-```bash
-node --experimental-strip-types build.ts
-```
-
-Outputs to `dist/`:
-- `eg-grid.js` - Full bundle with all plugins
-- `algorithm-push.js` - Push-down layout algorithm (standalone)
-- `algorithm-reorder.js` - Reorder layout algorithm (standalone)
-- `dev-overlay.js` - Debug/config overlay (standalone)
-- `placeholder.js` - Drop placeholder (standalone)
-- `camera.js` - Viewport auto-scroll (standalone)
-- `resize.js` - Item resize handles (standalone)
+[Beerware](LICENSE)
