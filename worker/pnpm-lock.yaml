@@ -8,9 +8,6 @@ importers:
 
   .:
     devDependencies:
-      esbuild-wasm:
-        specifier: ^0.24.0
-        version: 0.24.2
       wrangler:
         specifier: ^4.0.0
         version: 4.63.0
@@ -400,11 +397,6 @@ packages:
   error-stack-parser-es@1.0.5:
     resolution: {integrity: sha512-5qucVt2XcuGMcEGgWI7i+yZpmpByQ8J1lHhcL7PwqCwu9FPP3VUXzT4ltHe5i2z9dePwEHcDVOAfSnHsOlCXRA==}
 
-  esbuild-wasm@0.24.2:
-    resolution: {integrity: sha512-03/7Z1gD+ohDnScFztvI4XddTAbKVmMEzCvvkBpQdWKEXJ+73dTyeNrmdxP1Q0zpDMFjzUJwtK4rLjqwiHbzkw==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   esbuild@0.27.0:
     resolution: {integrity: sha512-jd0f4NHbD6cALCyGElNpGAOtWxSq46l9X/sWB0Nzd5er4Kz2YTm+Vl0qKFT9KUJvD8+fiO8AvoHhFvEatfVixA==}
     engines: {node: '>=18'}
@@ -726,8 +718,6 @@ snapshots:
   detect-libc@2.1.2: {}
 
   error-stack-parser-es@1.0.5: {}
-
-  esbuild-wasm@0.24.2: {}
 
   esbuild@0.27.0:
     optionalDependencies:

@@ -4,11 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "pnpm sync-sources && wrangler deploy",
-    "sync-sources": "node --experimental-strip-types scripts/sync-sources.ts"
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "esbuild-wasm": "^0.24.0",
     "wrangler": "^4.0.0"
   }
 }

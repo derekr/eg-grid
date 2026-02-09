@@ -5,3 +5,10 @@ compatibility_flags = ["nodejs_compat"]
 
 [observability]
 enabled = true
+
+[durable_objects]
+bindings = [{ name = "GRID_SESSION", class_name = "GridSession" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GridSession"]

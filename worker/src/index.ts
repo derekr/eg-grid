@@ -1,241 +1,180 @@
-import { bundle, formatMetafile, getPluginSizes } from './bundler';
-import { PLUGINS, PLUGIN_NAMES } from './manifest';
-import { renderOutput, renderPage } from './ui';
+/**
+ * Datastar + EG Grid integration worker.
+ *
+ * Architecture (CQRS):
+ *   GET  /           → HTML page
+ *   GET  /api/stream → Long-lived SSE connection (reads)
+ *   POST /api/*      → Fire-and-forget commands (writes)
+ *
+ * The Durable Object bridges POST commands to SSE streams:
+ * POST → DO processes → DO broadcasts via stored stream writers → SSE clients
+ */
+import { renderPage } from "./page";
+import { type ItemRect } from "./algorithm";
+import { GridSession } from "./session";
+
+export { GridSession };
+
+interface Env {
+  GRID_SESSION: DurableObjectNamespace<GridSession>;
+}
+
+const VITE_ORIGIN = "http://localhost:5176";
+const COOKIE_NAME = "egg-session";
 
 export default {
-	async fetch(request: Request): Promise<Response> {
-		const url = new URL(request.url);
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
 
-		// CORS preflight
-		if (request.method === 'OPTIONS') {
-			return new Response(null, { status: 204, headers: corsHeaders() });
-		}
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
 
-		// Routing
-		if (url.pathname === '/') {
-			return new Response(renderPage(url.origin), {
-				headers: { 'Content-Type': 'text/html; charset=utf-8' },
-			});
-		}
+    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/morph" || url.pathname === "/server" || url.pathname === "/client")) {
+      return handlePage(request, env, url.pathname);
+    }
 
-		if (url.pathname === '/build' && request.method === 'POST') {
-			return handleBuild(request, url);
-		}
+    if (url.pathname === "/api/stream" && request.method === "GET") {
+      return handleStream(request, env);
+    }
 
-		if (url.pathname === '/analyze') {
-			return handleAnalyze(url);
-		}
+    if (url.pathname.startsWith("/api/") && request.method === "POST") {
+      return handleCommand(request, env, url.pathname);
+    }
 
-		if (url.pathname === '/manifest.json') {
-			return json(PLUGINS, { 'Cache-Control': 'public, max-age=3600' });
-		}
-
-		if (url.pathname === '/bundle' || url.pathname.startsWith('/bundle/')) {
-			return handleBundle(request, url);
-		}
-
-		return json({ error: 'Not found', endpoints: ['/bundle', '/bundle?plugins=pointer,keyboard', '/manifest.json'] }, {}, 404);
-	},
+    return new Response("Not Found", { status: 404 });
+  },
 };
 
-// --- Bundle analysis ---
+// --- Page ---
 
-async function handleAnalyze(url: URL): Promise<Response> {
-	const param = url.searchParams.get('plugins');
-	const plugins = param === null ? [...PLUGIN_NAMES] : param === '' ? [] : param.split(',').filter(Boolean);
-	const sorted = [...plugins].sort();
+async function handlePage(request: Request, env: Env, pathname: string): Promise<Response> {
+  let sessionId = getSessionId(request);
+  const isNew = !sessionId;
+  if (!sessionId) sessionId = crypto.randomUUID();
 
-	const { metafile, size } = await bundle(sorted, { minify: true, metafile: true });
-	const analysis = formatMetafile(metafile!);
+  // Redirect / to /morph
+  if (pathname === "/") {
+    return Response.redirect(new URL("/morph", request.url).toString(), 302);
+  }
 
-	// Also build unminified to show raw vs minified
-	const unminified = await bundle(sorted, { minify: false });
+  const session = getSession(env, sessionId);
+  const items = await session.getLayout();
+  const tab = pathname === "/client" ? "client" : pathname === "/server" ? "server" : "morph";
+  const html = renderPage(items, VITE_ORIGIN, tab);
 
-	return new Response(
-		`Plugins: ${sorted.join(', ') || '(core only)'}\n` +
-		`Minified: ${(size / 1024).toFixed(1)} KB\n` +
-		`Unminified: ${(unminified.size / 1024).toFixed(1)} KB\n\n` +
-		analysis,
-		{ headers: { 'Content-Type': 'text/plain', ...corsHeaders() } },
-	);
+  const headers = new Headers({
+    "Content-Type": "text/html; charset=utf-8",
+  });
+  if (isNew) {
+    headers.set(
+      "Set-Cookie",
+      `${COOKIE_NAME}=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
+    );
+  }
+  return new Response(html, { headers });
 }
 
-// --- SSE build endpoint (Datastar fat morph) ---
+// --- SSE stream (long-lived read connection) ---
 
-async function handleBuild(request: Request, url: URL): Promise<Response> {
-	let signals: Record<string, unknown>;
-	try {
-		signals = await request.json();
-		console.log('[build] signals:', JSON.stringify(signals));
-	} catch {
-		return sseResponse(renderOutput({ plugins: [], origin: url.origin, error: 'Invalid request body' }));
-	}
+async function handleStream(request: Request, env: Env): Promise<Response> {
+  const sessionId = getSessionId(request);
+  if (!sessionId) {
+    return new Response("No session", { status: 401 });
+  }
 
-	const raw = signals.plugins;
-	const plugins = (Array.isArray(raw) ? raw : typeof raw === 'string' && raw ? [raw] : [])
-		.filter((p: any) => PLUGIN_NAMES.includes(p as any));
-	const sorted = [...plugins].sort();
-
-	try {
-		const start = Date.now();
-		const result = await bundle(sorted, { minify: true });
-		const time = `${Date.now() - start}ms`;
-		const pluginSizes = result.metafile ? getPluginSizes(result.metafile, sorted) : [];
-
-		// Warm the /bundle cache
-		const cacheKey = new URL(url.origin + '/bundle?plugins=' + sorted.join(','));
-		const cache = caches.default;
-		const cacheResponse = new Response(result.code, {
-			headers: {
-				'Content-Type': 'application/javascript; charset=utf-8',
-				'Cache-Control': 'public, max-age=31536000, immutable',
-				'X-Egg-Plugins': sorted.join(',') || '(core only)',
-				'X-Egg-Size': String(result.size),
-			},
-		});
-		request.cf && await cache.put(cacheKey, cacheResponse);
-
-		console.log('[build] success:', sorted.join(',') || '(core)', result.size, 'bytes');
-		return sseResponse(renderOutput({
-			plugins: sorted,
-			origin: url.origin,
-			size: result.size,
-			gzipSize: result.gzipSize,
-			brotliSize: result.brotliSize,
-			time,
-			pluginSizes,
-		}));
-	} catch (err: any) {
-		console.error('[build] error:', err.message);
-		return sseResponse(renderOutput({ plugins: sorted, origin: url.origin, error: err.message }));
-	}
+  // Use stub.fetch() to get a streaming Response from the DO
+  const id = env.GRID_SESSION.idFromName(sessionId);
+  const stub = env.GRID_SESSION.get(id);
+  return stub.fetch(new Request("http://do/stream"));
 }
 
-function sseResponse(fragmentHtml: string): Response {
-	// Datastar treats each `data: elements` line as a separate fragment,
-	// so the entire HTML must be on a single line.
-	const oneLine = fragmentHtml.replace(/\n\s*/g, '');
-	const body = `event: datastar-patch-elements\ndata: elements ${oneLine}\n\n`;
-	return new Response(body, {
-		headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
-	});
+// --- POST commands (fire-and-forget writes) ---
+
+async function handleCommand(
+  request: Request,
+  env: Env,
+  pathname: string,
+): Promise<Response> {
+  try {
+    const sessionId = getSessionId(request);
+    if (!sessionId) {
+      return new Response("No session", { status: 401 });
+    }
+
+    let signals: Record<string, unknown>;
+    try {
+      signals = await request.json();
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    const session = getSession(env, sessionId);
+    const dragItem = String(signals.dragItem || "");
+    const col = Number(signals.col) || 1;
+    const row = Number(signals.row) || 1;
+    const colspan = Number(signals.colspan) || 1;
+    const rowspan = Number(signals.rowspan) || 1;
+
+    switch (pathname) {
+      case "/api/drag-move":
+        await session.applyMove(dragItem, col, row, false);
+        break;
+      case "/api/drag-end":
+        await session.applyMove(dragItem, col, row, true);
+        break;
+      case "/api/resize-move":
+        await session.applyResize(dragItem, col, row, colspan, rowspan, false);
+        break;
+      case "/api/resize-end":
+        await session.applyResize(dragItem, col, row, colspan, rowspan, true);
+        break;
+      case "/api/save": {
+        const rawLayout = signals.layout;
+        let items: ItemRect[];
+        try {
+          items =
+            typeof rawLayout === "string"
+              ? JSON.parse(rawLayout)
+              : (rawLayout as ItemRect[]);
+        } catch {
+          return new Response("Invalid layout", { status: 400 });
+        }
+        await session.saveLayout(items);
+        break;
+      }
+      case "/api/reset":
+        await session.reset();
+        break;
+      default:
+        return new Response("Not Found", { status: 404 });
+    }
+
+    // Fire-and-forget: updates are pushed through SSE stream
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    console.error(`[API] Error:`, err);
+    return new Response("Server error", { status: 500 });
+  }
 }
 
-// --- Bundle endpoint ---
+// --- Helpers ---
 
-async function handleBundle(request: Request, url: URL): Promise<Response> {
-	// Resolve plugin list from path alias or query param
-	const plugins = resolvePlugins(url);
-	if ('error' in plugins) {
-		return json({ error: plugins.error }, {}, 400);
-	}
-
-	const sorted = plugins.list.sort();
-	const minify = url.searchParams.get('minify') !== 'false';
-
-	// Build cache key from sorted plugin list + minify flag
-	const cacheKey = new URL(url.origin + '/bundle?plugins=' + sorted.join(',') + (minify ? '' : '&minify=false'));
-	const cache = caches.default;
-
-	// Check cache
-	const cached = await cache.match(cacheKey);
-	if (cached) {
-		// Clone and add headers not stored in cache
-		const headers = new Headers(cached.headers);
-		for (const [k, v] of Object.entries(corsHeaders())) headers.set(k, v);
-		headers.set('X-Cache', 'HIT');
-		headers.set('Content-Disposition', `attachment; filename="${bundleFilename(sorted)}"`);
-		return new Response(cached.body, { headers });
-	}
-
-	// Bundle on demand
-	const start = Date.now();
-	let result: Awaited<ReturnType<typeof bundle>>;
-	try {
-		result = await bundle(sorted, { minify });
-	} catch (err: any) {
-		return json({ error: 'Bundle failed', detail: err.message }, {}, 500);
-	}
-	const elapsed = Date.now() - start;
-
-	const filename = bundleFilename(sorted);
-	const headers: Record<string, string> = {
-		'Content-Type': 'application/javascript; charset=utf-8',
-		'Content-Disposition': `attachment; filename="${filename}"`,
-		'Cache-Control': 'public, max-age=31536000, immutable',
-		'X-Egg-Plugins': sorted.join(',') || '(core only)',
-		'X-Egg-Size': String(result.size),
-		'X-Bundle-Time': `${elapsed}ms`,
-		'X-Cache': 'MISS',
-		...corsHeaders(),
-	};
-
-	const response = new Response(result.code, { headers });
-
-	// Store in cache (without CORS headers — we add them on read)
-	const cacheResponse = new Response(result.code, {
-		headers: {
-			'Content-Type': 'application/javascript; charset=utf-8',
-			'Cache-Control': 'public, max-age=31536000, immutable',
-			'X-Egg-Plugins': sorted.join(',') || '(core only)',
-			'X-Egg-Size': String(result.size),
-		},
-	});
-	request.cf && await cache.put(cacheKey, cacheResponse);
-
-	return response;
+function getSessionId(request: Request): string | null {
+  const cookie = request.headers.get("Cookie") || "";
+  const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
+  return match ? match[1] : null;
 }
 
-function resolvePlugins(url: URL): { list: string[] } | { error: string } {
-	// Path aliases
-	const path = url.pathname;
-	if (path === '/bundle/eg-grid.js') return { list: [...PLUGIN_NAMES] };
-	if (path === '/bundle/eg-grid-minimal.js') return { list: ['pointer'] };
-	if (path === '/bundle/eg-grid-core.js') return { list: [] };
-
-	// Query param
-	const param = url.searchParams.get('plugins');
-	if (param === null || param === undefined) {
-		// No param = full bundle
-		return { list: [...PLUGIN_NAMES] };
-	}
-	if (param === '') {
-		// Empty string = core only
-		return { list: [] };
-	}
-
-	const requested = param.split(',').map(s => s.trim()).filter(Boolean);
-	const invalid = requested.filter(p => !PLUGIN_NAMES.includes(p as any));
-	if (invalid.length > 0) {
-		return { error: `Unknown plugins: ${invalid.join(', ')}. Valid: ${PLUGIN_NAMES.join(', ')}` };
-	}
-
-	return { list: requested };
-}
-
-function bundleFilename(plugins: string[]): string {
-	if (plugins.length === 0) return 'eg-grid-core.js';
-	if (plugins.length === PLUGIN_NAMES.length) return 'eg-grid.js';
-	if (plugins.length === 1 && plugins[0] === 'pointer') return 'eg-grid-minimal.js';
-	return 'eg-grid-custom.js';
+function getSession(env: Env, sessionId: string): DurableObjectStub<GridSession> {
+  const id = env.GRID_SESSION.idFromName(sessionId);
+  return env.GRID_SESSION.get(id);
 }
 
 function corsHeaders(): Record<string, string> {
-	return {
-		'Access-Control-Allow-Origin': '*',
-		'Access-Control-Allow-Methods': 'GET, OPTIONS',
-		'Access-Control-Allow-Headers': 'Content-Type',
-		'Access-Control-Expose-Headers': 'X-Egg-Plugins, X-Egg-Size, X-Bundle-Time, X-Cache',
-	};
-}
-
-function json(data: unknown, extraHeaders: Record<string, string> = {}, status = 200): Response {
-	return new Response(JSON.stringify(data, null, 2), {
-		status,
-		headers: {
-			'Content-Type': 'application/json',
-			...corsHeaders(),
-			...extraHeaders,
-		},
-	});
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
 }
