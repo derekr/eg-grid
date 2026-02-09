@@ -86,6 +86,11 @@ export interface ResizeCancelDetail {
 	source: DragSource;
 }
 
+export interface LayoutChangeDetail {
+	items: Array<{ id: string; column: number; row: number; width: number; height: number }>;
+	columnCount: number;
+}
+
 export interface SelectDetail {
 	item: HTMLElement;
 }
@@ -427,17 +432,18 @@ export interface DropPreviewDetail {
 // Custom event types for type-safe event listeners
 declare global {
 	interface HTMLElementEventMap {
-		'egg:drag-start': CustomEvent<DragStartDetail>;
-		'egg:drag-move': CustomEvent<DragMoveDetail>;
-		'egg:drag-end': CustomEvent<DragEndDetail>;
-		'egg:drag-cancel': CustomEvent<DragCancelDetail>;
-		'egg:select': CustomEvent<SelectDetail>;
-		'egg:deselect': CustomEvent<DeselectDetail>;
-		'egg:column-count-change': CustomEvent<ColumnCountChangeDetail>;
-		'egg:resize-start': CustomEvent<ResizeStartDetail>;
-		'egg:resize-move': CustomEvent<ResizeMoveDetail>;
-		'egg:resize-end': CustomEvent<ResizeEndDetail>;
-		'egg:resize-cancel': CustomEvent<ResizeCancelDetail>;
-		'egg:drop-preview': CustomEvent<DropPreviewDetail>;
+		'egg-drag-start': CustomEvent<DragStartDetail>;
+		'egg-drag-move': CustomEvent<DragMoveDetail>;
+		'egg-drag-end': CustomEvent<DragEndDetail>;
+		'egg-drag-cancel': CustomEvent<DragCancelDetail>;
+		'egg-select': CustomEvent<SelectDetail>;
+		'egg-deselect': CustomEvent<DeselectDetail>;
+		'egg-column-count-change': CustomEvent<ColumnCountChangeDetail>;
+		'egg-resize-start': CustomEvent<ResizeStartDetail>;
+		'egg-resize-move': CustomEvent<ResizeMoveDetail>;
+		'egg-resize-end': CustomEvent<ResizeEndDetail>;
+		'egg-resize-cancel': CustomEvent<ResizeCancelDetail>;
+		'egg-drop-preview': CustomEvent<DropPreviewDetail>;
+		'egg-layout-change': CustomEvent<LayoutChangeDetail>;
 	}
 }

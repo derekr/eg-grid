@@ -237,7 +237,7 @@ export function attachReorderAlgorithm(
 					rowspan: landingItem.height,
 				};
 				queueMicrotask(() => {
-					el.dispatchEvent(new CustomEvent('egg:drop-preview', {
+					el.dispatchEvent(new CustomEvent('egg-drop-preview', {
 						detail: previewDetail,
 						bubbles: true,
 					}));

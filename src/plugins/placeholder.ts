@@ -189,15 +189,15 @@ export function attachPlaceholder(
 
 	// Attach listeners
 	const removeGridListeners = listenEvents(gridElement, {
-		'egg:drag-start': handleDragStart as EventListener,
-		'egg:drag-move': handleDragMove as EventListener,
-		'egg:drag-end': handleDragEnd as EventListener,
-		'egg:drag-cancel': handleDragCancel as EventListener,
-		'egg:drop-preview': handleDropPreview as EventListener,
-		'egg:resize-start': handleResizeStart as EventListener,
-		'egg:resize-move': handleResizeMove as EventListener,
-		'egg:resize-end': handleResizeEnd as EventListener,
-		'egg:resize-cancel': handleResizeCancel as EventListener,
+		'egg-drag-start': handleDragStart as EventListener,
+		'egg-drag-move': handleDragMove as EventListener,
+		'egg-drag-end': handleDragEnd as EventListener,
+		'egg-drag-cancel': handleDragCancel as EventListener,
+		'egg-drop-preview': handleDropPreview as EventListener,
+		'egg-resize-start': handleResizeStart as EventListener,
+		'egg-resize-move': handleResizeMove as EventListener,
+		'egg-resize-end': handleResizeEnd as EventListener,
+		'egg-resize-cancel': handleResizeCancel as EventListener,
 	});
 	const removeDocListeners = listenEvents(document, {
 		pointerup: handlePointerUp,

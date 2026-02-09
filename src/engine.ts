@@ -138,7 +138,7 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 
 		emit<T>(event: string, detail: T): void {
 			element.dispatchEvent(
-				new CustomEvent(`egg:${event}`, {
+				new CustomEvent(`egg-${event}`, {
 					bubbles: true,
 					detail,
 				}),

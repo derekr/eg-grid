@@ -174,14 +174,14 @@ export function attachAccessibility(core: EggCore): () => void {
 	};
 
 	const unlisten = listenEvents(core.element, {
-		'egg:drag-start': onDragStart as EventListener,
-		'egg:drag-move': onDragMove as EventListener,
-		'egg:drag-end': onDragEnd as EventListener,
-		'egg:drag-cancel': onDragCancel as EventListener,
-		'egg:resize-start': onResizeStart as EventListener,
-		'egg:resize-move': onResizeMove as EventListener,
-		'egg:resize-end': onResizeEnd as EventListener,
-		'egg:resize-cancel': onResizeCancel as EventListener,
+		'egg-drag-start': onDragStart as EventListener,
+		'egg-drag-move': onDragMove as EventListener,
+		'egg-drag-end': onDragEnd as EventListener,
+		'egg-drag-cancel': onDragCancel as EventListener,
+		'egg-resize-start': onResizeStart as EventListener,
+		'egg-resize-move': onResizeMove as EventListener,
+		'egg-resize-end': onResizeEnd as EventListener,
+		'egg-resize-cancel': onResizeCancel as EventListener,
 	});
 
 	return () => {

@@ -606,11 +606,11 @@
   <style id="egg-styles"></style>
 
   <script type="module">
-    import { init } from '../bundles/index.ts';
-    import { attachPushAlgorithm } from '../plugins/algorithm-push.ts';
-    import { attachReorderAlgorithm } from '../plugins/algorithm-reorder.ts';
-    import { attachDevOverlay } from '../plugins/dev-overlay.ts';
-    import { createLayoutModel } from '../layout-model.ts';
+    import { init } from '../src/bundles/index.ts';
+    import { attachPushAlgorithm } from '../src/plugins/algorithm-push.ts';
+    import { attachReorderAlgorithm } from '../src/plugins/algorithm-reorder.ts';
+    import { attachDevOverlay } from '../src/plugins/dev-overlay.ts';
+    import { createLayoutModel } from '../src/layout-model.ts';
 
     const gridElement = document.getElementById('grid');
     const gridContainer = document.getElementById('grid-container');
@@ -725,11 +725,11 @@
       }
     }
 
-    // Listen to all egg:* events and poll state machine
+    // Listen to all egg-* events and poll state machine
     const STATE_EVENTS = [
-      'egg:select', 'egg:deselect',
-      'egg:drag-start', 'egg:drag-move', 'egg:drag-end', 'egg:drag-cancel',
-      'egg:resize-start', 'egg:resize-move', 'egg:resize-end', 'egg:resize-cancel',
+      'egg-select', 'egg-deselect',
+      'egg-drag-start', 'egg-drag-move', 'egg-drag-end', 'egg-drag-cancel',
+      'egg-resize-start', 'egg-resize-move', 'egg-resize-end', 'egg-resize-cancel',
     ];
     for (const evt of STATE_EVENTS) {
       gridElement.addEventListener(evt, () => {
@@ -755,7 +755,7 @@
     EVENT_NAMES.forEach(name => {
       eventCounts[name] = 0;
 
-      gridElement.addEventListener(`egg:${name}`, () => {
+      gridElement.addEventListener(`egg-${name}`, () => {
         const badge = document.querySelector(`[data-event="${name}"]`);
         if (!badge) return;
 
@@ -899,7 +899,7 @@
     }
 
     // Update badge when column count changes
-    gridElement.addEventListener('egg:column-count-change', () => {
+    gridElement.addEventListener('egg-column-count-change', () => {
       updateColumnBadge();
     });
 

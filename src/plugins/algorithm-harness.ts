@@ -17,6 +17,7 @@ import type {
   GridCell,
   EggCore,
   ItemPosition,
+  LayoutChangeDetail,
   ResizeCancelDetail,
   ResizeEndDetail,
   ResizeMoveDetail,
@@ -272,6 +273,14 @@ export function attachAlgorithm(
     if (styles) {
       styles.clear("preview");
       styles.commit();
+    }
+
+    // Emit layout-change only on settled layouts (drag-end / resize-end)
+    if (core) {
+      core.emit<LayoutChangeDetail>("layout-change", {
+        items: layout,
+        columnCount,
+      });
     }
   }
 
@@ -660,14 +669,14 @@ export function attachAlgorithm(
   // =========================================================================
 
   return listenEvents(gridElement, {
-    "egg:drag-start": onDragStart,
-    "egg:drag-move": onDragMove,
-    "egg:drag-end": onDragEnd,
-    "egg:drag-cancel": onDragCancel,
-    "egg:camera-settled": onCameraSettled,
-    "egg:resize-start": onResizeStart,
-    "egg:resize-move": onResizeMove,
-    "egg:resize-end": onResizeEnd,
-    "egg:resize-cancel": onResizeCancel,
+    "egg-drag-start": onDragStart,
+    "egg-drag-move": onDragMove,
+    "egg-drag-end": onDragEnd,
+    "egg-drag-cancel": onDragCancel,
+    "egg-camera-settled": onCameraSettled,
+    "egg-resize-start": onResizeStart,
+    "egg-resize-move": onResizeMove,
+    "egg-resize-end": onResizeEnd,
+    "egg-resize-cancel": onResizeCancel,
   });
 }

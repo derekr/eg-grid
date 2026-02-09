@@ -160,7 +160,7 @@ export function attachResize(
 
 	function emit<T>(event: string, detail: T): void {
 		gridElement.dispatchEvent(
-			new CustomEvent(`egg:${event}`, {
+			new CustomEvent(`egg-${event}`, {
 				bubbles: true,
 				detail,
 			}),

@@ -6,9 +6,9 @@ import { statSync, readFileSync } from 'node:fs';
 const root = import.meta.dirname;
 
 const entries = [
-	{ entry: 'bundles/index.ts', name: 'eg-grid', label: 'full' },
-	{ entry: 'bundles/element.ts', name: 'eg-grid-element', label: 'web component' },
-	{ entry: 'plugins/dev-overlay.ts', name: 'dev-overlay', label: 'debug overlay' },
+	{ entry: 'src/bundles/index.ts', name: 'eg-grid', label: 'full' },
+	{ entry: 'src/bundles/element.ts', name: 'eg-grid-element', label: 'web component' },
+	{ entry: 'src/plugins/dev-overlay.ts', name: 'dev-overlay', label: 'debug overlay' },
 ];
 
 const minifyOptions = {

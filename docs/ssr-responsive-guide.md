@@ -262,7 +262,7 @@ layoutModel.subscribe(() => {
 
 ## Reference Implementation
 
-See `eg-grid/layout-model.ts` for the canonical TypeScript implementation of:
+See `src/layout-model.ts` for the canonical TypeScript implementation of:
 - `deriveLayoutForColumns()` - first-fit compaction algorithm
 - `generateAllBreakpointCSS()` - complete CSS generation
 

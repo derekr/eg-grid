@@ -212,7 +212,7 @@ export function attachCamera(
 				settleTimeoutId = null;
 				// Emit settle event so algorithm can recalculate
 				gridElement.dispatchEvent(
-					new CustomEvent('egg:camera-settled', { bubbles: true })
+					new CustomEvent('egg-camera-settled', { bubbles: true })
 				);
 			}, settleDelay);
 		}
@@ -442,11 +442,11 @@ export function attachCamera(
 	}
 
 	const removeListeners = listenEvents(gridElement, {
-		'egg:drag-start': onDragStart as EventListener,
-		'egg:drag-move': onDragMove as EventListener,
-		'egg:drag-end': onDragEnd as EventListener,
-		'egg:drag-cancel': onDragCancel as EventListener,
-		'egg:select': onSelect as EventListener,
+		'egg-drag-start': onDragStart as EventListener,
+		'egg-drag-move': onDragMove as EventListener,
+		'egg-drag-end': onDragEnd as EventListener,
+		'egg-drag-cancel': onDragCancel as EventListener,
+		'egg-select': onSelect as EventListener,
 	});
 
 	function destroy(): void {

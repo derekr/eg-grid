@@ -23,8 +23,9 @@ These docs distill the W3C specs ([CSS Grid Level 1](https://www.w3.org/TR/css-g
 - To serve – `pnpx vite .`
 
 Outputs to `dist/`:
-- `eg-grid.js` - Full bundle (all plugins)
-- Individual plugins for add-on use
+- `eg-grid.js` / `eg-grid.min.js` - Full bundle (all plugins)
+- `eg-grid-element.js` / `eg-grid-element.min.js` - Web component
+- `dev-overlay.js` / `dev-overlay.min.js` - Debug panel (optional)
 
 
 ## Project Overview
@@ -39,29 +40,33 @@ Outputs to `dist/`:
 
 ### Plugin Architecture
 
-Plugins are separate files with `attach*()` functions. `init()` in `engine.ts` wires them up directly based on options. Each plugin returns a cleanup function. Individual plugins can also be imported and attached manually for custom builds.
+Plugins are separate files with `attach*()` functions. `init()` in `src/engine.ts` wires them up directly based on options. Each plugin returns a cleanup function. Individual plugins can also be imported and attached manually for custom builds.
 
 ### Architecture
 
 ```
-engine.ts           - Core (grid measurement, events, state machine)
-layout-model.ts     - Responsive layout state management
-types.ts            - TypeScript type definitions
+src/
+  engine.ts           - Core (grid measurement, events, state machine)
+  layout-model.ts     - Responsive layout state management
+  types.ts            - TypeScript type definitions
+  eg-grid-element.ts  - <eg-grid> web component
 
-plugins/
-  pointer.ts        - Mouse/touch drag handling
-  keyboard.ts       - Arrow keys, pick-up/drop
-  accessibility.ts  - ARIA announcements
-  algorithm-push-core.ts  - Pure layout algorithm (no DOM)
-  algorithm-push.ts       - DOM integration for algorithm
-  camera.ts         - Viewport auto-scroll
-  resize.ts         - Item resizing
-  placeholder.ts    - Drop target indicator
-  responsive.ts     - Breakpoint detection + CSS injection
-  dev-overlay.ts    - Debug panel (Shift+D)
+  plugins/
+    pointer.ts        - Mouse/touch drag handling
+    keyboard.ts       - Arrow keys, pick-up/drop
+    accessibility.ts  - ARIA announcements
+    algorithm-push.ts - Push algorithm (dashboard-style)
+    algorithm-reorder.ts - Reorder algorithm (list-style)
+    algorithm-harness.ts - Shared algorithm integration
+    camera.ts         - Viewport auto-scroll
+    resize.ts         - Item resizing
+    placeholder.ts    - Drop target indicator
+    responsive.ts     - Breakpoint detection + CSS injection
+    dev-overlay.ts    - Debug panel (Shift+D)
 
-bundles/
-  index.ts          - Full bundle (all plugins)
+  bundles/
+    index.ts          - Full bundle (all plugins)
+    element.ts        - Web component bundle
 ```
 
 ## Core Principles
@@ -158,10 +163,10 @@ Plugins communicate via custom events, not direct function calls:
 
 ```ts
 // Plugin emits
-core.emit('egg:drag-move', { item, cell, colspan, rowspan });
+core.emit('egg-drag-move', { item, cell, colspan, rowspan });
 
 // Consumer handles
-element.addEventListener('egg:drag-move', (e) => {
+element.addEventListener('egg-drag-move', (e) => {
   // Run algorithm, update layout
 });
 ```
@@ -237,31 +242,18 @@ Use container queries, not media queries:
 }
 ```
 
-## Reference Implementation
-
-**Consult `original-prototype.html` when implementing features.**
-
-The prototype demonstrates working implementations of:
-- Responsive layout switching
-- View Transitions integration
-- Drag with placeholder preview
-- Debug/config panels
-- Keyboard navigation patterns
-
-If something worked in the prototype, understand how before reimplementing.
-
 ## File Reference
 
 | File | Purpose |
 |------|---------|
-| `engine.ts` | Grid measurement, cell detection, event emission |
-| `types.ts` | All TypeScript interfaces |
-| `layout-model.ts` | Responsive layout state |
-| `plugins/pointer.ts` | Pointer events, visual drag |
-| `plugins/keyboard.ts` | Arrow key navigation |
-| `plugins/algorithm-push-core.ts` | Pure push-down algorithm |
-| `plugins/algorithm-push.ts` | DOM integration for algorithm |
-| `original-prototype.html` | Reference implementation |
+| `src/engine.ts` | Grid measurement, cell detection, event emission |
+| `src/types.ts` | All TypeScript interfaces |
+| `src/layout-model.ts` | Responsive layout state |
+| `src/eg-grid-element.ts` | `<eg-grid>` web component |
+| `src/plugins/pointer.ts` | Pointer events, visual drag |
+| `src/plugins/keyboard.ts` | Arrow key navigation |
+| `src/plugins/algorithm-push.ts` | Push algorithm + DOM integration |
+| `src/plugins/algorithm-reorder.ts` | Reorder algorithm |
 
 ## Common Mistakes to Avoid
 
@@ -270,4 +262,3 @@ If something worked in the prototype, understand how before reimplementing.
 3. **DOM access in algorithm code** - Keep algorithms pure
 4. **Direct plugin-to-plugin calls** - Use events or state machine
 5. **Media queries instead of container queries** - Container queries are more flexible
-6. **Reimplementing without checking prototype** - Prototype has working patterns

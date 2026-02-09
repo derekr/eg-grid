@@ -686,12 +686,12 @@
   <!-- Removed: preview-styles merged into layout-styles via core.styles -->
 
   <script type="module">
-    import { init, createLayoutModel, attachResponsive } from '../bundles/index.ts';
-    import { attachPushAlgorithm, readItemsFromDOM, compactUp, layoutToCSS } from '../plugins/algorithm-push.ts';
-    import { attachDevOverlay } from '../plugins/dev-overlay.ts';
-    import { attachPlaceholder } from '../plugins/placeholder.ts';
-    import { attachCamera } from '../plugins/camera.ts';
-    import { attachResize } from '../plugins/resize.ts';
+    import { init, createLayoutModel, attachResponsive } from '../src/bundles/index.ts';
+    import { attachPushAlgorithm, readItemsFromDOM, compactUp, layoutToCSS } from '../src/plugins/algorithm-push.ts';
+    import { attachDevOverlay } from '../src/plugins/dev-overlay.ts';
+    import { attachPlaceholder } from '../src/plugins/placeholder.ts';
+    import { attachCamera } from '../src/plugins/camera.ts';
+    import { attachResize } from '../src/plugins/resize.ts';
 
     const gridElement = document.getElementById('grid');
     const layoutStyleElement = document.getElementById('layout-styles');

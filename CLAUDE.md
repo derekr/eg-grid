@@ -38,29 +38,33 @@ Outputs to `dist/`:
 
 ### Plugin Architecture
 
-Plugins are separate files with `attach*()` functions. `init()` in `engine.ts` wires them up directly based on options. Each plugin returns a cleanup function. Individual plugins can also be imported and attached manually for custom builds.
+Plugins are separate files with `attach*()` functions. `init()` in `src/engine.ts` wires them up directly based on options. Each plugin returns a cleanup function. Individual plugins can also be imported and attached manually for custom builds.
 
 ### Architecture
 
 ```
-engine.ts           - Core (grid measurement, events, state machine)
-layout-model.ts     - Responsive layout state management
-types.ts            - TypeScript type definitions
+src/
+  engine.ts           - Core (grid measurement, events, state machine)
+  layout-model.ts     - Responsive layout state management
+  types.ts            - TypeScript type definitions
+  eg-grid-element.ts  - <eg-grid> web component
 
-plugins/
-  pointer.ts        - Mouse/touch drag handling
-  keyboard.ts       - Arrow keys, pick-up/drop
-  accessibility.ts  - ARIA announcements
-  algorithm-push-core.ts  - Pure layout algorithm (no DOM)
-  algorithm-push.ts       - DOM integration for algorithm
-  camera.ts         - Viewport auto-scroll
-  resize.ts         - Item resizing
-  placeholder.ts    - Drop target indicator
-  responsive.ts     - Breakpoint detection + CSS injection
-  dev-overlay.ts    - Debug panel (Shift+D)
+  plugins/
+    pointer.ts        - Mouse/touch drag handling
+    keyboard.ts       - Arrow keys, pick-up/drop
+    accessibility.ts  - ARIA announcements
+    algorithm-push.ts - Push algorithm (dashboard-style)
+    algorithm-reorder.ts - Reorder algorithm (list-style)
+    algorithm-harness.ts - Shared algorithm integration
+    camera.ts         - Viewport auto-scroll
+    resize.ts         - Item resizing
+    placeholder.ts    - Drop target indicator
+    responsive.ts     - Breakpoint detection + CSS injection
+    dev-overlay.ts    - Debug panel (Shift+D)
 
-bundles/
-  index.ts          - Full bundle (all plugins)
+  bundles/
+    index.ts          - Full bundle (all plugins)
+    element.ts        - Web component bundle
 ```
 
 ## Core Principles
@@ -240,14 +244,14 @@ Use container queries, not media queries:
 
 | File | Purpose |
 |------|---------|
-| `engine.ts` | Grid measurement, cell detection, event emission |
-| `types.ts` | All TypeScript interfaces |
-| `layout-model.ts` | Responsive layout state |
-| `plugins/pointer.ts` | Pointer events, visual drag |
-| `plugins/keyboard.ts` | Arrow key navigation |
-| `plugins/algorithm-push-core.ts` | Pure push-down algorithm |
-| `plugins/algorithm-push.ts` | DOM integration for algorithm |
-| `eg-grid-element.ts` | `<eg-grid>` web component |
+| `src/engine.ts` | Grid measurement, cell detection, event emission |
+| `src/types.ts` | All TypeScript interfaces |
+| `src/layout-model.ts` | Responsive layout state |
+| `src/eg-grid-element.ts` | `<eg-grid>` web component |
+| `src/plugins/pointer.ts` | Pointer events, visual drag |
+| `src/plugins/keyboard.ts` | Arrow key navigation |
+| `src/plugins/algorithm-push.ts` | Push algorithm + DOM integration |
+| `src/plugins/algorithm-reorder.ts` | Reorder algorithm |
 
 ## Common Mistakes to Avoid
 

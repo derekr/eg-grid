@@ -606,12 +606,12 @@ export function attachDevOverlay(
 	};
 
 	// Attach listeners
-	gridElement.addEventListener('egg:drag-start', onDragStart);
-	gridElement.addEventListener('egg:drag-move', onDragMove);
-	gridElement.addEventListener('egg:drag-end', onDragEnd);
-	gridElement.addEventListener('egg:drag-cancel', onDragCancel);
-	gridElement.addEventListener('egg:select', onSelect);
-	gridElement.addEventListener('egg:deselect', onDeselect);
+	gridElement.addEventListener('egg-drag-start', onDragStart);
+	gridElement.addEventListener('egg-drag-move', onDragMove);
+	gridElement.addEventListener('egg-drag-end', onDragEnd);
+	gridElement.addEventListener('egg-drag-cancel', onDragCancel);
+	gridElement.addEventListener('egg-select', onSelect);
+	gridElement.addEventListener('egg-deselect', onDeselect);
 	document.addEventListener('keydown', onKeyDown);
 
 	// Add to DOM
@@ -619,12 +619,12 @@ export function attachDevOverlay(
 	render();
 
 	function destroy() {
-		gridElement.removeEventListener('egg:drag-start', onDragStart);
-		gridElement.removeEventListener('egg:drag-move', onDragMove);
-		gridElement.removeEventListener('egg:drag-end', onDragEnd);
-		gridElement.removeEventListener('egg:drag-cancel', onDragCancel);
-		gridElement.removeEventListener('egg:select', onSelect);
-		gridElement.removeEventListener('egg:deselect', onDeselect);
+		gridElement.removeEventListener('egg-drag-start', onDragStart);
+		gridElement.removeEventListener('egg-drag-move', onDragMove);
+		gridElement.removeEventListener('egg-drag-end', onDragEnd);
+		gridElement.removeEventListener('egg-drag-cancel', onDragCancel);
+		gridElement.removeEventListener('egg-select', onSelect);
+		gridElement.removeEventListener('egg-deselect', onDeselect);
 		document.removeEventListener('keydown', onKeyDown);
 		overlay.remove();
 	}
