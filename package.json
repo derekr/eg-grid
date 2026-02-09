@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node --experimental-strip-types build.ts",
+    "build:site": "vite build",
     "test": "vitest",
     "test:browser": "vitest --browser.enabled --browser.name=chromium --browser.provider=playwright"
   },

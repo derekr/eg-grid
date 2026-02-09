@@ -1,10 +1,21 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
 
 export default defineConfig({
-  // Use project root so imports resolve correctly
   root: '.',
-  // Dev server settings
   server: {
     open: '/examples/',
+  },
+  build: {
+    outDir: 'dist/site',
+    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: resolve(import.meta.dirname, 'index.html'),
+        'examples/index': resolve(import.meta.dirname, 'examples/index.html'),
+        'examples/advanced': resolve(import.meta.dirname, 'examples/advanced.html'),
+        'examples/web-component': resolve(import.meta.dirname, 'examples/web-component.html'),
+      },
+    },
   },
 });
