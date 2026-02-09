@@ -59,8 +59,8 @@ export function layoutToCSS(
   options: LayoutToCSSOptions = {},
 ): string {
   const {
-    selectorPrefix = "#",
-    selectorSuffix = "",
+    selectorPrefix = '[data-egg-item="',
+    selectorSuffix = '"]',
     excludeSelector = "",
     maxColumns,
   } = options;
@@ -98,7 +98,7 @@ export function readItemsFromDOM(container: HTMLElement): ItemRect[] {
       parseInt(element.getAttribute("data-egg-colspan") || "1", 10) || 1;
     const height =
       parseInt(element.getAttribute("data-egg-rowspan") || "1", 10) || 1;
-    const id = element.dataset.id || element.dataset.eggItem || "";
+    const id = element.dataset.eggItem || element.dataset.id || "";
 
     return { id, column, row, width, height };
   });
@@ -168,8 +168,8 @@ export function attachAlgorithm(
   options: AlgorithmHarnessOptions = {},
 ): () => void {
   const {
-    selectorPrefix = "#",
-    selectorSuffix = "",
+    selectorPrefix = '[data-egg-item="',
+    selectorSuffix = '"]',
     core,
     layoutModel,
   } = options;
@@ -206,7 +206,7 @@ export function attachAlgorithm(
   let resizeStartColumnCount: number | null = null;
 
   function getItemId(element: HTMLElement): string {
-    return element.dataset.id || element.dataset.eggItem || "";
+    return element.dataset.eggItem || element.dataset.id || "";
   }
 
   /** Read items from DOM with original positions restored (except the actively dragged item) */

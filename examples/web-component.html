@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EG Grid — Web Component</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    nav { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    nav a { margin-right: 1rem; color: #4facfe; text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    nav a.active { font-weight: bold; color: #fff; }
+
+    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
+    p.subtitle { font-size: 0.8rem; color: #888; margin-bottom: 24px; }
+
+    /* Grid styling — display + columns + gap here so items render
+       correctly before JS loads (progressive enhancement). */
+    eg-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      grid-auto-rows: 120px;
+      background: rgba(255,255,255,0.04);
+      padding: 8px;
+      border-radius: 12px;
+      max-width: 560px;
+    }
+
+    /* Items */
+    .item {
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 16px;
+      color: white;
+      cursor: default;
+      user-select: none;
+      -webkit-user-select: none;
+      position: relative;
+      view-transition-name: var(--item-id);
+      transition: filter 0.15s ease;
+    }
+
+    eg-grid[data-pointer-active] .item { cursor: grab; }
+
+    .item[data-egg-dragging] {
+      cursor: grabbing;
+      transform: scale(1.03);
+      filter: drop-shadow(0 16px 32px rgba(0,0,0,0.5));
+      z-index: 100;
+    }
+    .item[data-egg-dropping] { z-index: 100; }
+    .item[data-egg-selected] { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    .item[data-egg-resizing] { z-index: 100; outline: 2px solid rgba(251, 191, 36, 0.5); outline-offset: 2px; }
+
+    /* Resize handle indicators */
+    .item::after {
+      content: '';
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: 3px;
+      background: rgba(59, 130, 246, 0.7);
+    }
+    .item[data-egg-handle-hover="se"]::after { opacity: 1; width: 12px; height: 12px; bottom: 4px; right: 4px; }
+    .item[data-egg-handle-hover="sw"]::after { opacity: 1; width: 12px; height: 12px; bottom: 4px; left: 4px; }
+    .item[data-egg-handle-hover="ne"]::after { opacity: 1; width: 12px; height: 12px; top: 4px; right: 4px; }
+    .item[data-egg-handle-hover="nw"]::after { opacity: 1; width: 12px; height: 12px; top: 4px; left: 4px; }
+    .item[data-egg-handle-hover="n"]::after { opacity: 1; height: 3px; top: 4px; left: 16px; right: 16px; }
+    .item[data-egg-handle-hover="s"]::after { opacity: 1; height: 3px; bottom: 4px; left: 16px; right: 16px; }
+    .item[data-egg-handle-hover="e"]::after { opacity: 1; width: 3px; right: 4px; top: 16px; bottom: 16px; }
+    .item[data-egg-handle-hover="w"]::after { opacity: 1; width: 3px; left: 4px; top: 16px; bottom: 16px; }
+    .item[data-egg-handle-active]::after { opacity: 1; background: rgba(59, 130, 246, 0.95); box-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
+    .item[data-egg-handle-active="se"]::after { width: 12px; height: 12px; bottom: 4px; right: 4px; top: auto; left: auto; }
+    .item[data-egg-handle-active="sw"]::after { width: 12px; height: 12px; bottom: 4px; left: 4px; top: auto; right: auto; }
+    .item[data-egg-handle-active="ne"]::after { width: 12px; height: 12px; top: 4px; right: 4px; bottom: auto; left: auto; }
+    .item[data-egg-handle-active="nw"]::after { width: 12px; height: 12px; top: 4px; left: 4px; bottom: auto; right: auto; }
+    .item[data-egg-handle-active="n"]::after { height: 3px; top: 4px; left: 16px; right: 16px; bottom: auto; width: auto; }
+    .item[data-egg-handle-active="s"]::after { height: 3px; bottom: 4px; left: 16px; right: 16px; top: auto; width: auto; }
+    .item[data-egg-handle-active="e"]::after { width: 3px; right: 4px; top: 16px; bottom: 16px; left: auto; height: auto; }
+    .item[data-egg-handle-active="w"]::after { width: 3px; left: 4px; top: 16px; bottom: 16px; right: auto; height: auto; }
+
+    /* Placeholder */
+    .drop-placeholder {
+      background: rgba(255,255,255,0.06);
+      border: 2px dashed rgba(255,255,255,0.25);
+      border-radius: 8px;
+      pointer-events: none;
+      view-transition-name: none;
+    }
+
+    /* Colors */
+    .item[data-color="1"] { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .item[data-color="2"] { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .item[data-color="3"] { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .item[data-color="4"] { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .item[data-color="5"] { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .item[data-color="6"] { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
+
+    /* View Transitions */
+    ::view-transition-group(*) {
+      animation-duration: 200ms;
+      animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+    ::view-transition-old(*) { animation: none; opacity: 0; }
+    ::view-transition-new(*) { animation: none; }
+    ::view-transition-old(dragging), ::view-transition-new(dragging), ::view-transition-group(dragging) { animation: none; }
+    ::view-transition-old(resizing), ::view-transition-new(resizing), ::view-transition-group(resizing) { animation: none; }
+
+    /* Keyboard mode */
+    eg-grid[data-egg-keyboard-mode] {
+      outline: 2px solid rgba(251, 191, 36, 0.3);
+      outline-offset: 4px;
+    }
+
+    /* --- Page layout below the demo --- */
+
+    .hint {
+      font-size: 0.75rem;
+      color: #555;
+      margin-top: 16px;
+      max-width: 560px;
+    }
+
+    .approaches {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 900px;
+      margin-top: 32px;
+    }
+
+    .approach h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #fff;
+    }
+
+    .approach p {
+      font-size: 0.75rem;
+      color: #888;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .approach p code {
+      color: #a0a0a0;
+      background: rgba(255,255,255,0.06);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.7rem;
+    }
+
+    .approach pre {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.7rem;
+      line-height: 1.6;
+      color: #a0a0a0;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .responsive-note {
+      max-width: 900px;
+      margin-top: 24px;
+      padding: 16px 20px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      border-left: 3px solid rgba(79, 172, 254, 0.3);
+    }
+
+    .responsive-note h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #4facfe;
+      margin-bottom: 4px;
+    }
+
+    .responsive-note p {
+      font-size: 0.75rem;
+      color: #888;
+      line-height: 1.5;
+    }
+
+    .responsive-note code {
+      color: #a0a0a0;
+      background: rgba(255,255,255,0.06);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.7rem;
+    }
+
+    .responsive-note pre {
+      background: rgba(0,0,0,0.25);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.7rem;
+      line-height: 1.6;
+      color: #a0a0a0;
+      overflow-x: auto;
+      white-space: pre;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 700px) {
+      .approaches { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">Architecture</a>
+    <a href="advanced.html">Advanced</a>
+    <a href="web-component.html" class="active">Web Component</a>
+  </nav>
+
+  <h1>&lt;eg-grid&gt;</h1>
+  <p class="subtitle">Web component wrapper. Drag to rearrange, resize from edges.</p>
+
+  <!-- Item positions via CSS — renders correctly before JS loads. -->
+  <style>
+    [data-egg-item="item-a"] { grid-column: 1 / span 2; grid-row: 1; }
+    [data-egg-item="item-b"] { grid-column: 3; grid-row: 1; }
+    [data-egg-item="item-c"] { grid-column: 4; grid-row: 1; }
+    [data-egg-item="item-d"] { grid-column: 1; grid-row: 2 / span 2; }
+    [data-egg-item="item-e"] { grid-column: 2 / span 2; grid-row: 2; }
+    [data-egg-item="item-f"] { grid-column: 4; grid-row: 2; }
+    [data-egg-item="item-g"] { grid-column: 2; grid-row: 3; }
+    [data-egg-item="item-h"] { grid-column: 3 / span 2; grid-row: 3; }
+  </style>
+
+  <eg-grid columns="4" cell-size="120" gap="8" algorithm="push" resize-handles="all" placeholder-class="drop-placeholder">
+    <div class="item" data-egg-item="item-a" data-color="1">A (2&times;1)</div>
+    <div class="item" data-egg-item="item-b" data-color="2">B</div>
+    <div class="item" data-egg-item="item-c" data-color="3">C</div>
+    <div class="item" data-egg-item="item-d" data-color="4">D (1&times;2)</div>
+    <div class="item" data-egg-item="item-e" data-color="5">E (2&times;1)</div>
+    <div class="item" data-egg-item="item-f" data-color="6">F</div>
+    <div class="item" data-egg-item="item-g" data-color="1">G</div>
+    <div class="item" data-egg-item="item-h" data-color="2">H (2&times;1)</div>
+  </eg-grid>
+
+  <p class="hint">
+    Drag items to rearrange. Resize from corners/edges. Arrow keys to navigate.
+  </p>
+
+  <!-- Two approaches -->
+  <div class="approaches">
+    <div class="approach">
+      <h2>Server-rendered</h2>
+      <p>CSS positions items before JS loads &mdash; no flash of unstyled content. Persist layout changes via <code>egg:drag-end</code> events.</p>
+      <pre>&lt;script type="module" src="eg-grid-element.js"&gt;&lt;/script&gt;
+
+&lt;style&gt;
+  eg-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  [data-egg-item="a"] { grid-column: 1 / span 2; grid-row: 1; }
+  [data-egg-item="b"] { grid-column: 3; grid-row: 1; }
+&lt;/style&gt;
+
+&lt;eg-grid algorithm="push" resize-handles="all"&gt;
+  &lt;div data-egg-item="a"&gt;A&lt;/div&gt;
+  &lt;div data-egg-item="b"&gt;B&lt;/div&gt;
+&lt;/eg-grid&gt;</pre>
+    </div>
+
+    <div class="approach">
+      <h2>Client-side</h2>
+      <p>Attributes configure the grid. Items auto-flow &mdash; no CSS needed. Simpler setup for SPAs where JS is always available.</p>
+      <pre>&lt;script type="module" src="eg-grid-element.js"&gt;&lt;/script&gt;
+
+&lt;eg-grid columns="4" gap="8"
+         algorithm="push" resize-handles="all"&gt;
+  &lt;div data-egg-item="a"&gt;A&lt;/div&gt;
+  &lt;div data-egg-item="b"&gt;B&lt;/div&gt;
+&lt;/eg-grid&gt;</pre>
+    </div>
+  </div>
+
+  <div class="responsive-note">
+    <h3>Responsive</h3>
+    <p>
+      Optional for both approaches. Add <code>cell-size</code> to auto-generate container query breakpoints
+      that reflow items as the grid resizes. Without it, column count stays fixed.
+    </p>
+    <pre>&lt;eg-grid columns="4" cell-size="120" gap="8" ...&gt;</pre>
+  </div>
+
+  <script type="module" src="../bundles/element.ts"></script>
+</body>
+</html>

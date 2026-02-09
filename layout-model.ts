@@ -237,8 +237,8 @@ export function createLayoutModel(
 
 		generateAllBreakpointCSS(options?: BreakpointCSSOptions): string {
 			const {
-				selectorPrefix = '#',
-				selectorSuffix = '',
+				selectorPrefix = '[data-egg-item="',
+				selectorSuffix = '"]',
 				cellSize,
 				gap,
 				gridSelector = '.grid-container',

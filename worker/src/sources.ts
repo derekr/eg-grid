@@ -1245,8 +1245,8 @@ export function createLayoutModel(
 
 		generateAllBreakpointCSS(options?: BreakpointCSSOptions): string {
 			const {
-				selectorPrefix = '#',
-				selectorSuffix = '',
+				selectorPrefix = '[data-egg-item="',
+				selectorSuffix = '"]',
 				cellSize,
 				gap,
 				gridSelector = '.grid-container',
@@ -1591,8 +1591,8 @@ export function layoutToCSS(
 	options: LayoutToCSSOptions = {},
 ): string {
 	const {
-		selectorPrefix = '#',
-		selectorSuffix = '',
+		selectorPrefix = '[data-egg-item="',
+		selectorSuffix = '"]',
 		excludeSelector = '',
 		maxColumns,
 	} = options;
@@ -1626,7 +1626,7 @@ export function readItemsFromDOM(container: HTMLElement): ItemRect[] {
 			parseInt(element.getAttribute('data-egg-colspan') || '1', 10) || 1;
 		const height =
 			parseInt(element.getAttribute('data-egg-rowspan') || '1', 10) || 1;
-		const id = element.dataset.id || element.dataset.eggItem || '';
+		const id = element.dataset.eggItem || element.dataset.id || '';
 
 		return { id, column, row, width, height };
 	});
@@ -1695,7 +1695,7 @@ export function attachAlgorithm(
 	strategy: AlgorithmStrategy,
 	options: AlgorithmHarnessOptions = {},
 ): () => void {
-	const { selectorPrefix = '#', selectorSuffix = '', core, layoutModel } = options;
+	const { selectorPrefix = '[data-egg-item="', selectorSuffix = '"]', core, layoutModel } = options;
 	const styles: StyleManager | null = core?.styles ?? null;
 
 	function getCurrentColumnCount(): number {
@@ -1740,7 +1740,7 @@ export function attachAlgorithm(
 	}
 
 	function getItemId(element: HTMLElement): string {
-		return element.dataset.id || element.dataset.eggItem || '';
+		return element.dataset.eggItem || element.dataset.id || '';
 	}
 
 	/** Read items from DOM with original positions restored (except the actively dragged item) */
@@ -3515,7 +3515,7 @@ export function attachDevOverlay(
 				<div class="egg-dev-grid-info">
 					<div class="egg-dev-info-item">
 						<span class="egg-dev-info-label">drag</span>
-						<span class="egg-dev-info-value">\${dragState ? \`dragging \${dragState.item.dataset.id || dragState.item.id || '?'}\` : 'idle'}</span>
+						<span class="egg-dev-info-value">\${dragState ? \`dragging \${dragState.item.dataset.eggItem || dragState.item.dataset.id || dragState.item.id || '?'}\` : 'idle'}</span>
 					</div>
 					\${dragState ? \`
 					<div class="egg-dev-info-item">
@@ -3568,7 +3568,7 @@ export function attachDevOverlay(
 				<div class="egg-dev-items-list">
 					\${items.map(item => {
 						const cell = getItemCell(item);
-						const id = item.dataset.id || item.id || '?';
+						const id = item.dataset.eggItem || item.dataset.id || item.id || '?';
 						const colspan = item.getAttribute('data-egg-colspan') || '1';
 						const rowspan = item.getAttribute('data-egg-rowspan') || '1';
 						return \`
@@ -3672,37 +3672,37 @@ export function attachDevOverlay(
 	// Event listeners for logging
 	const onDragStart = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('drag-start', \`\${id} at (\${detail.cell.column}, \${detail.cell.row})\`);
 	};
 
 	const onDragMove = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('drag-move', \`\${id} → (\${detail.cell.column}, \${detail.cell.row})\`);
 	};
 
 	const onDragEnd = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('drag-end', \`\${id} at (\${detail.cell.column}, \${detail.cell.row})\`);
 	};
 
 	const onDragCancel = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('drag-cancel', id);
 	};
 
 	const onSelect = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('select', id);
 	};
 
 	const onDeselect = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || 'none';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || 'none';
 		logEvent('deselect', id);
 	};
 
@@ -5148,7 +5148,7 @@ export function attachResize(
 		item.style.width = '';
 		item.style.height = '';
 		item.style.zIndex = '';
-		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
+		const itemId = item.style.getPropertyValue('--item-id') || item.dataset.eggItem || item.id || item.dataset.id;
 		item.style.viewTransitionName = itemId || '';
 		item.removeAttribute('data-egg-resizing');
 		item.removeAttribute('data-egg-handle-active');
@@ -5577,6 +5577,7 @@ export function animateFLIP(
 export function getItemViewTransitionName(element: HTMLElement): string | null {
 	return (
 		element.style.getPropertyValue('--item-id') ||
+		element.dataset.eggItem ||
 		element.id ||
 		element.dataset.id ||
 		null

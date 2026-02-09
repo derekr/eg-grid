@@ -394,7 +394,7 @@ export function attachResize(
 		item.style.width = '';
 		item.style.height = '';
 		item.style.zIndex = '';
-		const itemId = item.style.getPropertyValue('--item-id') || item.id || item.dataset.id;
+		const itemId = item.style.getPropertyValue('--item-id') || item.dataset.eggItem || item.id || item.dataset.id;
 		item.style.viewTransitionName = itemId || '';
 		item.removeAttribute('data-egg-resizing');
 		item.removeAttribute('data-egg-handle-active');

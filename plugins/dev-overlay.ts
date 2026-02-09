@@ -451,7 +451,7 @@ export function attachDevOverlay(
 				<div class="egg-dev-items-list">
 					${items.map(item => {
 						const cell = getItemCell(item);
-						const id = item.dataset.id || item.id || '?';
+						const id = item.dataset.eggItem || item.dataset.id || item.id || '?';
 						const colspan = item.getAttribute('data-egg-colspan') || '1';
 						const rowspan = item.getAttribute('data-egg-rowspan') || '1';
 						return `
@@ -564,37 +564,37 @@ export function attachDevOverlay(
 	// Event listeners for logging
 	const onDragStart = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('drag-start', `${id} at (${detail.cell.column}, ${detail.cell.row})`);
 	};
 
 	const onDragMove = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('drag-move', `${id} → (${detail.cell.column}, ${detail.cell.row})`);
 	};
 
 	const onDragEnd = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('drag-end', `${id} at (${detail.cell.column}, ${detail.cell.row})`);
 	};
 
 	const onDragCancel = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('drag-cancel', id);
 	};
 
 	const onSelect = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || '?';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || '?';
 		logEvent('select', id);
 	};
 
 	const onDeselect = (e: Event) => {
 		const detail = (e as CustomEvent).detail;
-		const id = detail.item?.dataset?.id || detail.item?.id || 'none';
+		const id = detail.item?.dataset?.eggItem || detail.item?.dataset?.id || detail.item?.id || 'none';
 		logEvent('deselect', id);
 	};
 

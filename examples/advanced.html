@@ -311,138 +311,138 @@
   -->
   <style id="layout-styles">
 /* Fallback: canonical 6-col layout (applies immediately before container queries) */
-#item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
-#item-2 { grid-column: 3 / span 2; grid-row: 1 / span 1; }
-#item-3 { grid-column: 5 / span 2; grid-row: 1 / span 1; }
-#item-4 { grid-column: 3 / span 1; grid-row: 2 / span 2; }
-#item-5 { grid-column: 4 / span 1; grid-row: 2 / span 1; }
-#item-6 { grid-column: 5 / span 2; grid-row: 2 / span 2; }
-#item-7 { grid-column: 1 / span 3; grid-row: 4 / span 1; }
-#item-8 { grid-column: 4 / span 1; grid-row: 3 / span 1; }
-#item-9 { grid-column: 1 / span 2; grid-row: 5 / span 1; }
-#item-10 { grid-column: 3 / span 2; grid-row: 5 / span 2; }
-#item-11 { grid-column: 5 / span 2; grid-row: 5 / span 1; }
-#item-12 { grid-column: 5 / span 1; grid-row: 6 / span 1; }
-#item-13 { grid-column: 6 / span 1; grid-row: 6 / span 1; }
-#item-14 { grid-column: 1 / span 2; grid-row: 6 / span 1; }
-#item-15 { grid-column: 1 / span 4; grid-row: 7 / span 1; }
-#item-16 { grid-column: 5 / span 2; grid-row: 7 / span 2; }
-#item-17 { grid-column: 1 / span 2; grid-row: 8 / span 1; }
-#item-18 { grid-column: 3 / span 2; grid-row: 8 / span 1; }
+[data-egg-item="item-1"] { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+[data-egg-item="item-2"] { grid-column: 3 / span 2; grid-row: 1 / span 1; }
+[data-egg-item="item-3"] { grid-column: 5 / span 2; grid-row: 1 / span 1; }
+[data-egg-item="item-4"] { grid-column: 3 / span 1; grid-row: 2 / span 2; }
+[data-egg-item="item-5"] { grid-column: 4 / span 1; grid-row: 2 / span 1; }
+[data-egg-item="item-6"] { grid-column: 5 / span 2; grid-row: 2 / span 2; }
+[data-egg-item="item-7"] { grid-column: 1 / span 3; grid-row: 4 / span 1; }
+[data-egg-item="item-8"] { grid-column: 4 / span 1; grid-row: 3 / span 1; }
+[data-egg-item="item-9"] { grid-column: 1 / span 2; grid-row: 5 / span 1; }
+[data-egg-item="item-10"] { grid-column: 3 / span 2; grid-row: 5 / span 2; }
+[data-egg-item="item-11"] { grid-column: 5 / span 2; grid-row: 5 / span 1; }
+[data-egg-item="item-12"] { grid-column: 5 / span 1; grid-row: 6 / span 1; }
+[data-egg-item="item-13"] { grid-column: 6 / span 1; grid-row: 6 / span 1; }
+[data-egg-item="item-14"] { grid-column: 1 / span 2; grid-row: 6 / span 1; }
+[data-egg-item="item-15"] { grid-column: 1 / span 4; grid-row: 7 / span 1; }
+[data-egg-item="item-16"] { grid-column: 5 / span 2; grid-row: 7 / span 2; }
+[data-egg-item="item-17"] { grid-column: 1 / span 2; grid-row: 8 / span 1; }
+[data-egg-item="item-18"] { grid-column: 3 / span 2; grid-row: 8 / span 1; }
 
 /* 5 columns (derived) */
 @container (min-width: 984px) and (max-width: 1183px) {
   #grid { grid-template-columns: repeat(5, 1fr); }
-  #item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
-  #item-2 { grid-column: 3 / span 2; grid-row: 1 / span 1; }
-  #item-3 { grid-column: 3 / span 2; grid-row: 2 / span 1; }
-  #item-4 { grid-column: 5 / span 1; grid-row: 1 / span 2; }
-  #item-5 { grid-column: 1 / span 1; grid-row: 3 / span 1; }
-  #item-6 { grid-column: 2 / span 2; grid-row: 3 / span 2; }
-  #item-7 { grid-column: 4 / span 2; grid-row: 3 / span 1; }
-  #item-8 { grid-column: 4 / span 1; grid-row: 4 / span 1; }
-  #item-9 { grid-column: 1 / span 2; grid-row: 5 / span 1; }
-  #item-10 { grid-column: 3 / span 2; grid-row: 5 / span 2; }
-  #item-11 { grid-column: 5 / span 1; grid-row: 4 / span 1; }
-  #item-12 { grid-column: 5 / span 1; grid-row: 5 / span 1; }
-  #item-13 { grid-column: 5 / span 1; grid-row: 6 / span 1; }
-  #item-14 { grid-column: 1 / span 2; grid-row: 6 / span 1; }
-  #item-15 { grid-column: 1 / span 4; grid-row: 7 / span 1; }
-  #item-16 { grid-column: 1 / span 2; grid-row: 8 / span 2; }
-  #item-17 { grid-column: 3 / span 2; grid-row: 8 / span 1; }
-  #item-18 { grid-column: 5 / span 1; grid-row: 7 / span 1; }
+  [data-egg-item="item-1"] { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+  [data-egg-item="item-2"] { grid-column: 3 / span 2; grid-row: 1 / span 1; }
+  [data-egg-item="item-3"] { grid-column: 3 / span 2; grid-row: 2 / span 1; }
+  [data-egg-item="item-4"] { grid-column: 5 / span 1; grid-row: 1 / span 2; }
+  [data-egg-item="item-5"] { grid-column: 1 / span 1; grid-row: 3 / span 1; }
+  [data-egg-item="item-6"] { grid-column: 2 / span 2; grid-row: 3 / span 2; }
+  [data-egg-item="item-7"] { grid-column: 4 / span 2; grid-row: 3 / span 1; }
+  [data-egg-item="item-8"] { grid-column: 4 / span 1; grid-row: 4 / span 1; }
+  [data-egg-item="item-9"] { grid-column: 1 / span 2; grid-row: 5 / span 1; }
+  [data-egg-item="item-10"] { grid-column: 3 / span 2; grid-row: 5 / span 2; }
+  [data-egg-item="item-11"] { grid-column: 5 / span 1; grid-row: 4 / span 1; }
+  [data-egg-item="item-12"] { grid-column: 5 / span 1; grid-row: 5 / span 1; }
+  [data-egg-item="item-13"] { grid-column: 5 / span 1; grid-row: 6 / span 1; }
+  [data-egg-item="item-14"] { grid-column: 1 / span 2; grid-row: 6 / span 1; }
+  [data-egg-item="item-15"] { grid-column: 1 / span 4; grid-row: 7 / span 1; }
+  [data-egg-item="item-16"] { grid-column: 1 / span 2; grid-row: 8 / span 2; }
+  [data-egg-item="item-17"] { grid-column: 3 / span 2; grid-row: 8 / span 1; }
+  [data-egg-item="item-18"] { grid-column: 5 / span 1; grid-row: 7 / span 1; }
 }
 
 /* 4 columns (derived) */
 @container (min-width: 784px) and (max-width: 983px) {
   #grid { grid-template-columns: repeat(4, 1fr); }
-  #item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
-  #item-2 { grid-column: 3 / span 2; grid-row: 1 / span 1; }
-  #item-3 { grid-column: 3 / span 2; grid-row: 2 / span 1; }
-  #item-4 { grid-column: 3 / span 1; grid-row: 3 / span 2; }
-  #item-5 { grid-column: 4 / span 1; grid-row: 3 / span 1; }
-  #item-6 { grid-column: 1 / span 2; grid-row: 3 / span 2; }
-  #item-7 { grid-column: 1 / span 3; grid-row: 5 / span 1; }
-  #item-8 { grid-column: 4 / span 1; grid-row: 4 / span 1; }
-  #item-9 { grid-column: 1 / span 2; grid-row: 6 / span 1; }
-  #item-10 { grid-column: 3 / span 2; grid-row: 6 / span 2; }
-  #item-11 { grid-column: 1 / span 2; grid-row: 7 / span 1; }
-  #item-12 { grid-column: 4 / span 1; grid-row: 5 / span 1; }
-  #item-13 { grid-column: 1 / span 1; grid-row: 8 / span 1; }
-  #item-14 { grid-column: 1 / span 3; grid-row: 9 / span 1; }
-  #item-15 { grid-column: 1 / span 4; grid-row: 10 / span 1; }
-  #item-16 { grid-column: 2 / span 2; grid-row: 8 / span 2; }
-  #item-17 { grid-column: 1 / span 2; grid-row: 11 / span 1; }
-  #item-18 { grid-column: 3 / span 2; grid-row: 11 / span 1; }
+  [data-egg-item="item-1"] { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+  [data-egg-item="item-2"] { grid-column: 3 / span 2; grid-row: 1 / span 1; }
+  [data-egg-item="item-3"] { grid-column: 3 / span 2; grid-row: 2 / span 1; }
+  [data-egg-item="item-4"] { grid-column: 3 / span 1; grid-row: 3 / span 2; }
+  [data-egg-item="item-5"] { grid-column: 4 / span 1; grid-row: 3 / span 1; }
+  [data-egg-item="item-6"] { grid-column: 1 / span 2; grid-row: 3 / span 2; }
+  [data-egg-item="item-7"] { grid-column: 1 / span 3; grid-row: 5 / span 1; }
+  [data-egg-item="item-8"] { grid-column: 4 / span 1; grid-row: 4 / span 1; }
+  [data-egg-item="item-9"] { grid-column: 1 / span 2; grid-row: 6 / span 1; }
+  [data-egg-item="item-10"] { grid-column: 3 / span 2; grid-row: 6 / span 2; }
+  [data-egg-item="item-11"] { grid-column: 1 / span 2; grid-row: 7 / span 1; }
+  [data-egg-item="item-12"] { grid-column: 4 / span 1; grid-row: 5 / span 1; }
+  [data-egg-item="item-13"] { grid-column: 1 / span 1; grid-row: 8 / span 1; }
+  [data-egg-item="item-14"] { grid-column: 1 / span 3; grid-row: 9 / span 1; }
+  [data-egg-item="item-15"] { grid-column: 1 / span 4; grid-row: 10 / span 1; }
+  [data-egg-item="item-16"] { grid-column: 2 / span 2; grid-row: 8 / span 2; }
+  [data-egg-item="item-17"] { grid-column: 1 / span 2; grid-row: 11 / span 1; }
+  [data-egg-item="item-18"] { grid-column: 3 / span 2; grid-row: 11 / span 1; }
 }
 
 /* 3 columns (derived) */
 @container (min-width: 584px) and (max-width: 783px) {
   #grid { grid-template-columns: repeat(3, 1fr); }
-  #item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
-  #item-2 { grid-column: 1 / span 2; grid-row: 3 / span 1; }
-  #item-3 { grid-column: 3 / span 1; grid-row: 1 / span 1; }
-  #item-4 { grid-column: 3 / span 1; grid-row: 2 / span 2; }
-  #item-5 { grid-column: 1 / span 1; grid-row: 4 / span 1; }
-  #item-6 { grid-column: 2 / span 2; grid-row: 4 / span 2; }
-  #item-7 { grid-column: 1 / span 3; grid-row: 6 / span 1; }
-  #item-8 { grid-column: 1 / span 1; grid-row: 5 / span 1; }
-  #item-9 { grid-column: 1 / span 2; grid-row: 7 / span 1; }
-  #item-10 { grid-column: 1 / span 2; grid-row: 8 / span 2; }
-  #item-11 { grid-column: 3 / span 1; grid-row: 7 / span 1; }
-  #item-12 { grid-column: 3 / span 1; grid-row: 8 / span 1; }
-  #item-13 { grid-column: 3 / span 1; grid-row: 9 / span 1; }
-  #item-14 { grid-column: 1 / span 3; grid-row: 10 / span 1; }
-  #item-15 { grid-column: 1 / span 3; grid-row: 11 / span 1; }
-  #item-16 { grid-column: 1 / span 2; grid-row: 12 / span 2; }
-  #item-17 { grid-column: 1 / span 2; grid-row: 14 / span 1; }
-  #item-18 { grid-column: 3 / span 1; grid-row: 12 / span 1; }
+  [data-egg-item="item-1"] { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+  [data-egg-item="item-2"] { grid-column: 1 / span 2; grid-row: 3 / span 1; }
+  [data-egg-item="item-3"] { grid-column: 3 / span 1; grid-row: 1 / span 1; }
+  [data-egg-item="item-4"] { grid-column: 3 / span 1; grid-row: 2 / span 2; }
+  [data-egg-item="item-5"] { grid-column: 1 / span 1; grid-row: 4 / span 1; }
+  [data-egg-item="item-6"] { grid-column: 2 / span 2; grid-row: 4 / span 2; }
+  [data-egg-item="item-7"] { grid-column: 1 / span 3; grid-row: 6 / span 1; }
+  [data-egg-item="item-8"] { grid-column: 1 / span 1; grid-row: 5 / span 1; }
+  [data-egg-item="item-9"] { grid-column: 1 / span 2; grid-row: 7 / span 1; }
+  [data-egg-item="item-10"] { grid-column: 1 / span 2; grid-row: 8 / span 2; }
+  [data-egg-item="item-11"] { grid-column: 3 / span 1; grid-row: 7 / span 1; }
+  [data-egg-item="item-12"] { grid-column: 3 / span 1; grid-row: 8 / span 1; }
+  [data-egg-item="item-13"] { grid-column: 3 / span 1; grid-row: 9 / span 1; }
+  [data-egg-item="item-14"] { grid-column: 1 / span 3; grid-row: 10 / span 1; }
+  [data-egg-item="item-15"] { grid-column: 1 / span 3; grid-row: 11 / span 1; }
+  [data-egg-item="item-16"] { grid-column: 1 / span 2; grid-row: 12 / span 2; }
+  [data-egg-item="item-17"] { grid-column: 1 / span 2; grid-row: 14 / span 1; }
+  [data-egg-item="item-18"] { grid-column: 3 / span 1; grid-row: 12 / span 1; }
 }
 
 /* 2 columns (derived) */
 @container (min-width: 384px) and (max-width: 583px) {
   #grid { grid-template-columns: repeat(2, 1fr); }
-  #item-1 { grid-column: 1 / span 2; grid-row: 1 / span 2; }
-  #item-2 { grid-column: 1 / span 2; grid-row: 3 / span 1; }
-  #item-3 { grid-column: 1 / span 2; grid-row: 4 / span 1; }
-  #item-4 { grid-column: 1 / span 1; grid-row: 5 / span 2; }
-  #item-5 { grid-column: 2 / span 1; grid-row: 5 / span 1; }
-  #item-6 { grid-column: 1 / span 2; grid-row: 7 / span 2; }
-  #item-7 { grid-column: 1 / span 2; grid-row: 9 / span 1; }
-  #item-8 { grid-column: 2 / span 1; grid-row: 6 / span 1; }
-  #item-9 { grid-column: 1 / span 2; grid-row: 10 / span 1; }
-  #item-10 { grid-column: 1 / span 2; grid-row: 11 / span 2; }
-  #item-11 { grid-column: 1 / span 2; grid-row: 13 / span 1; }
-  #item-12 { grid-column: 1 / span 1; grid-row: 14 / span 1; }
-  #item-13 { grid-column: 2 / span 1; grid-row: 14 / span 1; }
-  #item-14 { grid-column: 1 / span 2; grid-row: 15 / span 1; }
-  #item-15 { grid-column: 1 / span 2; grid-row: 16 / span 1; }
-  #item-16 { grid-column: 1 / span 2; grid-row: 17 / span 2; }
-  #item-17 { grid-column: 1 / span 2; grid-row: 19 / span 1; }
-  #item-18 { grid-column: 1 / span 2; grid-row: 20 / span 1; }
+  [data-egg-item="item-1"] { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+  [data-egg-item="item-2"] { grid-column: 1 / span 2; grid-row: 3 / span 1; }
+  [data-egg-item="item-3"] { grid-column: 1 / span 2; grid-row: 4 / span 1; }
+  [data-egg-item="item-4"] { grid-column: 1 / span 1; grid-row: 5 / span 2; }
+  [data-egg-item="item-5"] { grid-column: 2 / span 1; grid-row: 5 / span 1; }
+  [data-egg-item="item-6"] { grid-column: 1 / span 2; grid-row: 7 / span 2; }
+  [data-egg-item="item-7"] { grid-column: 1 / span 2; grid-row: 9 / span 1; }
+  [data-egg-item="item-8"] { grid-column: 2 / span 1; grid-row: 6 / span 1; }
+  [data-egg-item="item-9"] { grid-column: 1 / span 2; grid-row: 10 / span 1; }
+  [data-egg-item="item-10"] { grid-column: 1 / span 2; grid-row: 11 / span 2; }
+  [data-egg-item="item-11"] { grid-column: 1 / span 2; grid-row: 13 / span 1; }
+  [data-egg-item="item-12"] { grid-column: 1 / span 1; grid-row: 14 / span 1; }
+  [data-egg-item="item-13"] { grid-column: 2 / span 1; grid-row: 14 / span 1; }
+  [data-egg-item="item-14"] { grid-column: 1 / span 2; grid-row: 15 / span 1; }
+  [data-egg-item="item-15"] { grid-column: 1 / span 2; grid-row: 16 / span 1; }
+  [data-egg-item="item-16"] { grid-column: 1 / span 2; grid-row: 17 / span 2; }
+  [data-egg-item="item-17"] { grid-column: 1 / span 2; grid-row: 19 / span 1; }
+  [data-egg-item="item-18"] { grid-column: 1 / span 2; grid-row: 20 / span 1; }
 }
 
 /* 1 column (derived) */
 @container (max-width: 383px) {
   #grid { grid-template-columns: repeat(1, 1fr); }
-  #item-1 { grid-column: 1 / span 1; grid-row: 1 / span 2; }
-  #item-2 { grid-column: 1 / span 1; grid-row: 3 / span 1; }
-  #item-3 { grid-column: 1 / span 1; grid-row: 4 / span 1; }
-  #item-4 { grid-column: 1 / span 1; grid-row: 5 / span 2; }
-  #item-5 { grid-column: 1 / span 1; grid-row: 7 / span 1; }
-  #item-6 { grid-column: 1 / span 1; grid-row: 8 / span 2; }
-  #item-7 { grid-column: 1 / span 1; grid-row: 10 / span 1; }
-  #item-8 { grid-column: 1 / span 1; grid-row: 11 / span 1; }
-  #item-9 { grid-column: 1 / span 1; grid-row: 12 / span 1; }
-  #item-10 { grid-column: 1 / span 1; grid-row: 13 / span 2; }
-  #item-11 { grid-column: 1 / span 1; grid-row: 15 / span 1; }
-  #item-12 { grid-column: 1 / span 1; grid-row: 16 / span 1; }
-  #item-13 { grid-column: 1 / span 1; grid-row: 17 / span 1; }
-  #item-14 { grid-column: 1 / span 1; grid-row: 18 / span 1; }
-  #item-15 { grid-column: 1 / span 1; grid-row: 19 / span 1; }
-  #item-16 { grid-column: 1 / span 1; grid-row: 20 / span 2; }
-  #item-17 { grid-column: 1 / span 1; grid-row: 22 / span 1; }
-  #item-18 { grid-column: 1 / span 1; grid-row: 23 / span 1; }
+  [data-egg-item="item-1"] { grid-column: 1 / span 1; grid-row: 1 / span 2; }
+  [data-egg-item="item-2"] { grid-column: 1 / span 1; grid-row: 3 / span 1; }
+  [data-egg-item="item-3"] { grid-column: 1 / span 1; grid-row: 4 / span 1; }
+  [data-egg-item="item-4"] { grid-column: 1 / span 1; grid-row: 5 / span 2; }
+  [data-egg-item="item-5"] { grid-column: 1 / span 1; grid-row: 7 / span 1; }
+  [data-egg-item="item-6"] { grid-column: 1 / span 1; grid-row: 8 / span 2; }
+  [data-egg-item="item-7"] { grid-column: 1 / span 1; grid-row: 10 / span 1; }
+  [data-egg-item="item-8"] { grid-column: 1 / span 1; grid-row: 11 / span 1; }
+  [data-egg-item="item-9"] { grid-column: 1 / span 1; grid-row: 12 / span 1; }
+  [data-egg-item="item-10"] { grid-column: 1 / span 1; grid-row: 13 / span 2; }
+  [data-egg-item="item-11"] { grid-column: 1 / span 1; grid-row: 15 / span 1; }
+  [data-egg-item="item-12"] { grid-column: 1 / span 1; grid-row: 16 / span 1; }
+  [data-egg-item="item-13"] { grid-column: 1 / span 1; grid-row: 17 / span 1; }
+  [data-egg-item="item-14"] { grid-column: 1 / span 1; grid-row: 18 / span 1; }
+  [data-egg-item="item-15"] { grid-column: 1 / span 1; grid-row: 19 / span 1; }
+  [data-egg-item="item-16"] { grid-column: 1 / span 1; grid-row: 20 / span 2; }
+  [data-egg-item="item-17"] { grid-column: 1 / span 1; grid-row: 22 / span 1; }
+  [data-egg-item="item-18"] { grid-column: 1 / span 1; grid-row: 23 / span 1; }
 }
   </style>
 </head>
@@ -450,19 +450,18 @@
   <nav>
     <a href="index.html">Architecture</a>
     <a href="advanced.html" class="active">Advanced</a>
+    <a href="web-component.html">Web Component</a>
   </nav>
 
   <div class="grid-wrapper">
   <div class="grid" id="grid">
     <!-- 2x2 item -->
     <div
-      id="item-1"
       class="item"
-      data-egg-item
+      data-egg-item="item-1"
       data-egg-label="Chart A"
       data-egg-colspan="2"
       data-egg-rowspan="2"
-      data-id="item-1"
       data-color="1"
       data-column="1"
       data-row="1"
@@ -471,12 +470,10 @@
 
     <!-- 2x1 item -->
     <div
-      id="item-2"
       class="item"
-      data-egg-item
+      data-egg-item="item-2"
       data-egg-label="Chart B"
       data-egg-colspan="2"
-      data-id="item-2"
       data-color="2"
       data-column="3"
       data-row="1"
@@ -485,12 +482,10 @@
 
     <!-- 2x1 item -->
     <div
-      id="item-3"
       class="item"
-      data-egg-item
+      data-egg-item="item-3"
       data-egg-label="Chart C"
       data-egg-colspan="2"
-      data-id="item-3"
       data-color="3"
       data-column="5"
       data-row="1"
@@ -499,12 +494,10 @@
 
     <!-- 1x2 item -->
     <div
-      id="item-4"
       class="item"
-      data-egg-item
+      data-egg-item="item-4"
       data-egg-label="Chart D"
       data-egg-rowspan="2"
-      data-id="item-4"
       data-color="4"
       data-column="3"
       data-row="2"
@@ -513,11 +506,9 @@
 
     <!-- 1x1 item -->
     <div
-      id="item-5"
       class="item"
-      data-egg-item
+      data-egg-item="item-5"
       data-egg-label="Chart E"
-      data-id="item-5"
       data-color="5"
       data-column="4"
       data-row="2"
@@ -526,13 +517,11 @@
 
     <!-- 2x2 item -->
     <div
-      id="item-6"
       class="item"
-      data-egg-item
+      data-egg-item="item-6"
       data-egg-label="Chart F"
       data-egg-colspan="2"
       data-egg-rowspan="2"
-      data-id="item-6"
       data-color="6"
       data-column="5"
       data-row="2"
@@ -541,12 +530,10 @@
 
     <!-- 3x1 item -->
     <div
-      id="item-7"
       class="item"
-      data-egg-item
+      data-egg-item="item-7"
       data-egg-label="Chart G"
       data-egg-colspan="3"
-      data-id="item-7"
       data-color="1"
       data-column="1"
       data-row="4"
@@ -555,11 +542,9 @@
 
     <!-- 1x1 item -->
     <div
-      id="item-8"
       class="item"
-      data-egg-item
+      data-egg-item="item-8"
       data-egg-label="Chart H"
-      data-id="item-8"
       data-color="2"
       data-column="4"
       data-row="3"
@@ -568,12 +553,10 @@
 
     <!-- 2x1 item -->
     <div
-      id="item-9"
       class="item"
-      data-egg-item
+      data-egg-item="item-9"
       data-egg-label="Chart I"
       data-egg-colspan="2"
-      data-id="item-9"
       data-color="3"
       data-column="1"
       data-row="5"
@@ -582,13 +565,11 @@
 
     <!-- Additional items for scroll testing -->
     <div
-      id="item-10"
       class="item"
-      data-egg-item
+      data-egg-item="item-10"
       data-egg-label="Chart J"
       data-egg-colspan="2"
       data-egg-rowspan="2"
-      data-id="item-10"
       data-color="4"
       data-column="3"
       data-row="5"
@@ -596,12 +577,10 @@
     >J (2×2)</div>
 
     <div
-      id="item-11"
       class="item"
-      data-egg-item
+      data-egg-item="item-11"
       data-egg-label="Chart K"
       data-egg-colspan="2"
-      data-id="item-11"
       data-color="5"
       data-column="5"
       data-row="5"
@@ -609,11 +588,9 @@
     >K (2×1)</div>
 
     <div
-      id="item-12"
       class="item"
-      data-egg-item
+      data-egg-item="item-12"
       data-egg-label="Chart L"
-      data-id="item-12"
       data-color="6"
       data-column="5"
       data-row="6"
@@ -621,11 +598,9 @@
     >L (1×1)</div>
 
     <div
-      id="item-13"
       class="item"
-      data-egg-item
+      data-egg-item="item-13"
       data-egg-label="Chart M"
-      data-id="item-13"
       data-color="1"
       data-column="6"
       data-row="6"
@@ -633,12 +608,10 @@
     >M (1×1)</div>
 
     <div
-      id="item-14"
       class="item"
-      data-egg-item
+      data-egg-item="item-14"
       data-egg-label="Chart N"
       data-egg-colspan="2"
-      data-id="item-14"
       data-color="2"
       data-column="1"
       data-row="6"
@@ -646,12 +619,10 @@
     >N (2×1)</div>
 
     <div
-      id="item-15"
       class="item"
-      data-egg-item
+      data-egg-item="item-15"
       data-egg-label="Chart O"
       data-egg-colspan="4"
-      data-id="item-15"
       data-color="3"
       data-column="1"
       data-row="7"
@@ -659,13 +630,11 @@
     >O (4×1)</div>
 
     <div
-      id="item-16"
       class="item"
-      data-egg-item
+      data-egg-item="item-16"
       data-egg-label="Chart P"
       data-egg-colspan="2"
       data-egg-rowspan="2"
-      data-id="item-16"
       data-color="4"
       data-column="5"
       data-row="7"
@@ -673,12 +642,10 @@
     >P (2×2)</div>
 
     <div
-      id="item-17"
       class="item"
-      data-egg-item
+      data-egg-item="item-17"
       data-egg-label="Chart Q"
       data-egg-colspan="2"
-      data-id="item-17"
       data-color="5"
       data-column="1"
       data-row="8"
@@ -686,12 +653,10 @@
     >Q (2×1)</div>
 
     <div
-      id="item-18"
       class="item"
-      data-egg-item
+      data-egg-item="item-18"
       data-egg-label="Chart R"
       data-egg-colspan="2"
-      data-id="item-18"
       data-color="6"
       data-column="3"
       data-row="8"
@@ -739,7 +704,7 @@
       const positions = new Map();
 
       for (const el of elements) {
-        const id = el.dataset.id || el.id;
+        const id = el.dataset.eggItem || el.dataset.id || el.id;
         const width = parseInt(el.getAttribute('data-egg-colspan') || '1', 10) || 1;
         const height = parseInt(el.getAttribute('data-egg-rowspan') || '1', 10) || 1;
 

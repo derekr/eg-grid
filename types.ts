@@ -371,9 +371,9 @@ export interface ResponsiveLayoutModel {
  * Options for CSS generation
  */
 export interface BreakpointCSSOptions {
-	/** CSS selector prefix for item rules (default: '#') */
+	/** CSS selector prefix for item rules (default: '[data-egg-item="') */
 	selectorPrefix?: string;
-	/** CSS selector suffix for item rules (default: '') */
+	/** CSS selector suffix for item rules (default: '"]') */
 	selectorSuffix?: string;
 	/** Cell size in pixels (for breakpoint calculation) */
 	cellSize: number;

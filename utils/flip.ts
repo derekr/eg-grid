@@ -80,6 +80,7 @@ export function animateFLIP(
 export function getItemViewTransitionName(element: HTMLElement): string | null {
 	return (
 		element.style.getPropertyValue('--item-id') ||
+		element.dataset.eggItem ||
 		element.id ||
 		element.dataset.id ||
 		null
