@@ -68,7 +68,7 @@ export class GridSession extends DurableObject {
     const signalEvent = patchSignals({ layoutCSS: layoutToCSS(layout, SERVER_SELECTOR) });
     const morphEvent = patchElements(
       `<style id="morph-layout">${layoutToCSS(layout, MORPH_SELECTOR)}</style>`,
-      { selector: "#morph-layout", mode: "outer" },
+      { selector: "#morph-layout", mode: "outer", useViewTransition: true },
     );
     writer.write(encoder.encode(signalEvent + morphEvent)).catch(() => {});
 
@@ -93,7 +93,7 @@ export class GridSession extends DurableObject {
     const signalEvent = patchSignals({ layoutCSS: layoutToCSS(layout, SERVER_SELECTOR) });
     const morphEvent = patchElements(
       `<style id="morph-layout">${layoutToCSS(layout, MORPH_SELECTOR)}</style>`,
-      { selector: "#morph-layout", mode: "outer" },
+      { selector: "#morph-layout", mode: "outer", useViewTransition: true },
     );
     this.broadcast(signalEvent + morphEvent);
   }

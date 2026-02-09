@@ -263,7 +263,7 @@ ${itemsHTML}
     <code>data-effect</code> writes CSS to a <code>&lt;style&gt;</code> &rarr; grid repositions.
   </p>
 
-  <div data-effect="document.getElementById('server-layout').textContent = $layoutCSS"></div>
+  <div data-effect="$layoutCSS &amp;&amp; (document.startViewTransition ? document.startViewTransition(() => document.getElementById('server-layout').textContent = $layoutCSS) : document.getElementById('server-layout').textContent = $layoutCSS)"></div>
   <style id="server-layout">${initialCSS}</style>
   <eg-grid id="grid-server" columns="4" cell-size="120" gap="8"
     algorithm="none" resize-handles="all" placeholder-class="drop-placeholder"
