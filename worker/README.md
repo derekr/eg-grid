@@ -5,18 +5,18 @@ Cloudflare Worker demo showing three server integration patterns for drag-and-dr
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      BROWSER (Tab)                          │
-│                                                             │
-│  ┌─────────────┐    ┌──────────┐    ┌────────────────────┐  │
-│  │  <eg-grid>   │───>│ Datastar │───>│  SSE EventSource   │  │
-│  │  web component│<──│ reactive │<───│  (long-lived GET)  │  │
-│  └─────────────┘    └──────────┘    └────────────────────┘  │
-│         │                │                     ^             │
-│         │ egg-drag-move  │ @post (fire+forget) │ SSE events  │
-│         │ egg-drag-end   │ returns 204         │             │
-│         │ egg-resize-end │                     │             │
-│         v                v                     │             │
+┌───────────────────────────────────────────────────────────────┐
+│                      BROWSER (Tab)                            │
+│                                                               │
+│  ┌───────────────┐    ┌──────────┐    ┌────────────────────┐  │
+│  │  <eg-grid>    │───>│ Datastar │───>│  SSE EventSource   │  │
+│  │  web component│<── │ reactive │<───│  (long-lived GET)  │  │
+│  └───────────────┘    └──────────┘    └────────────────────┘  │
+│         │                │                     ^              │
+│         │ egg-drag-move  │ @post (fire+forget) │ SSE events   │
+│         │ egg-drag-end   │ returns 204         │              │
+│         │ egg-resize-end │                     │              │
+│         v                v                     │              │
 └─────────────────────┬─────────────────────┬────┘
                       │  POST /api/*        │  GET /{tab}
                       │  (writes)           │  Accept: text/event-stream
@@ -30,15 +30,15 @@ Cloudflare Worker demo showing three server integration patterns for drag-and-dr
               └──────┬───────┘
                      │ stub.fetch() / RPC
                      v
-              ┌──────────────────────────────────┐
+              ┌───────────────────────────────────┐
               │     GridSession Durable Object    │
               │                                   │
-              │  ┌───────────┐  ┌──────────────┐ │
-              │  │  SQLite   │  │ SSE Writers  │ │
-              │  │  (items)  │  │ Set<{writer, │ │
-              │  │           │  │       tab}>  │ │
-              │  └───────────┘  └──────────────┘ │
-              └──────────────────────────────────┘
+              │  ┌───────────┐  ┌──────────────┐  │
+              │  │  SQLite   │  │ SSE Writers  │  │
+              │  │  (items)  │  │ Set<{writer, │  │
+              │  │           │  │       tab}>  │  │
+              │  └───────────┘  └──────────────┘  │
+              └───────────────────────────────────┘
 ```
 
 ## CQRS: Reads and Writes are Separate Paths
@@ -69,9 +69,9 @@ Cloudflare Worker demo showing three server integration patterns for drag-and-dr
     │  event: datastar-patch-  │     (initial layout      │
     │    elements              │      from SQLite)        │
     │  data: ...               │                          │
-    │< ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│
+    │< ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│
     │                          │                          │
-    │    connection stays open, events pushed on changes   │
+    │   connection stays open, events pushed on changes   │
 ```
 
 The same route serves both HTML pages and SSE connections, differentiated by the `Accept: text/event-stream` header. Datastar's `data-init="@get('/morph')"` establishes the SSE connection automatically.
@@ -99,7 +99,7 @@ The same route serves both HTML pages and SSE connections, differentiated by the
     │  event: datastar-patch-  │                          │
     │    elements              │                          │
     │  data: <style>...</style>│                          │
-    │< ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│
+    │< ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│
     │                          │                          │
     │  Datastar morphs <style> │                          │
     │  into DOM -> grid        │                          │
