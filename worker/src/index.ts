@@ -19,7 +19,6 @@ interface Env {
   GRID_SESSION: DurableObjectNamespace<GridSession>;
 }
 
-const VITE_ORIGIN = "http://localhost:5176";
 const COOKIE_NAME = "egg-session";
 
 export default {
@@ -58,7 +57,7 @@ async function handlePage(request: Request, env: Env, pathname: string): Promise
   const session = getSession(env, sessionId);
   const items = await session.getLayout();
   const tab = pathname === "/client" ? "client" : pathname === "/server" ? "server" : "morph";
-  const html = renderPage(items, VITE_ORIGIN, tab);
+  const html = renderPage(items, tab);
 
   const headers = new Headers({
     "Content-Type": "text/html; charset=utf-8",

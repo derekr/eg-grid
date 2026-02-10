@@ -4,7 +4,9 @@
  */
 import { layoutToCSS, type ItemRect } from "./algorithm";
 
-export function renderPage(items: ItemRect[], viteOrigin: string, tab: "morph" | "server" | "client"): string {
+const EG_GRID_CDN = "https://cdn.jsdelivr.net/gh/derekr/eg-grid@v0.1.0/dist/eg-grid-element.min.js";
+
+export function renderPage(items: ItemRect[], tab: "morph" | "server" | "client"): string {
   const selectorMap: Record<string, string | undefined> = {
     morph: '#grid-morph [data-egg-item="ID"]',
     server: '#grid-server [data-egg-item="ID"]',
@@ -31,7 +33,7 @@ export function renderPage(items: ItemRect[], viteOrigin: string, tab: "morph" |
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Datastar + EG Grid</title>
   <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@1.0.0-RC.7/bundles/datastar.js"><\/script>
-  <script type="module" src="${viteOrigin}/src/bundles/element.ts"><\/script>
+  <script type="module" src="${EG_GRID_CDN}"><\/script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
