@@ -251,7 +251,7 @@ app.config.compilerOptions
 
     function App() {
       return html`
-        <eg-grid columns="3" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
+        <eg-grid columns="3" cell-size="80" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
           <div class="item" data-egg-item="r1" data-color="1" data-egg-colspan="2">A</div>
           <div class="item" data-egg-item="r2" data-color="2">B</div>
           <div class="item" data-egg-item="r3" data-color="3">C</div>
@@ -270,7 +270,7 @@ app.config.compilerOptions
 
     const app = createApp({
       template: `
-        <eg-grid columns="3" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
+        <eg-grid columns="3" cell-size="80" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
           <div class="item" data-egg-item="v1" data-color="3">A</div>
           <div class="item" data-egg-item="v2" data-color="4" data-egg-colspan="2">B</div>
           <div class="item" data-egg-item="v3" data-color="5">C</div>
@@ -289,7 +289,7 @@ app.config.compilerOptions
     import html from 'https://esm.sh/solid-js/html';
 
     render(() => html`
-      <eg-grid columns="3" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
+      <eg-grid columns="3" cell-size="80" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
         <div class="item" data-egg-item="s1" data-color="5">A</div>
         <div class="item" data-egg-item="s2" data-color="6">B</div>
         <div class="item" data-egg-item="s3" data-color="1" data-egg-colspan="2">C</div>

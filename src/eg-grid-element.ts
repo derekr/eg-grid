@@ -190,7 +190,40 @@ export class EgGridElement extends HTMLElement {
 			canonicalPositions.set(id, { column: colStart, row: rowStart });
 		}
 
-		// 7. Build layout model
+		// 7. Pack items if no explicit CSS positions were set.
+		//    When items lack grid-column/grid-row CSS, getComputedStyle returns "auto"
+		//    which resolves to (1,1) for every item. Detect this overlap and run
+		//    first-fit compaction so items don't stack on top of each other.
+		if (canonicalPositions.size > 1) {
+			const allOverlap = Array.from(canonicalPositions.values())
+				.every(p => p.column === 1 && p.row === 1);
+			if (allOverlap) {
+				const occupied: (string | null)[][] = [];
+				for (let r = 0; r < 100; r++) occupied.push(new Array(maxColumns).fill(null));
+				for (const def of itemDefs) {
+					const w = Math.min(def.width, maxColumns);
+					const h = def.height;
+					let placed = false;
+					for (let row = 0; row < 100 && !placed; row++) {
+						for (let col = 0; col <= maxColumns - w && !placed; col++) {
+							let fits = true;
+							for (let dy = 0; dy < h && fits; dy++)
+								for (let dx = 0; dx < w && fits; dx++)
+									if (occupied[row + dy]?.[col + dx] !== null) fits = false;
+							if (fits) {
+								canonicalPositions.set(def.id, { column: col + 1, row: row + 1 });
+								for (let dy = 0; dy < h; dy++)
+									for (let dx = 0; dx < w; dx++)
+										if (occupied[row + dy]) occupied[row + dy]![col + dx] = def.id;
+								placed = true;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// 8. Build layout model
 		if (itemDefs.length > 0) {
 			this.layoutModel = createLayoutModel({
 				maxColumns,
@@ -200,7 +233,7 @@ export class EgGridElement extends HTMLElement {
 			});
 		}
 
-		// 8. Build InitOptions from attributes
+		// 9. Build InitOptions from attributes
 		const options: InitOptions = {
 			styleElement: this._styleEl,
 			layoutModel: this.layoutModel ?? undefined,
@@ -226,19 +259,19 @@ export class EgGridElement extends HTMLElement {
 			};
 		}
 
-		// 9. Initialize
+		// 10. Initialize
 		this.core = init(this, options);
 
-		// 10. Clear inline grid-column/grid-row so CSS injection works
+		// 11. Clear inline grid-column/grid-row so CSS injection works
 		for (const item of items) {
 			item.style.removeProperty('grid-column');
 			item.style.removeProperty('grid-row');
 		}
 
-		// 11. Set data-pointer-active (pointer is always enabled)
+		// 12. Set data-pointer-active (pointer is always enabled)
 		this.setAttribute('data-pointer-active', '');
 
-		// 12. MutationObserver for React compat (childList changes)
+		// 13. MutationObserver for React compat (childList changes)
 		this._observeChildren();
 	}
 
