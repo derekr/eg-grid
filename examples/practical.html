@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EG Grid - Practical Dashboard Example</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    nav {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    nav a {
+      margin-right: 1rem;
+      color: #4facfe;
+      text-decoration: none;
+    }
+
+    nav a:hover {
+      text-decoration: underline;
+    }
+
+    nav a.active {
+      font-weight: bold;
+      color: #fff;
+    }
+
+    /* Container wrapper for container queries */
+    .grid-wrapper {
+      container-type: inline-size;
+      max-width: 1216px;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      grid-auto-rows: 184px;
+      gap: 16px;
+    }
+
+    .item {
+      border-radius: 12px;
+      background: #1a1d2e;
+      border: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      scroll-margin: 25vh 10vw;
+      -webkit-touch-callout: none;
+      transition: border-color 0.2s ease;
+      view-transition-name: var(--item-id);
+      position: relative;
+    }
+
+    .item:hover {
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    .item-header {
+      padding: 10px 14px 0;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+
+    .chart-container {
+      flex: 1;
+      min-height: 0;
+      pointer-events: none;
+    }
+
+    .chart-container canvas {
+      background: transparent;
+    }
+
+    /* Drag states */
+    .item[data-egg-dragging] {
+      cursor: grabbing;
+      transform: scale(1.02);
+      filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
+      z-index: 100;
+      border-color: rgba(74, 158, 255, 0.3);
+    }
+
+    .item[data-egg-dropping] {
+      z-index: 100;
+    }
+
+    /* Selected state */
+    .item[data-egg-selected] {
+      outline: 2px solid rgba(74, 158, 255, 0.6);
+      outline-offset: 2px;
+      z-index: 50;
+    }
+
+    /* Resizing state */
+    .item[data-egg-resizing] {
+      z-index: 100;
+      outline: 2px solid rgba(74, 158, 255, 0.4);
+      outline-offset: 2px;
+    }
+
+    /* Resize handle indicator */
+    .item::after {
+      content: '';
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: 3px;
+      background: rgba(74, 158, 255, 0.6);
+    }
+
+    /* Corner handles */
+    .item[data-egg-handle-hover="se"]::after { opacity: 1; width: 14px; height: 14px; bottom: 4px; right: 4px; }
+    .item[data-egg-handle-hover="sw"]::after { opacity: 1; width: 14px; height: 14px; bottom: 4px; left: 4px; }
+    .item[data-egg-handle-hover="ne"]::after { opacity: 1; width: 14px; height: 14px; top: 4px; right: 4px; }
+    .item[data-egg-handle-hover="nw"]::after { opacity: 1; width: 14px; height: 14px; top: 4px; left: 4px; }
+
+    /* Edge handles */
+    .item[data-egg-handle-hover="n"]::after { opacity: 1; height: 4px; top: 4px; left: 20px; right: 20px; }
+    .item[data-egg-handle-hover="s"]::after { opacity: 1; height: 4px; bottom: 4px; left: 20px; right: 20px; }
+    .item[data-egg-handle-hover="e"]::after { opacity: 1; width: 4px; right: 4px; top: 20px; bottom: 20px; }
+    .item[data-egg-handle-hover="w"]::after { opacity: 1; width: 4px; left: 4px; top: 20px; bottom: 20px; }
+
+    /* Active handle */
+    .item[data-egg-handle-active]::after {
+      opacity: 1;
+      background: rgba(74, 158, 255, 0.9);
+      box-shadow: 0 0 8px rgba(74, 158, 255, 0.4);
+    }
+
+    .item[data-egg-handle-active="se"]::after { width: 14px; height: 14px; bottom: 4px; right: 4px; top: auto; left: auto; }
+    .item[data-egg-handle-active="sw"]::after { width: 14px; height: 14px; bottom: 4px; left: 4px; top: auto; right: auto; }
+    .item[data-egg-handle-active="ne"]::after { width: 14px; height: 14px; top: 4px; right: 4px; bottom: auto; left: auto; }
+    .item[data-egg-handle-active="nw"]::after { width: 14px; height: 14px; top: 4px; left: 4px; bottom: auto; right: auto; }
+    .item[data-egg-handle-active="n"]::after { height: 4px; top: 4px; left: 20px; right: 20px; bottom: auto; width: auto; }
+    .item[data-egg-handle-active="s"]::after { height: 4px; bottom: 4px; left: 20px; right: 20px; top: auto; width: auto; }
+    .item[data-egg-handle-active="e"]::after { width: 4px; right: 4px; top: 20px; bottom: 20px; left: auto; height: auto; }
+    .item[data-egg-handle-active="w"]::after { width: 4px; left: 4px; top: 20px; bottom: 20px; right: auto; height: auto; }
+
+    /* Keyboard mode */
+    .grid[data-egg-keyboard-mode] {
+      outline: 2px solid rgba(74, 158, 255, 0.2);
+      outline-offset: 4px;
+    }
+
+    /* Drop placeholder */
+    .drop-placeholder {
+      background: rgba(74, 158, 255, 0.05);
+      border: 2px dashed rgba(74, 158, 255, 0.3);
+      border-radius: 12px;
+      pointer-events: none;
+      view-transition-name: none;
+    }
+
+    /* View Transition styles */
+    ::view-transition-group(*) {
+      animation-duration: 200ms;
+      animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    ::view-transition-old(*) {
+      animation: none;
+      opacity: 0;
+    }
+
+    ::view-transition-new(*) {
+      animation: none;
+    }
+
+    ::view-transition-old(dragging),
+    ::view-transition-new(dragging),
+    ::view-transition-group(dragging) {
+      animation: none;
+    }
+
+    ::view-transition-old(resizing),
+    ::view-transition-new(resizing),
+    ::view-transition-group(resizing) {
+      animation: none;
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      ::view-transition-group(*),
+      ::view-transition-old(*),
+      ::view-transition-new(*) {
+        animation: none !important;
+      }
+
+      .item[data-egg-dragging] {
+        transform: none;
+      }
+    }
+
+    /* Instructions panel */
+    .instructions {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      max-width: 300px;
+      z-index: 1000;
+      view-transition-name: instructions-panel;
+    }
+
+    ::view-transition-group(instructions-panel),
+    ::view-transition-group(dev-overlay) {
+      z-index: 1000;
+    }
+
+    .instructions h3 {
+      margin-bottom: 8px;
+    }
+
+    .instructions ul {
+      margin-left: 20px;
+    }
+
+    .instructions li {
+      margin-bottom: 4px;
+    }
+
+    /* Chart fallback */
+    .chart-fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: rgba(255,255,255,0.2);
+      font-size: 13px;
+    }
+  </style>
+  <style id="layout-styles">
+/* Fallback: canonical 6-col layout */
+[data-egg-item="revenue"] { grid-column: 1 / span 2; grid-row: 1 / span 2; }
+[data-egg-item="sales"] { grid-column: 3 / span 2; grid-row: 1 / span 1; }
+[data-egg-item="users"] { grid-column: 5 / span 2; grid-row: 1 / span 1; }
+[data-egg-item="stock"] { grid-column: 3 / span 2; grid-row: 2 / span 1; }
+[data-egg-item="engagement"] { grid-column: 5 / span 2; grid-row: 2 / span 1; }
+[data-egg-item="traffic"] { grid-column: 1 / span 3; grid-row: 3 / span 1; }
+[data-egg-item="server"] { grid-column: 4 / span 3; grid-row: 3 / span 1; }
+[data-egg-item="campaign"] { grid-column: 1 / span 4; grid-row: 4 / span 1; }
+[data-egg-item="orders"] { grid-column: 5 / span 2; grid-row: 4 / span 1; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="../index.html">EG Grid</a>
+    <a href="index.html">Architecture</a>
+    <a href="practical.html" class="active">Practical</a>
+    <a href="web-component.html">Web Component</a>
+  </nav>
+
+  <div class="grid-wrapper">
+  <div class="grid" id="grid">
+    <div
+      class="item"
+      data-egg-item="revenue"
+      data-egg-label="Revenue"
+      data-egg-colspan="2"
+      data-egg-rowspan="2"
+      data-column="1"
+      data-row="1"
+      style="--item-id: revenue"
+    >
+      <div class="item-header">Revenue</div>
+      <div class="chart-container" data-chart="revenue"></div>
+    </div>
+
+    <div
+      class="item"
+      data-egg-item="sales"
+      data-egg-label="Sales by Category"
+      data-egg-colspan="2"
+      data-column="3"
+      data-row="1"
+      style="--item-id: sales"
+    >
+      <div class="item-header">Sales by Category</div>
+      <div class="chart-container" data-chart="sales"></div>
+    </div>
+
+    <div
+      class="item"
+      data-egg-item="users"
+      data-egg-label="User Growth"
+      data-egg-colspan="2"
+      data-column="5"
+      data-row="1"
+      style="--item-id: users"
+    >
+      <div class="item-header">User Growth</div>
+      <div class="chart-container" data-chart="users"></div>
+    </div>
+
+    <div
+      class="item"
+      data-egg-item="stock"
+      data-egg-label="Stock Price"
+      data-egg-colspan="2"
+      data-column="3"
+      data-row="2"
+      style="--item-id: stock"
+    >
+      <div class="item-header">Stock Price</div>
+      <div class="chart-container" data-chart="stock"></div>
+    </div>
+
+    <div
+      class="item"
+      data-egg-item="engagement"
+      data-egg-label="Engagement"
+      data-egg-colspan="2"
+      data-column="5"
+      data-row="2"
+      style="--item-id: engagement"
+    >
+      <div class="item-header">Engagement</div>
+      <div class="chart-container" data-chart="engagement"></div>
+    </div>
+
+    <div
+      class="item"
+      data-egg-item="traffic"
+      data-egg-label="Weekly Traffic"
+      data-egg-colspan="3"
+      data-column="1"
+      data-row="3"
+      style="--item-id: traffic"
+    >
+      <div class="item-header">Weekly Traffic</div>
+      <div class="chart-container" data-chart="traffic"></div>
+    </div>
+
+    <div
+      class="item"
+      data-egg-item="server"
+      data-egg-label="Server Performance"
+      data-egg-colspan="3"
+      data-column="4"
+      data-row="3"
+      style="--item-id: server"
+    >
+      <div class="item-header">Server Performance</div>
+      <div class="chart-container" data-chart="server"></div>
+    </div>
+
+    <div
+      class="item"
+      data-egg-item="campaign"
+      data-egg-label="Campaign ROI"
+      data-egg-colspan="4"
+      data-column="1"
+      data-row="4"
+      style="--item-id: campaign"
+    >
+      <div class="item-header">Campaign ROI</div>
+      <div class="chart-container" data-chart="campaign"></div>
+    </div>
+
+    <div
+      class="item"
+      data-egg-item="orders"
+      data-egg-label="Order Distribution"
+      data-egg-colspan="2"
+      data-column="5"
+      data-row="4"
+      style="--item-id: orders"
+    >
+      <div class="item-header">Order Distribution</div>
+      <div class="chart-container" data-chart="orders"></div>
+    </div>
+  </div>
+  </div><!-- .grid-wrapper -->
+
+  <div class="instructions">
+    <h3>EG Grid Practical Dashboard</h3>
+    <ul>
+      <li><b>Mouse:</b> Click to select, drag to move</li>
+      <li><b>Shift+G:</b> Toggle keyboard mode</li>
+      <li><b>Arrows/hjkl:</b> Nudge selected item</li>
+      <li><b>Shift+nav:</b> Resize selected item</li>
+      <li><b>Enter/Space:</b> Pick up / drop</li>
+      <li><b>Escape:</b> Cancel / deselect</li>
+      <li><b>Shift+D:</b> Toggle dev overlay</li>
+      <li><b>Corners/edges:</b> Drag to resize</li>
+    </ul>
+  </div>
+
+  <script type="module">
+    import { init, createLayoutModel, attachResponsive } from '../src/bundles/index.ts';
+    import { attachPushAlgorithm, readItemsFromDOM, compactUp } from '../src/plugins/algorithm-push.ts';
+    import { attachDevOverlay } from '../src/plugins/dev-overlay.ts';
+    import { attachPlaceholder } from '../src/plugins/placeholder.ts';
+    import { attachCamera } from '../src/plugins/camera.ts';
+    import { attachResize } from '../src/plugins/resize.ts';
+
+    const gridElement = document.getElementById('grid');
+    const layoutStyleElement = document.getElementById('layout-styles');
+
+    // Read initial items from DOM
+    function readItemDefinitions() {
+      const elements = gridElement.querySelectorAll('[data-egg-item]');
+      const items = [];
+      const positions = new Map();
+
+      for (const el of elements) {
+        const id = el.dataset.eggItem;
+        const width = parseInt(el.getAttribute('data-egg-colspan') || '1', 10) || 1;
+        const height = parseInt(el.getAttribute('data-egg-rowspan') || '1', 10) || 1;
+        const column = parseInt(el.dataset.column, 10) || 1;
+        const row = parseInt(el.dataset.row, 10) || 1;
+
+        items.push({ id, width, height });
+        positions.set(id, { column, row });
+      }
+
+      return { items, positions };
+    }
+
+    const { items, positions } = readItemDefinitions();
+
+    const layoutModel = createLayoutModel({
+      maxColumns: 6,
+      items,
+      canonicalPositions: positions,
+    });
+
+    // Initialize EG Grid
+    const grid = init(gridElement, {
+      styleElement: layoutStyleElement,
+      algorithm: false,
+      placeholder: false,
+      camera: false,
+      resize: false,
+    });
+
+    // Responsive plugin
+    const detachResponsive = attachResponsive(gridElement, {
+      layoutModel,
+      cellSize: 184,
+      gap: 16,
+    }, grid);
+
+    // Push algorithm
+    let algorithmOptions = {
+      layoutModel,
+      compaction: true,
+      core: grid
+    };
+    let detachAlgorithm = null;
+
+    function reattachAlgorithm() {
+      if (detachAlgorithm) detachAlgorithm();
+      detachAlgorithm = attachPushAlgorithm(gridElement, algorithmOptions);
+    }
+
+    reattachAlgorithm();
+
+    // Dev overlay
+    const devOverlay = attachDevOverlay(gridElement, { visible: false, core: grid });
+
+    devOverlay.registerOption({
+      key: 'compaction',
+      label: 'Compact items upward',
+      type: 'boolean',
+      value: algorithmOptions.compaction,
+      onChange: (value) => {
+        algorithmOptions.compaction = value;
+        reattachAlgorithm();
+      }
+    });
+
+    devOverlay.registerOption({
+      key: 'compact-now',
+      label: 'Compact Now',
+      type: 'action',
+      onAction: () => {
+        const items = readItemsFromDOM(gridElement);
+        compactUp(items, '');
+        const positions = new Map();
+        for (const item of items) {
+          positions.set(item.id, { column: item.column, row: item.row });
+        }
+        layoutModel.saveLayout(layoutModel.currentColumnCount, positions);
+      }
+    });
+
+    // Placeholder
+    attachPlaceholder(gridElement, { className: 'drop-placeholder' });
+
+    // Camera
+    attachCamera(gridElement, {
+      mode: 'contain',
+      edgeSize: 80,
+      scrollSpeed: 12,
+      scrollMargin: 64,
+      settleDelay: 50,
+      core: grid
+    });
+
+    // Resize
+    attachResize(gridElement, {
+      handles: 'all',
+      handleSize: 16,
+      minSize: { colspan: 1, rowspan: 1 },
+      maxSize: { colspan: 6, rowspan: 6 },
+      showSizeLabel: true,
+      core: grid
+    });
+
+    // --- ChartGPU ---
+
+    // Seedable PRNG for consistent demo data
+    let seed = 42;
+    function random() {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    }
+
+    function generateData() {
+      const revenue = Array.from({length: 12}, (_, i) =>
+        [i, Math.round(50 + i * 8 + random() * 15)]);
+
+      const sales = Array.from({length: 8}, (_, i) =>
+        [i, Math.round(20 + random() * 80)]);
+
+      const users = Array.from({length: 20}, (_, i) =>
+        [i, Math.round(10 * Math.pow(1.08, i) + random() * 5)]);
+
+      let price = 150;
+      const stock = Array.from({length: 30}, (_, i) => {
+        const open = Math.round(price);
+        const change = (random() - 0.48) * 8;
+        const close = Math.round(open + change);
+        const high = Math.max(open, close) + Math.round(random() * 4);
+        const low = Math.min(open, close) - Math.round(random() * 4);
+        price = close;
+        return [i, open, close, low, high];
+      });
+
+      const engage1 = Array.from({length: 20}, (_, i) =>
+        [i, Math.round(40 + Math.sin(i * 0.5) * 20 + random() * 10)]);
+      const engage2 = Array.from({length: 20}, (_, i) =>
+        [i, Math.round(30 + Math.cos(i * 0.5) * 15 + random() * 10)]);
+
+      const traffic = Array.from({length: 12}, (_, i) =>
+        [i, Math.round(50 + random() * 30 + (i > 6 ? 20 : 0))]);
+
+      const cpu = Array.from({length: 24}, (_, i) =>
+        [i, Math.round(30 + Math.sin(i * 0.3) * 20 + random() * 15)]);
+      const memory = Array.from({length: 24}, (_, i) =>
+        [i, Math.round(50 + Math.sin(i * 0.2) * 10 + random() * 10)]);
+      const network = Array.from({length: 24}, (_, i) =>
+        [i, Math.round(20 + Math.cos(i * 0.4) * 15 + random() * 10)]);
+
+      const email = Array.from({length: 24}, (_, i) =>
+        [i, Math.round(150 + i * 5 + random() * 50)]);
+      const social = Array.from({length: 24}, (_, i) =>
+        [i, Math.round(100 + i * 8 + random() * 40)]);
+      const search = Array.from({length: 24}, (_, i) =>
+        [i, Math.round(200 + i * 3 + random() * 60)]);
+
+      const orders = Array.from({length: 50}, () =>
+        [Math.round(random() * 100), Math.round(random() * 100)]);
+
+      return { revenue, sales, users, stock, engage1, engage2, traffic, cpu, memory, network, email, social, search, orders };
+    }
+
+    async function initCharts() {
+      if (!navigator.gpu) {
+        for (const el of document.querySelectorAll('.chart-container')) {
+          el.innerHTML = '<div class="chart-fallback">WebGPU not available</div>';
+        }
+        return;
+      }
+
+      const { ChartGPU } = await import('https://esm.sh/chartgpu@0.2.4');
+      const data = generateData();
+      const charts = new Map();
+
+      const shared = {
+        grid: { left: 80, right: 16, top: 12, bottom: 32 },
+        animation: { duration: 800, easing: 'cubicOut' },
+      };
+
+      const configs = {
+        revenue: {
+          ...shared,
+          xAxis: { type: 'value', min: 0, max: 11 },
+          yAxis: { type: 'value' },
+          palette: ['#4a9eff'],
+          series: [{
+            type: 'line', name: 'Revenue', data: data.revenue,
+            areaStyle: { opacity: 0.15 },
+            lineStyle: { width: 2 }
+          }]
+        },
+        sales: {
+          ...shared,
+          xAxis: { type: 'value', min: -0.5, max: 7.5 },
+          yAxis: { type: 'value' },
+          palette: ['#51cf66'],
+          series: [{ type: 'bar', name: 'Sales', data: data.sales }]
+        },
+        users: {
+          ...shared,
+          xAxis: { type: 'value', min: 0, max: 19 },
+          yAxis: { type: 'value' },
+          palette: ['#ff6b6b'],
+          series: [{
+            type: 'line', name: 'Users', data: data.users,
+            lineStyle: { width: 2 }
+          }]
+        },
+        stock: {
+          ...shared,
+          xAxis: { type: 'value', min: 0, max: 29 },
+          yAxis: { type: 'value' },
+          palette: ['#51cf66', '#ff6b6b'],
+          series: [
+            { type: 'line', name: 'Close', data: data.stock.map(d => [d[0], d[2]]), lineStyle: { width: 2 } },
+            { type: 'line', name: 'Open', data: data.stock.map(d => [d[0], d[1]]), lineStyle: { width: 1, opacity: 0.5 } }
+          ]
+        },
+        engagement: {
+          ...shared,
+          xAxis: { type: 'value', min: 0, max: 19 },
+          yAxis: { type: 'value' },
+          palette: ['#cc5de8', '#20c997'],
+          series: [
+            { type: 'line', name: 'Sessions', data: data.engage1, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 } },
+            { type: 'line', name: 'Pageviews', data: data.engage2, areaStyle: { opacity: 0.15 }, lineStyle: { width: 2 } }
+          ]
+        },
+        traffic: {
+          ...shared,
+          xAxis: { type: 'value', min: -0.5, max: 11.5 },
+          yAxis: { type: 'value' },
+          palette: ['#ffd43b'],
+          series: [{ type: 'bar', name: 'Visits', data: data.traffic }]
+        },
+        server: {
+          ...shared,
+          xAxis: { type: 'value', min: 0, max: 23 },
+          yAxis: { type: 'value', min: 0, max: 100 },
+          palette: ['#4a9eff', '#ff6b6b', '#51cf66'],
+          series: [
+            { type: 'line', name: 'CPU', data: data.cpu, lineStyle: { width: 2 } },
+            { type: 'line', name: 'Memory', data: data.memory, lineStyle: { width: 2 } },
+            { type: 'line', name: 'Network', data: data.network, lineStyle: { width: 2 } }
+          ]
+        },
+        campaign: {
+          ...shared,
+          grid: { left: 80, right: 16, top: 12, bottom: 32 },
+          xAxis: { type: 'value', min: 0, max: 23 },
+          yAxis: { type: 'value' },
+          palette: ['#ff922b', '#748ffc', '#20c997'],
+          series: [
+            { type: 'line', name: 'Email', data: data.email, areaStyle: { opacity: 0.1 }, lineStyle: { width: 2 } },
+            { type: 'line', name: 'Social', data: data.social, areaStyle: { opacity: 0.1 }, lineStyle: { width: 2 } },
+            { type: 'line', name: 'Search', data: data.search, areaStyle: { opacity: 0.1 }, lineStyle: { width: 2 } }
+          ]
+        },
+        orders: {
+          ...shared,
+          xAxis: { type: 'value', min: 0, max: 100 },
+          yAxis: { type: 'value', min: 0, max: 100 },
+          palette: ['#4a9eff'],
+          series: [{ type: 'scatter', name: 'Orders', data: data.orders }]
+        }
+      };
+
+      for (const [id, config] of Object.entries(configs)) {
+        const container = document.querySelector(`[data-chart="${id}"]`);
+        if (!container) continue;
+
+        try {
+          const chart = await ChartGPU.create(container, config);
+          charts.set(id, chart);
+        } catch (err) {
+          container.innerHTML = '<div class="chart-fallback">Chart error</div>';
+          console.warn(`Chart "${id}" failed:`, err);
+        }
+      }
+
+      // Resize charts when containers change size
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const id = entry.target.dataset.chart;
+          if (id && charts.has(id)) charts.get(id).resize();
+        }
+      });
+      for (const el of document.querySelectorAll('.chart-container')) ro.observe(el);
+    }
+
+    initCharts().catch(err => {
+      console.warn('ChartGPU initialization failed:', err);
+      for (const el of document.querySelectorAll('.chart-container')) {
+        el.innerHTML = '<div class="chart-fallback">Charts unavailable</div>';
+      }
+    });
+
+    console.log('EG Grid practical dashboard initialized');
+    console.log('Press Shift+D to toggle dev overlay');
+  </script>
+</body>
+</html>
