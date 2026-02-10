@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EG Grid — Framework Interop</title>
+  <script type="module" src="../src/bundles/element.ts"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    nav { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    nav a { margin-right: 1rem; color: #4facfe; text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    nav a.active { font-weight: bold; color: #fff; }
+
+    header { max-width: 960px; margin-bottom: 32px; }
+    header h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
+    header p { font-size: 0.85rem; color: #888; line-height: 1.5; margin-bottom: 12px; }
+    header p code { color: #a0a0a0; background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; }
+
+    .datastar-link {
+      display: inline-block;
+      padding: 8px 16px;
+      background: rgba(79, 172, 254, 0.08);
+      border: 1px solid rgba(79, 172, 254, 0.2);
+      border-radius: 6px;
+      color: #4facfe;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .datastar-link:hover { background: rgba(79, 172, 254, 0.15); border-color: rgba(79, 172, 254, 0.4); }
+
+    /* Framework sections */
+    .frameworks {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      max-width: 960px;
+    }
+
+    @media (max-width: 800px) {
+      .frameworks { grid-template-columns: 1fr; max-width: 400px; }
+    }
+
+    .framework h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .framework h2 .badge {
+      font-size: 0.6rem;
+      font-weight: 400;
+      color: #888;
+      background: rgba(255,255,255,0.06);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    /* Grid styling for all eg-grid instances on this page */
+    eg-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      grid-auto-rows: 80px;
+      background: rgba(255,255,255,0.03);
+      padding: 8px;
+      border-radius: 10px;
+    }
+
+    .item {
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      color: white;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      position: relative;
+      view-transition-name: var(--item-id);
+    }
+
+    .item[data-egg-dragging] {
+      cursor: grabbing;
+      transform: scale(1.04);
+      filter: drop-shadow(0 12px 24px rgba(0,0,0,0.5));
+      z-index: 100;
+    }
+    .item[data-egg-dropping] { z-index: 100; }
+    .item[data-egg-selected] { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    .item[data-egg-resizing] { z-index: 100; outline: 2px solid rgba(251,191,36,0.5); outline-offset: 2px; }
+
+    /* Resize handles */
+    .item::after {
+      content: '';
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: 3px;
+      background: rgba(59, 130, 246, 0.7);
+    }
+    .item[data-egg-handle-hover="se"]::after { opacity: 1; width: 10px; height: 10px; bottom: 3px; right: 3px; }
+    .item[data-egg-handle-hover="sw"]::after { opacity: 1; width: 10px; height: 10px; bottom: 3px; left: 3px; }
+    .item[data-egg-handle-hover="ne"]::after { opacity: 1; width: 10px; height: 10px; top: 3px; right: 3px; }
+    .item[data-egg-handle-hover="nw"]::after { opacity: 1; width: 10px; height: 10px; top: 3px; left: 3px; }
+    .item[data-egg-handle-active]::after { opacity: 1; background: rgba(59,130,246,0.95); box-shadow: 0 0 6px rgba(59,130,246,0.5); }
+    .item[data-egg-handle-active="se"]::after { width: 10px; height: 10px; bottom: 3px; right: 3px; top: auto; left: auto; }
+    .item[data-egg-handle-active="sw"]::after { width: 10px; height: 10px; bottom: 3px; left: 3px; top: auto; right: auto; }
+    .item[data-egg-handle-active="ne"]::after { width: 10px; height: 10px; top: 3px; right: 3px; bottom: auto; left: auto; }
+    .item[data-egg-handle-active="nw"]::after { width: 10px; height: 10px; top: 3px; left: 3px; bottom: auto; right: auto; }
+
+    /* Placeholder */
+    .drop-placeholder {
+      background: rgba(255,255,255,0.06);
+      border: 2px dashed rgba(255,255,255,0.2);
+      border-radius: 6px;
+      pointer-events: none;
+      view-transition-name: none;
+    }
+
+    /* Colors */
+    .item[data-color="1"] { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .item[data-color="2"] { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .item[data-color="3"] { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .item[data-color="4"] { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .item[data-color="5"] { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .item[data-color="6"] { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
+
+    /* View Transitions */
+    ::view-transition-group(*) {
+      animation-duration: 200ms;
+      animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+    ::view-transition-old(*) { animation: none; opacity: 0; }
+    ::view-transition-new(*) { animation: none; }
+    ::view-transition-old(dragging), ::view-transition-new(dragging), ::view-transition-group(dragging) { animation: none; }
+    ::view-transition-old(resizing), ::view-transition-new(resizing), ::view-transition-group(resizing) { animation: none; }
+
+    /* Code snippets */
+    .framework pre {
+      margin-top: 12px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.65rem;
+      line-height: 1.6;
+      color: #a0a0a0;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .framework pre .comment { color: #555; }
+    .framework pre .tag { color: #7ec8e3; }
+    .framework pre .attr { color: #c3a6ff; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="../index.html">EG Grid</a>
+    <a href="index.html">Architecture</a>
+    <a href="practical.html">Practical</a>
+    <a href="web-component.html">Web Component</a>
+    <a href="frameworks.html" class="active">Frameworks</a>
+  </nav>
+
+  <header>
+    <h1>Framework Interop</h1>
+    <p>
+      <code>&lt;eg-grid&gt;</code> is a standard custom element — it works with any framework.
+      Each grid below is rendered and owned by its framework. Drag to rearrange, resize from corners.
+    </p>
+    <a class="datastar-link" href="https://eg-grid-cdn.derekr.workers.dev/morph" target="_blank" rel="noopener">
+      Datastar + Cloudflare Workers demo &rarr;
+    </a>
+  </header>
+
+  <div class="frameworks">
+    <!-- React -->
+    <section class="framework">
+      <h2>React <span class="badge">via HTM &mdash; no build</span></h2>
+      <div id="react-root"></div>
+      <pre><span class="comment">// Works like any HTML element in JSX</span>
+<span class="tag">&lt;eg-grid</span> <span class="attr">columns</span>="3" <span class="attr">algorithm</span>="push"<span class="tag">&gt;</span>
+  {items.map(item =&gt;
+    <span class="tag">&lt;div</span> <span class="attr">key</span>={item.id}
+         <span class="attr">data-egg-item</span>={item.id}
+         <span class="attr">data-egg-colspan</span>={item.w}<span class="tag">&gt;</span>
+      {item.label}
+    <span class="tag">&lt;/div&gt;</span>
+  )}
+<span class="tag">&lt;/eg-grid&gt;</span></pre>
+    </section>
+
+    <!-- Vue -->
+    <section class="framework">
+      <h2>Vue <span class="badge">runtime + compiler</span></h2>
+      <div id="vue-root"></div>
+      <pre><span class="comment">// Register as custom element</span>
+app.config.compilerOptions
+  .isCustomElement = t =&gt; t === 'eg-grid'
+
+<span class="tag">&lt;eg-grid</span> <span class="attr">columns</span>="3" <span class="attr">algorithm</span>="push"<span class="tag">&gt;</span>
+  <span class="tag">&lt;div</span> <span class="attr">v-for</span>="item in items"
+       <span class="attr">:data-egg-item</span>="item.id"
+       <span class="attr">:data-egg-colspan</span>="item.w"<span class="tag">&gt;</span>
+    {{ item.label }}
+  <span class="tag">&lt;/div&gt;</span>
+<span class="tag">&lt;/eg-grid&gt;</span></pre>
+    </section>
+
+    <!-- Solid -->
+    <section class="framework">
+      <h2>Solid <span class="badge">via html tag &mdash; no build</span></h2>
+      <div id="solid-root"></div>
+      <pre><span class="comment">// Custom elements work natively</span>
+<span class="tag">&lt;eg-grid</span> <span class="attr">columns</span>="3" <span class="attr">algorithm</span>="push"<span class="tag">&gt;</span>
+  <span class="tag">&lt;For</span> <span class="attr">each</span>={items}<span class="tag">&gt;</span>{item =&gt;
+    <span class="tag">&lt;div</span> <span class="attr">data-egg-item</span>={item.id}
+         <span class="attr">data-egg-colspan</span>={item.w}<span class="tag">&gt;</span>
+      {item.label}
+    <span class="tag">&lt;/div&gt;</span>
+  }<span class="tag">&lt;/For&gt;</span>
+<span class="tag">&lt;/eg-grid&gt;</span></pre>
+    </section>
+  </div>
+
+  <!-- React -->
+  <script type="module">
+    import React from 'https://esm.sh/react@19';
+    import { createRoot } from 'https://esm.sh/react-dom@19/client';
+    import htm from 'https://esm.sh/htm@3';
+
+    const html = htm.bind(React.createElement);
+
+    function App() {
+      return html`
+        <eg-grid columns="3" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
+          <div class="item" data-egg-item="r1" data-color="1" data-egg-colspan="2">A</div>
+          <div class="item" data-egg-item="r2" data-color="2">B</div>
+          <div class="item" data-egg-item="r3" data-color="3">C</div>
+          <div class="item" data-egg-item="r4" data-color="4">D</div>
+          <div class="item" data-egg-item="r5" data-color="5" data-egg-colspan="2">E</div>
+        </eg-grid>
+      `;
+    }
+
+    createRoot(document.getElementById('react-root')).render(html`<${App} />`);
+  </script>
+
+  <!-- Vue -->
+  <script type="module">
+    import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+
+    const app = createApp({
+      template: `
+        <eg-grid columns="3" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
+          <div class="item" data-egg-item="v1" data-color="3">A</div>
+          <div class="item" data-egg-item="v2" data-color="4" data-egg-colspan="2">B</div>
+          <div class="item" data-egg-item="v3" data-color="5">C</div>
+          <div class="item" data-egg-item="v4" data-color="6">D</div>
+          <div class="item" data-egg-item="v5" data-color="1" data-egg-colspan="2">E</div>
+        </eg-grid>
+      `
+    });
+    app.config.compilerOptions.isCustomElement = tag => tag === 'eg-grid';
+    app.mount('#vue-root');
+  </script>
+
+  <!-- Solid -->
+  <script type="module">
+    import { render } from 'https://esm.sh/solid-js/web';
+    import html from 'https://esm.sh/solid-js/html';
+
+    render(() => html`
+      <eg-grid columns="3" gap="8" algorithm="push" resize-handles="corners" placeholder-class="drop-placeholder">
+        <div class="item" data-egg-item="s1" data-color="5">A</div>
+        <div class="item" data-egg-item="s2" data-color="6">B</div>
+        <div class="item" data-egg-item="s3" data-color="1" data-egg-colspan="2">C</div>
+        <div class="item" data-egg-item="s4" data-color="2" data-egg-colspan="2">D</div>
+        <div class="item" data-egg-item="s5" data-color="3">E</div>
+      </eg-grid>
+    `, document.getElementById('solid-root'));
+  </script>
+</body>
+</html>
