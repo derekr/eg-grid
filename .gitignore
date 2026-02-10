@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
+# Build output (dist/ is committed for jsDelivr CDN serving)
+dist/site/
 
 # Editor/IDE
 .idea/
