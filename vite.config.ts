@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   root: '.',
+  base: '/eg-grid/',
   server: {
     open: '/examples/',
   },
