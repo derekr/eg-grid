@@ -2,6 +2,7 @@
   "name": "eg-grid",
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@10.5.2",
   "scripts": {
     "dev": "vite",
     "build": "node --experimental-strip-types build.ts",
