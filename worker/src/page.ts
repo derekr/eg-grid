@@ -237,12 +237,6 @@ export function renderPage(items: ItemRect[], viteOrigin: string, tab: "morph" |
       $colspan = evt.detail.colspan; $rowspan = evt.detail.rowspan;
       @post('/api/drag-end')
     "
-    data-on:egg-resize-move__throttle.16ms="
-      $dragItem = evt.detail.item.dataset.eggItem;
-      $col = evt.detail.cell.column; $row = evt.detail.cell.row;
-      $colspan = evt.detail.colspan; $rowspan = evt.detail.rowspan;
-      @post('/api/resize-move')
-    "
     data-on:egg-resize-end="
       $dragItem = evt.detail.item.dataset.eggItem;
       $col = evt.detail.cell.column; $row = evt.detail.cell.row;
@@ -278,12 +272,6 @@ ${itemsHTML}
       $col = evt.detail.cell.column; $row = evt.detail.cell.row;
       $colspan = evt.detail.colspan; $rowspan = evt.detail.rowspan;
       @post('/api/drag-end')
-    "
-    data-on:egg-resize-move__throttle.16ms="
-      $dragItem = evt.detail.item.dataset.eggItem;
-      $col = evt.detail.cell.column; $row = evt.detail.cell.row;
-      $colspan = evt.detail.colspan; $rowspan = evt.detail.rowspan;
-      @post('/api/resize-move')
     "
     data-on:egg-resize-end="
       $dragItem = evt.detail.item.dataset.eggItem;
