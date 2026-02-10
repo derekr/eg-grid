@@ -162,22 +162,31 @@ Datastar morphs the        Datastar updates signal,    Server just persists,
   └─────────┘                 └─────────┘                 └─────────┘
 ```
 
-## Session Isolation
+## Session Isolation + Cross-Tab Sync
 
 ```
-Browser A (cookie: abc-123)     Browser B (cookie: xyz-789)
-         │                               │
-         v                               v
-  ┌──────────────┐                ┌──────────────┐
-  │ GridSession   │                │ GridSession   │
-  │ id: abc-123   │                │ id: xyz-789   │
-  │               │                │               │
-  │ Own SQLite DB │                │ Own SQLite DB │
-  │ Own SSE Set   │                │ Own SSE Set   │
-  └──────────────┘                └──────────────┘
+Browser A (cookie: abc-123)
+  ├── Tab 1: /morph  ──┐
+  ├── Tab 2: /server ──┼──> GridSession DO (abc-123)
+  └── Tab 3: /client ──┘    Own SQLite DB + SSE writer per tab
+                             Drag in any tab -> all tabs update
+
+Browser B (cookie: xyz-789)
+  └── Tab 1: /morph  ──────> GridSession DO (xyz-789)
+                             Completely isolated layout
 ```
 
-Session cookie is set on first GET and used for all subsequent requests. Each tab in the same browser shares the session — drag in one tab, other tabs see the update via SSE broadcast.
+A session cookie (`egg-session`) is set on first page load via `Set-Cookie` with a `crypto.randomUUID()`. All subsequent requests (SSE connections, POSTs) include the cookie, routing to the same Durable Object.
+
+**Cross-tab broadcasting:** Each SSE connection registers a writer tagged with its tab type (`morph`, `server`, or `client`). When any tab triggers a layout change (drag, resize, reset), the DO runs the algorithm once and broadcasts to ALL writers in the session — each getting its own event format:
+
+```
+Tab 1 (morph)  <── datastar-patch-elements (<style> morph)
+Tab 2 (server) <── datastar-patch-signals  ({ layoutCSS })
+Tab 3 (client) <── (no event, client manages own layout)
+```
+
+Different browsers or incognito windows get different cookies, creating separate DOs with fully isolated persistence.
 
 ## Routes
 

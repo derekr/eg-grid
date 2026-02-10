@@ -65,7 +65,7 @@ async function handlePage(request: Request, env: Env, pathname: string): Promise
   if (isNew) {
     headers.set(
       "Set-Cookie",
-      `${COOKIE_NAME}=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
+      `${COOKIE_NAME}=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=86400`,
     );
   }
   return new Response(html, { headers });
