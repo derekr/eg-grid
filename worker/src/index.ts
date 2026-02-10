@@ -31,11 +31,8 @@ export default {
     }
 
     if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/morph" || url.pathname === "/server" || url.pathname === "/client")) {
-      return handlePage(request, env, url.pathname);
-    }
-
-    if (url.pathname === "/api/stream" && request.method === "GET") {
-      return handleStream(request, env);
+      const wantsSSE = request.headers.get("Accept")?.includes("text/event-stream");
+      return wantsSSE ? handleStream(request, env, url.pathname) : handlePage(request, env, url.pathname);
     }
 
     if (url.pathname.startsWith("/api/") && request.method === "POST") {
@@ -77,16 +74,16 @@ async function handlePage(request: Request, env: Env, pathname: string): Promise
 
 // --- SSE stream (long-lived read connection) ---
 
-async function handleStream(request: Request, env: Env): Promise<Response> {
+async function handleStream(request: Request, env: Env, pathname: string): Promise<Response> {
   const sessionId = getSessionId(request);
   if (!sessionId) {
     return new Response("No session", { status: 401 });
   }
 
-  // Use stub.fetch() to get a streaming Response from the DO
+  const tab = pathname.replace("/", "") || "morph";
   const id = env.GRID_SESSION.idFromName(sessionId);
   const stub = env.GRID_SESSION.get(id);
-  return stub.fetch(new Request("http://do/stream"));
+  return stub.fetch(new Request(`http://do/stream?tab=${tab}`));
 }
 
 // --- POST commands (fire-and-forget writes) ---

@@ -203,7 +203,7 @@ export function renderPage(items: ItemRect[], viteOrigin: string, tab: "morph" |
 </head>
 <body
   data-signals='{ "dragItem": "", "col": 0, "row": 0, "colspan": 0, "rowspan": 0, "layout": "", "layoutCSS": "", "saved": false, "savedAt": "" }'
-  data-init="@get('/api/stream')"
+  data-init="@get('/${tab}')"
 >
 
   <h1>Datastar + EG Grid</h1>

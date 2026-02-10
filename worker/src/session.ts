@@ -30,9 +30,16 @@ const DEFAULT_ITEMS: ItemRect[] = [
 
 const encoder = new TextEncoder();
 
+type Tab = "morph" | "server" | "client";
+
+interface StreamWriter {
+  writer: WritableStreamDefaultWriter;
+  tab: Tab;
+}
+
 export class GridSession extends DurableObject {
   private sql: SqlStorage;
-  private writers = new Set<WritableStreamDefaultWriter>();
+  private streams = new Set<StreamWriter>();
 
   constructor(ctx: DurableObjectState, env: Record<string, unknown>) {
     super(ctx, env);
@@ -54,23 +61,22 @@ export class GridSession extends DurableObject {
    * The DO holds the writable side and pushes events on layout changes.
    */
   async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const tab = (url.searchParams.get("tab") || "morph") as Tab;
+
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
-    this.writers.add(writer);
+    const stream: StreamWriter = { writer, tab };
+    this.streams.add(stream);
 
     // Clean up when the client disconnects
     writer.closed
-      .then(() => this.writers.delete(writer))
-      .catch(() => this.writers.delete(writer));
+      .then(() => this.streams.delete(stream))
+      .catch(() => this.streams.delete(stream));
 
-    // Send current layout as the first event (both formats — each tab uses its own)
-    const layout = this.getLayout();
-    const signalEvent = patchSignals({ layoutCSS: layoutToCSS(layout, SERVER_SELECTOR) });
-    const morphEvent = patchElements(
-      `<style id="morph-layout">${layoutToCSS(layout, MORPH_SELECTOR)}</style>`,
-      { selector: "#morph-layout", mode: "outer", useViewTransition: true },
-    );
-    writer.write(encoder.encode(signalEvent + morphEvent)).catch(() => {});
+    // Send current layout as the first event (format depends on tab)
+    const event = this.formatLayoutEvent(this.getLayout(), tab);
+    if (event) writer.write(encoder.encode(event)).catch(() => {});
 
     return new Response(readable, {
       headers: {
@@ -80,22 +86,37 @@ export class GridSession extends DurableObject {
     });
   }
 
-  /** Broadcast an SSE event to all connected streams. */
-  private broadcast(event: string): void {
-    const data = encoder.encode(event);
-    for (const writer of this.writers) {
-      writer.write(data).catch(() => this.writers.delete(writer));
+  /** Format a layout SSE event for the given tab type. */
+  private formatLayoutEvent(layout: ItemRect[], tab: Tab): string | null {
+    switch (tab) {
+      case "morph":
+        return patchElements(
+          `<style id="morph-layout">${layoutToCSS(layout, MORPH_SELECTOR)}</style>`,
+          { selector: "#morph-layout", mode: "outer", useViewTransition: true },
+        );
+      case "server":
+        return patchSignals({ layoutCSS: layoutToCSS(layout, SERVER_SELECTOR) });
+      case "client":
+        return null; // client tab manages layout locally
     }
   }
 
-  /** Broadcast current layout CSS to all connected clients (both formats). */
+  /** Broadcast an SSE event to all connected streams. */
+  private broadcast(event: string): void {
+    const data = encoder.encode(event);
+    for (const stream of this.streams) {
+      stream.writer.write(data).catch(() => this.streams.delete(stream));
+    }
+  }
+
+  /** Broadcast current layout to all connected clients (each gets its own format). */
   private broadcastLayout(layout: ItemRect[]): void {
-    const signalEvent = patchSignals({ layoutCSS: layoutToCSS(layout, SERVER_SELECTOR) });
-    const morphEvent = patchElements(
-      `<style id="morph-layout">${layoutToCSS(layout, MORPH_SELECTOR)}</style>`,
-      { selector: "#morph-layout", mode: "outer", useViewTransition: true },
-    );
-    this.broadcast(signalEvent + morphEvent);
+    for (const stream of this.streams) {
+      const event = this.formatLayoutEvent(layout, stream.tab);
+      if (event) {
+        stream.writer.write(encoder.encode(event)).catch(() => this.streams.delete(stream));
+      }
+    }
   }
 
   private seed(): void {
