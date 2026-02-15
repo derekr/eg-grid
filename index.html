@@ -158,6 +158,23 @@
       padding: 8px 32px 0;
     }
 
+    .demo-reset {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      color: #666;
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      cursor: pointer;
+      margin-left: 8px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .demo-reset:hover {
+      color: #aaa;
+      border-color: rgba(255,255,255,0.2);
+    }
+
     /* ─── Examples nav ─── */
     .examples-nav {
       display: flex;
@@ -434,7 +451,7 @@
       <div class="item" data-egg-item="item-h" data-color="2">H (2&times;1)</div>
     </eg-grid>
   </div>
-  <p class="demo-hint">Drag to rearrange. Resize from corners and edges. Arrow keys to navigate.</p>
+  <p class="demo-hint">Drag to rearrange. Resize from corners and edges. Arrow keys to navigate. <button class="demo-reset" id="demo-reset">Reset</button></p>
 
   <!-- ─── Examples nav ─── -->
   <div class="examples-nav">
@@ -763,6 +780,24 @@ core.destroy()      // Clean up all listeners</pre>
   </div>
 
   <script type="module" src="src/bundles/element.ts"></script>
+
+  <!-- Demo reset -->
+  <script>
+  document.getElementById('demo-reset').addEventListener('click', () => {
+    const grid = document.querySelector('eg-grid');
+    if (!grid) return;
+    const parent = grid.parentElement;
+    const clone = grid.cloneNode(true);
+    // Remove internal style element from clone (web component will recreate it)
+    const internalStyle = clone.querySelector('style');
+    if (internalStyle) internalStyle.remove();
+    if (document.startViewTransition) {
+      document.startViewTransition(() => { parent.replaceChild(clone, grid); });
+    } else {
+      parent.replaceChild(clone, grid);
+    }
+  });
+  </script>
 
   <!-- Copy-to-clipboard buttons -->
   <script>
