@@ -10,14 +10,51 @@
  * for use with backend-driven state (e.g., Datastar integration).
  */
 
-import type {
-	BreakpointCSSOptions,
-	CreateLayoutModelOptions,
-	ItemDefinition,
-	ItemPosition,
-	LayoutItem,
-	ResponsiveLayoutModel,
-} from './types';
+// ── Types (self-contained) ───────────────────────────────────────────────────
+
+export interface ItemDefinition {
+	id: string
+	width: number
+	height: number
+}
+
+export interface ItemPosition {
+	column: number
+	row: number
+}
+
+export interface BreakpointCSSOptions {
+	selectorPrefix?: string
+	selectorSuffix?: string
+	cellSize: number
+	gap: number
+	gridSelector?: string
+}
+
+export interface CreateLayoutModelOptions {
+	maxColumns: number
+	minColumns?: number
+	items: ItemDefinition[]
+	canonicalPositions: Map<string, ItemPosition>
+	overrides?: Map<number, Map<string, ItemPosition>>
+}
+
+export interface ResponsiveLayoutModel {
+	readonly maxColumns: number
+	readonly minColumns: number
+	readonly items: ReadonlyMap<string, ItemDefinition>
+	readonly currentColumnCount: number
+	getLayoutForColumns(columnCount: number): Map<string, ItemPosition>
+	getCurrentLayout(): Map<string, ItemPosition>
+	hasOverride(columnCount: number): boolean
+	getOverrideColumnCounts(): number[]
+	saveLayout(columnCount: number, positions: Map<string, ItemPosition>): void
+	clearOverride(columnCount: number): void
+	updateItemSize(itemId: string, size: { width: number; height: number }): void
+	setCurrentColumnCount(columnCount: number): void
+	generateAllBreakpointCSS(options?: BreakpointCSSOptions): string
+	subscribe(callback: () => void): () => void
+}
 
 const MAX_ROWS = 100; // Safety limit for layout derivation
 

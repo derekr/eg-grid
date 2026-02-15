@@ -8,9 +8,10 @@
  * Toggle with Shift+D (or programmatically)
  */
 
-import { getItemCell } from '../engine';
-import { isDragging, isResizing } from '../state-machine';
-import type { GridInfo, EggCore } from '../types';
+import { getItemCell } from '../eg-grid';
+import type { EggCore } from '../eg-grid';
+
+type GridInfo = ReturnType<EggCore['getGridInfo']>;
 
 export interface DevOverlayOptions {
 	/** Initial tab to show ('debug' | 'config') */
@@ -385,11 +386,10 @@ export function attachDevOverlay(
 
 	function renderDebugTab(gridInfo: GridInfo | undefined, items: HTMLElement[]): string {
 		if (!gridInfo) return '<div class="egg-dev-section">No core available</div>';
-		// Query state machine for live state
-		const smState = core?.stateMachine.getState();
-		const dragging = smState && isDragging(smState);
-		const resizing = smState && isResizing(smState);
-		const interaction = smState?.interaction;
+		// Query core state
+		const dragging = core?.phase === 'interacting' && core?.interaction?.type === 'drag';
+		const resizing = core?.phase === 'interacting' && core?.interaction?.type === 'resize';
+		const interaction = core?.interaction;
 
 		return `
 			${core ? `
@@ -398,7 +398,7 @@ export function attachDevOverlay(
 				<div class="egg-dev-grid-info">
 					<div class="egg-dev-info-item">
 						<span class="egg-dev-info-label">phase</span>
-						<span class="egg-dev-info-value">${smState?.phase ?? 'unknown'}</span>
+						<span class="egg-dev-info-value">${core?.phase ?? 'unknown'}</span>
 					</div>
 					<div class="egg-dev-info-item">
 						<span class="egg-dev-info-label">interaction</span>
@@ -412,7 +412,7 @@ export function attachDevOverlay(
 					` : ''}
 					<div class="egg-dev-info-item">
 						<span class="egg-dev-info-label">selected</span>
-						<span class="egg-dev-info-value">${smState?.selectedItemId ?? 'none'}</span>
+						<span class="egg-dev-info-value">${core?.selectedItem?.dataset?.eggItem ?? core?.selectedItem?.id ?? 'none'}</span>
 					</div>
 				</div>
 			</div>

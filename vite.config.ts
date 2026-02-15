@@ -14,7 +14,6 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         'examples/index': resolve(import.meta.dirname, 'examples/index.html'),
-        'examples/practical': resolve(import.meta.dirname, 'examples/practical.html'),
         'examples/web-component': resolve(import.meta.dirname, 'examples/web-component.html'),
         'examples/frameworks': resolve(import.meta.dirname, 'examples/frameworks.html'),
       },

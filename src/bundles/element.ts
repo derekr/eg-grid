@@ -1,6 +1,8 @@
-// Web component bundle — full library + <eg-grid> custom element auto-registration
+// Web component bundle — eg-grid + <eg-grid> custom element auto-registration
 
-export * from './index';
+export * from '../eg-grid';
+export { createLayoutModel } from '../layout-model';
+export type { ItemDefinition, ItemPosition, CreateLayoutModelOptions, ResponsiveLayoutModel, BreakpointCSSOptions } from '../layout-model';
 export { EgGridElement } from '../eg-grid-element';
 
 import { EgGridElement } from '../eg-grid-element';

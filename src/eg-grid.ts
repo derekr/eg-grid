@@ -1,5 +1,5 @@
-// EG Grid — condensed single-file version
-// Zero-dependency CSS Grid drag-and-drop. Copy this file into your project and tweak as needed.
+// EG Grid — zero-dependency CSS Grid drag-and-drop
+// Copy this file into your project and tweak as needed.
 // Optionally import { createLayoutModel } from './layout-model' for responsive breakpoint support.
 
 // ── Types ──────────────────────────────────────────────────────────────────────

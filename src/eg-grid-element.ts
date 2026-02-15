@@ -17,14 +17,9 @@
  *   </eg-grid>
  */
 
-import type {
-	EggCore,
-	InitOptions,
-	ItemDefinition,
-	ItemPosition,
-	ResponsiveLayoutModel,
-} from './types';
-import { init } from './engine';
+import type { EggCore, InitOptions, ResponsiveLayoutModel } from './eg-grid';
+import { init } from './eg-grid';
+import type { ItemDefinition, ItemPosition } from './layout-model';
 import { createLayoutModel } from './layout-model';
 
 let nextId = 0;
@@ -262,16 +257,10 @@ export class EgGridElement extends HTMLElement {
 		// 10. Initialize
 		this.core = init(this, options);
 
-		// 11. Clear inline grid-column/grid-row so CSS injection works
-		for (const item of items) {
-			item.style.removeProperty('grid-column');
-			item.style.removeProperty('grid-row');
-		}
-
-		// 12. Set data-pointer-active (pointer is always enabled)
+		// 11. Set data-pointer-active (pointer is always enabled)
 		this.setAttribute('data-pointer-active', '');
 
-		// 13. MutationObserver for React compat (childList changes)
+		// 12. MutationObserver for React compat (childList changes)
 		this._observeChildren();
 	}
 
@@ -324,7 +313,7 @@ export class EgGridElement extends HTMLElement {
 			if (this._rafId) return;
 			this._rafId = requestAnimationFrame(() => {
 				this._rafId = 0;
-				if (this.core?.stateMachine.getState().phase === 'interacting') return;
+				if (this.core?.phase === 'interacting') return;
 				this._teardown();
 				this._init();
 			});

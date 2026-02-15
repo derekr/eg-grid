@@ -481,7 +481,6 @@
     <nav>
       <a href="../index.html">EG Grid</a>
       <a href="index.html" class="active">Architecture</a>
-      <a href="practical.html">Practical</a>
       <a href="web-component.html">Web Component</a>
       <a href="frameworks.html">Frameworks</a>
     </nav>
@@ -607,9 +606,7 @@
   <style id="egg-styles"></style>
 
   <script type="module">
-    import { init } from '../src/bundles/index.ts';
-    import { attachPushAlgorithm } from '../src/plugins/algorithm-push.ts';
-    import { attachReorderAlgorithm } from '../src/plugins/algorithm-reorder.ts';
+    import { init } from '../src/eg-grid.ts';
     import { attachDevOverlay } from '../src/plugins/dev-overlay.ts';
     import { createLayoutModel } from '../src/layout-model.ts';
 
@@ -650,60 +647,25 @@
     // Initialize — all plugins enabled, algorithm disabled (we manage it manually)
     // =========================================================================
 
+    const currentAlgorithm = 'push';
+
     const core = init(gridElement, {
       styleElement: eggStyleElement,
       layoutModel,
-      algorithm: false,
+      algorithm: currentAlgorithm,
       responsive: { layoutModel, cellSize: 120, gap: 8 },
       resize: { handles: 'all', handleSize: 14, showSizeLabel: true },
       placeholder: { className: 'drop-placeholder' },
-    });
-
-    // Clear inline grid styles so CSS injection can take effect
-    gridElement.querySelectorAll('[data-egg-item]').forEach(item => {
-      item.style.removeProperty('grid-column');
-      item.style.removeProperty('grid-row');
     });
 
     // Pointer is always enabled — show grab cursor
     gridElement.setAttribute('data-pointer-active', '');
 
     // =========================================================================
-    // Algorithm Management (manually attached for switching)
-    // =========================================================================
-
-    let algorithmCleanup = null;
-    let currentAlgorithm = 'push';
-
-    function switchAlgorithm(name) {
-      if (algorithmCleanup) algorithmCleanup();
-      algorithmCleanup = null;
-      currentAlgorithm = name;
-
-      if (name === 'reorder') {
-        algorithmCleanup = attachReorderAlgorithm(gridElement, { core, layoutModel });
-      } else {
-        algorithmCleanup = attachPushAlgorithm(gridElement, { core, layoutModel });
-      }
-    }
-
-    // Start with push algorithm
-    switchAlgorithm('push');
-
-    // =========================================================================
-    // Dev Overlay with algorithm toggle
+    // Dev Overlay
     // =========================================================================
 
     const devOverlay = attachDevOverlay(gridElement, { core });
-
-    devOverlay.registerOption({
-      key: 'algorithm',
-      label: 'Algorithm',
-      type: 'select',
-      value: 'push',
-      options: ['push', 'reorder'],
-      onChange: (value) => switchAlgorithm(value),
-    });
 
     // =========================================================================
     // State Machine Display
@@ -713,20 +675,20 @@
     const ctxSelected = document.getElementById('ctx-selected');
     const ctxInteraction = document.getElementById('ctx-interaction');
 
-    function updateStateDisplay(state) {
+    function updateStateDisplay() {
       stateNodes.forEach(n => {
-        n.classList.toggle('active', n.dataset.phase === state.phase);
+        n.classList.toggle('active', n.dataset.phase === core.phase);
       });
-      ctxSelected.textContent = state.selectedItemId || '\u2014';
-      if (state.interaction) {
-        const { type, mode } = state.interaction;
+      ctxSelected.textContent = core.selectedItem?.dataset?.eggItem || core.selectedItem?.id || '\u2014';
+      if (core.interaction) {
+        const { type, mode } = core.interaction;
         ctxInteraction.textContent = `${type} via ${mode}`;
       } else {
         ctxInteraction.textContent = '\u2014';
       }
     }
 
-    // Listen to all egg-* events and poll state machine
+    // Listen to all egg-* events and poll core state
     const STATE_EVENTS = [
       'egg-select', 'egg-deselect',
       'egg-drag-start', 'egg-drag-move', 'egg-drag-end', 'egg-drag-cancel',
@@ -734,11 +696,11 @@
     ];
     for (const evt of STATE_EVENTS) {
       gridElement.addEventListener(evt, () => {
-        updateStateDisplay(core.stateMachine.getState());
+        updateStateDisplay();
         scheduleCoreStateUpdate();
       });
     }
-    updateStateDisplay(core.stateMachine.getState());
+    updateStateDisplay();
 
     // =========================================================================
     // Event Badges
@@ -777,11 +739,11 @@
     let coreStateUpdatePending = false;
 
     function updateCoreState() {
-      const state = core.stateMachine.getState();
+      const selectedId = core.selectedItem?.dataset?.eggItem || core.selectedItem?.id || 'none';
       let html = '';
-      html += `<div class="provider-entry"><span class="provider-name">phase</span>: <span class="provider-value">${state.phase}</span></div>`;
-      html += `<div class="provider-entry"><span class="provider-name">selected</span>: <span class="provider-value">${state.selectedItemId || 'none'}</span></div>`;
-      html += `<div class="provider-entry"><span class="provider-name">interaction</span>: <span class="provider-value">${state.interaction ? `${state.interaction.type} (${state.interaction.mode})` : 'none'}</span></div>`;
+      html += `<div class="provider-entry"><span class="provider-name">phase</span>: <span class="provider-value">${core.phase}</span></div>`;
+      html += `<div class="provider-entry"><span class="provider-name">selected</span>: <span class="provider-value">${selectedId}</span></div>`;
+      html += `<div class="provider-entry"><span class="provider-name">interaction</span>: <span class="provider-value">${core.interaction ? `${core.interaction.type} (${core.interaction.mode})` : 'none'}</span></div>`;
       html += `<div class="provider-entry"><span class="provider-name">algorithm</span>: <span class="provider-value">${currentAlgorithm}</span></div>`;
       html += `<div class="provider-entry"><span class="provider-name">cameraScrolling</span>: <span class="provider-value">${core.cameraScrolling}</span></div>`;
       coreStateOutput.innerHTML = html;

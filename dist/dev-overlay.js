@@ -1,14 +1,8 @@
-function isDragging(state) {
-	return (state.phase === "interacting" || state.phase === "committing") && state.interaction?.type === "drag";
-}
-function isResizing(state) {
-	return (state.phase === "interacting" || state.phase === "committing") && state.interaction?.type === "resize";
-}
 function getItemCell(item) {
-	const style = getComputedStyle(item);
+	const s = getComputedStyle(item);
 	return {
-		column: parseInt(style.gridColumnStart, 10) || 1,
-		row: parseInt(style.gridRowStart, 10) || 1
+		column: parseInt(s.gridColumnStart, 10) || 1,
+		row: parseInt(s.gridRowStart, 10) || 1
 	};
 }
 var STYLES = `
@@ -328,10 +322,9 @@ function attachDevOverlay(gridElement, options = {}) {
 	}
 	function renderDebugTab(gridInfo, items) {
 		if (!gridInfo) return "<div class=\"egg-dev-section\">No core available</div>";
-		const smState = core?.stateMachine.getState();
-		const dragging = smState && isDragging(smState);
-		const resizing = smState && isResizing(smState);
-		const interaction = smState?.interaction;
+		const dragging = core?.phase === "interacting" && core?.interaction?.type === "drag";
+		const resizing = core?.phase === "interacting" && core?.interaction?.type === "resize";
+		const interaction = core?.interaction;
 		return `
 			${core ? `
 			<div class="egg-dev-section">
@@ -339,7 +332,7 @@ function attachDevOverlay(gridElement, options = {}) {
 				<div class="egg-dev-grid-info">
 					<div class="egg-dev-info-item">
 						<span class="egg-dev-info-label">phase</span>
-						<span class="egg-dev-info-value">${smState?.phase ?? "unknown"}</span>
+						<span class="egg-dev-info-value">${core?.phase ?? "unknown"}</span>
 					</div>
 					<div class="egg-dev-info-item">
 						<span class="egg-dev-info-label">interaction</span>
@@ -353,7 +346,7 @@ function attachDevOverlay(gridElement, options = {}) {
 					` : ""}
 					<div class="egg-dev-info-item">
 						<span class="egg-dev-info-label">selected</span>
-						<span class="egg-dev-info-value">${smState?.selectedItemId ?? "none"}</span>
+						<span class="egg-dev-info-value">${core?.selectedItem?.dataset?.eggItem ?? core?.selectedItem?.id ?? "none"}</span>
 					</div>
 				</div>
 			</div>

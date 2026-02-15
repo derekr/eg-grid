@@ -1,10 +1,11 @@
 ---
 # egg-1a0s
 title: Cross-grid coordinator plugin
-status: draft
+status: scrapped
 type: feature
+priority: normal
 created_at: 2026-02-09T21:36:12Z
-updated_at: 2026-02-09T21:36:12Z
+updated_at: 2026-02-15T20:16:37Z
 ---
 
 Design and implement cross-grid dragging support. Allow items to be dragged between multiple eg-grid instances.
@@ -58,3 +59,7 @@ EG Grid is compelling for grid-to-grid drag (CSS Grid awareness, View Transition
 2. Transfer control — should users be able to prevent/customize DOM transfer?
 3. Different cell sizes between grids?
 4. Animation on transfer — FLIP across grids?
+
+## Reasons for Scrapping
+
+Obsolete after condensed-first restructuring. The old multi-file plugin architecture was replaced with a single-file library. See bean egg-ivjb.

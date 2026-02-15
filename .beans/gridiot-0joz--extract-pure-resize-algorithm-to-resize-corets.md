@@ -1,10 +1,11 @@
 ---
 # gridiot-0joz
 title: Extract pure resize algorithm to resize-core.ts
-status: todo
+status: scrapped
 type: task
+priority: normal
 created_at: 2026-02-08T05:39:19Z
-updated_at: 2026-02-08T05:39:19Z
+updated_at: 2026-02-15T20:16:13Z
 parent: gridiot-b1da
 ---
 
@@ -14,3 +15,7 @@ Input: grid dimensions, handle, pointer position, constraints
 Output: new cell position and span
 
 Enables unit testing without DOM.
+
+## Reasons for Scrapping
+
+Obsolete after condensed-first restructuring. The old multi-file plugin architecture was replaced with a single-file library. See bean egg-ivjb.

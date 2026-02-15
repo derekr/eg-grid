@@ -21,51 +21,33 @@ These docs distill the W3C specs ([CSS Grid Level 1](https://www.w3.org/TR/css-g
 - To serve – `pnpx vite .`
 
 Outputs to `dist/`:
-- `eg-grid.js` / `eg-grid.min.js` - Full bundle (all plugins)
+- `eg-grid.js` / `eg-grid.min.js` - Core library (all features in one file)
 - `eg-grid-element.js` / `eg-grid-element.min.js` - Web component
 - `dev-overlay.js` / `dev-overlay.min.js` - Debug panel (optional)
 
-
 ## Project Overview
 
-**EG Grid** is a zero-dependency CSS Grid drag-and-drop library. The core philosophy is **separation of concerns**: the library handles input detection and grid measurement, while layout algorithms are pluggable.
+**EG Grid** is a zero-dependency CSS Grid drag-and-drop library in a single file (~1,165 lines). The core philosophy is **vendor-first**: copy the file into your project, read it, and make it yours. Use your LLM to customize. No versions, no publishing, no npm.
 
 ### Goals
 
-- **No npm publish** - This library is not published to npm. Use via git or copy files directly.
-- **No dependencies** - Zero runtime dependencies. Avoid dev dependencies too; prefer built-in Node/browser APIs.
-- **Platform-first** - Maximize use of browser features, minimize JavaScript.
+- **Vendor-first** - Copy one file, own every line. No npm, no semver.
+- **No dependencies** - Zero runtime dependencies.
+- **Platform-first** - CSS Grid for layout, View Transitions for animation, container queries for responsive.
+- **LLM-friendly** - One file, readable code. Feed it to your AI.
 
-### Plugin Architecture
-
-Plugins are separate files with `attach*()` functions. `init()` in `src/engine.ts` wires them up directly based on options. Each plugin returns a cleanup function. Individual plugins can also be imported and attached manually for custom builds.
-
-### Architecture
+### Source Structure
 
 ```
 src/
-  engine.ts           - Core (grid measurement, events, state machine)
-  layout-model.ts     - Responsive layout state management
-  types.ts            - TypeScript type definitions
-  eg-grid-element.ts  - <eg-grid> web component
-
-  plugins/
-    pointer.ts        - Mouse/touch drag handling
-    keyboard.ts       - Arrow keys, pick-up/drop
-    accessibility.ts  - ARIA announcements
-    algorithm-push.ts - Push algorithm (dashboard-style)
-    algorithm-reorder.ts - Reorder algorithm (list-style)
-    algorithm-harness.ts - Shared algorithm integration
-    camera.ts         - Viewport auto-scroll
-    resize.ts         - Item resizing
-    placeholder.ts    - Drop target indicator
-    responsive.ts     - Breakpoint detection + CSS injection
-    dev-overlay.ts    - Debug panel (Shift+D)
-
-  bundles/
-    index.ts          - Full bundle (all plugins)
-    element.ts        - Web component bundle
+  eg-grid.ts            ← THE library (everything in one file)
+  eg-grid-element.ts    ← <eg-grid> web component wrapper
+  layout-model.ts       ← Responsive layout model (optional)
+  bundles/element.ts    ← Web component bundle entry
+  plugins/dev-overlay.ts← Debug panel (Shift+D, optional)
 ```
+
+`eg-grid.ts` contains: core engine, state machine, pointer handling, keyboard handling, accessibility, push algorithm, reorder algorithm, algorithm harness, camera scroll, resize, placeholder, and responsive plugins. All in one file.
 
 ## Core Principles
 
@@ -108,8 +90,8 @@ Why? View Transitions require stylesheet changes to capture before/after states:
 
 ```ts
 // CORRECT: Style injection
-const style = document.getElementById('layout-styles');
-style.textContent = `#item-1 { grid-column: 2; grid-row: 1; }`;
+core.baseCSS = `[data-egg-item="a"] { grid-column: 2; grid-row: 1; }`;
+core.commitStyles();
 
 // WRONG: Inline styles break View Transitions
 element.style.gridColumn = '2';
@@ -119,24 +101,14 @@ Inline styles are only acceptable during active drag (when item is position: fix
 
 ### 4. Separate Logic from DOM
 
-Layout algorithms must be pure functions with no DOM access:
+Layout algorithms are pure functions with no DOM access:
 
 ```ts
-// algorithm-push-core.ts - PURE, testable
-function calculateLayout(items: LayoutItem[], targetCell: GridCell): LayoutItem[] {
-  // Only works with data, returns new layout
-}
+// Pure, testable
+calculatePushLayout(items, draggedId, targetCell, columnCount);
 
-// algorithm-push.ts - DOM integration
-function attachPushAlgorithm(element: HTMLElement, options) {
-  // Listens to events, calls pure algorithm, updates DOM
-}
+// DOM integration is in the algorithm harness section of eg-grid.ts
 ```
-
-This separation enables:
-- Unit testing without DOM
-- Reuse across different rendering targets
-- Clearer reasoning about behavior
 
 ### 5. Data Attributes for State
 
@@ -157,27 +129,59 @@ Never toggle classes or inline styles for state. Data attributes are queryable a
 
 ### 6. Events for Coordination
 
-Plugins communicate via custom events, not direct function calls:
+Internal features communicate via custom events, not direct function calls:
 
 ```ts
-// Plugin emits
+// Emit
 core.emit('egg-drag-move', { item, cell, colspan, rowspan });
 
-// Consumer handles
+// Listen
 element.addEventListener('egg-drag-move', (e) => {
   // Run algorithm, update layout
 });
 ```
 
-For shared state between plugins, use the state machine or direct properties on core:
+State is tracked directly on the core object:
 
 ```ts
-// Check interaction state
-const state = core.stateMachine.getState();
-if (state.phase === 'interacting') { /* ... */ }
+core.phase         // 'idle' | 'selected' | 'interacting'
+core.interaction   // { type, mode, itemId, element, columnCount } | null
+core.selectedItem  // HTMLElement | null
+core.cameraScrolling // boolean (set by camera, read by algorithm)
+```
 
-// Camera scrolling flag (set by camera.ts, read by algorithm-harness.ts)
-core.cameraScrolling // boolean
+## Key Interfaces
+
+```ts
+interface EggCore {
+  element: HTMLElement
+  phase: 'idle' | 'selected' | 'interacting'
+  interaction: { type: 'drag' | 'resize'; mode: 'pointer' | 'keyboard'; itemId: string; element: HTMLElement; columnCount: number } | null
+  selectedItem: HTMLElement | null
+  cameraScrolling: boolean
+  select(item: HTMLElement | null): void
+  deselect(): void
+  getCellFromPoint(x: number, y: number): GridCell | null
+  getGridInfo(): { rect: DOMRect; columns: number[]; rows: number[]; gap: number; cellWidth: number; cellHeight: number }
+  emit(event: string, detail: any): void
+  commitStyles(): void
+  baseCSS: string
+  previewCSS: string
+  destroy(): void
+}
+
+interface InitOptions {
+  algorithm?: 'push' | 'reorder' | false
+  resize?: { handles?: 'corners' | 'edges' | 'all'; ... } | false
+  camera?: { ... } | false
+  placeholder?: { className?: string } | false
+  accessibility?: false
+  pointer?: false
+  keyboard?: false
+  responsive?: { layoutModel: ResponsiveLayoutModel; cellSize?: number; gap?: number }
+  layoutModel?: ResponsiveLayoutModel
+  styleElement?: HTMLStyleElement
+}
 ```
 
 ## Implementation Patterns
@@ -194,7 +198,7 @@ item.style.left = `${rect.left}px`;
 
 // Drag end
 item.style.position = '';
-// Algorithm plugin sets final position via CSS injection
+// Algorithm sets final position via CSS injection
 // Item rejoins grid flow
 ```
 
@@ -205,20 +209,10 @@ Always use View Transitions when available:
 ```ts
 if (document.startViewTransition) {
   document.startViewTransition(() => {
-    // Update CSS via core.styles or inline styles
     updateLayout(item, cell);
   });
 } else {
-  // FLIP fallback
   updateLayout(item, cell);
-}
-```
-
-Items need `view-transition-name` to animate:
-
-```css
-.item {
-  view-transition-name: var(--item-id);
 }
 ```
 
@@ -234,29 +228,24 @@ Use container queries, not media queries:
 @container (min-width: 1100px) {
   /* 6-column layout */
 }
-
-@container (min-width: 650px) and (max-width: 1099px) {
-  /* 4-column layout */
-}
 ```
 
 ## File Reference
 
 | File | Purpose |
 |------|---------|
-| `src/engine.ts` | Grid measurement, cell detection, event emission |
-| `src/types.ts` | All TypeScript interfaces |
-| `src/layout-model.ts` | Responsive layout state |
+| `src/eg-grid.ts` | THE library — all features in one file |
+| `src/layout-model.ts` | Responsive layout state (optional, for breakpoints) |
 | `src/eg-grid-element.ts` | `<eg-grid>` web component |
-| `src/plugins/pointer.ts` | Pointer events, visual drag |
-| `src/plugins/keyboard.ts` | Arrow key navigation |
-| `src/plugins/algorithm-push.ts` | Push algorithm + DOM integration |
-| `src/plugins/algorithm-reorder.ts` | Reorder algorithm |
+| `src/plugins/dev-overlay.ts` | Debug panel (Shift+D) |
+| `src/bundles/element.ts` | Web component bundle entry |
+| `build.ts` | Build script (Vite library mode) |
+| `vite.config.ts` | Dev server + examples site build |
 
 ## Common Mistakes to Avoid
 
 1. **Calculating pixel positions** - Let CSS Grid do it
 2. **Using inline styles for layout** - Breaks View Transitions
 3. **DOM access in algorithm code** - Keep algorithms pure
-4. **Direct plugin-to-plugin calls** - Use events or state machine
-5. **Media queries instead of container queries** - Container queries are more flexible
+4. **Media queries instead of container queries** - Container queries are more flexible
+5. **Referencing old multi-file architecture** - Everything is in `eg-grid.ts` now (no `engine.ts`, `state-machine.ts`, `types.ts`, or separate plugin files)
