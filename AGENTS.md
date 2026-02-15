@@ -56,7 +56,6 @@ src/
     keyboard.ts       - Arrow keys, pick-up/drop
     accessibility.ts  - ARIA announcements
     algorithm-push.ts - Push algorithm (dashboard-style)
-    algorithm-reorder.ts - Reorder algorithm (list-style)
     algorithm-harness.ts - Shared algorithm integration
     camera.ts         - Viewport auto-scroll
     resize.ts         - Item resizing
@@ -253,7 +252,6 @@ Use container queries, not media queries:
 | `src/plugins/pointer.ts` | Pointer events, visual drag |
 | `src/plugins/keyboard.ts` | Arrow key navigation |
 | `src/plugins/algorithm-push.ts` | Push algorithm + DOM integration |
-| `src/plugins/algorithm-reorder.ts` | Reorder algorithm |
 
 ## Common Mistakes to Avoid
 

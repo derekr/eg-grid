@@ -47,7 +47,7 @@ src/
   plugins/dev-overlay.ts← Debug panel (Shift+D, optional)
 ```
 
-`eg-grid.ts` contains: core engine, state machine, pointer handling, keyboard handling, accessibility, push algorithm, reorder algorithm, algorithm harness, camera scroll, resize, placeholder, and responsive plugins. All in one file.
+`eg-grid.ts` contains: core engine, state machine, pointer handling, keyboard handling, accessibility, push algorithm, algorithm harness, camera scroll, resize, placeholder, and responsive plugins. All in one file.
 
 ## Core Principles
 
@@ -171,7 +171,7 @@ interface EggCore {
 }
 
 interface InitOptions {
-  algorithm?: 'push' | 'reorder' | false
+  algorithm?: 'push' | false
   resize?: { handles?: 'corners' | 'edges' | 'all'; ... } | false
   camera?: { ... } | false
   placeholder?: { className?: string } | false

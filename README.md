@@ -83,7 +83,7 @@ Everything is in one file. No plugins to configure — just `init()` options:
 
 | Option | Default | Description |
 |---|---|---|
-| `algorithm` | `false` | `'push'` (dashboard), `'reorder'` (list), or `false` (manual) |
+| `algorithm` | `false` | `'push'` or `false` |
 | `resize` | enabled | `{ handles: 'corners' \| 'edges' \| 'all' }` or `false` |
 | `camera` | enabled | Auto-scroll during drag. `false` to disable |
 | `placeholder` | enabled | Drop target indicator. `{ className }` or `false` |
@@ -146,7 +146,6 @@ import {
   layoutToCSS,            // Convert layout map to CSS string
   readItemsFromDOM,       // Snapshot all items as ItemRect[]
   calculatePushLayout,    // Pure push algorithm
-  calculateReorderLayout, // Pure reorder algorithm
 } from './eg-grid';
 ```
 

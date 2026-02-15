@@ -232,7 +232,7 @@ export class EgGridElement extends HTMLElement {
 		const options: InitOptions = {
 			styleElement: this._styleEl,
 			layoutModel: this.layoutModel ?? undefined,
-			algorithm: algorithmAttr === 'none' ? false : (algorithmAttr === 'reorder' ? 'reorder' : 'push'),
+			algorithm: algorithmAttr === 'none' ? false : 'push',
 			keyboard: this.hasAttribute('no-keyboard') ? false : undefined,
 			accessibility: this.hasAttribute('no-accessibility') ? false : undefined,
 			camera: this.hasAttribute('no-camera') ? false : undefined,

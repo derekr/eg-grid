@@ -26,7 +26,7 @@ interface EggCore {
 }
 
 interface InitOptions {
-	algorithm?: 'push' | 'reorder' | false
+	algorithm?: 'push' | false
 	compaction?: boolean
 	resize?: { handles?: 'corners' | 'edges' | 'all'; handleSize?: number; minSize?: { colspan: number; rowspan: number }; maxSize?: { colspan: number; rowspan: number }; showSizeLabel?: boolean } | false
 	camera?: { edgeSize?: number; scrollSpeed?: number; scrollMargin?: number; settleDelay?: number } | false
@@ -153,52 +153,6 @@ function calculatePushLayout(items: ItemRect[], movedId: string, targetCell: Gri
 	pushDown(result, moved, movedId)
 	if (compact) compactUp(result, movedId)
 	return result
-}
-
-// Reorder algorithm
-
-function reflowItems(items: ItemRect[], columns: number): ItemRect[] {
-	const occupied = new Set<string>()
-	const result: ItemRect[] = []
-	for (const item of items) {
-		const w = Math.min(item.width, columns)
-		let placed = false
-		for (let row = 1; !placed; row++) {
-			for (let col = 1; col <= columns; col++) {
-				let fits = col + w - 1 <= columns
-				if (fits) {
-					for (let r = row; r < row + item.height && fits; r++)
-						for (let c = col; c < col + w && fits; c++)
-							if (occupied.has(`${c},${r}`)) fits = false
-				}
-				if (fits) {
-					for (let r = row; r < row + item.height; r++)
-						for (let c = col; c < col + w; c++)
-							occupied.add(`${c},${r}`)
-					result.push({ ...item, column: col, row, width: w })
-					placed = true
-					break
-				}
-			}
-			if (row > 100) { result.push({ ...item, column: 1, row, width: w }); placed = true }
-		}
-	}
-	return result
-}
-
-function calculateReorderLayout(items: ItemRect[], movedId: string, targetCell: GridCell, columns: number): ItemRect[] {
-	const all = items.map(i => ({ ...i }))
-	const ordered = [...all].sort((a, b) => a.row - b.row || a.column - b.column)
-	const moved = ordered.find(i => i.id === movedId)
-	if (!moved) return reflowItems(ordered, columns)
-	const remaining = ordered.filter(i => i.id !== movedId)
-	const reflowed = reflowItems(remaining, columns)
-	let insertIdx = reflowed.length
-	for (let i = 0; i < reflowed.length; i++) {
-		const r = reflowed[i]
-		if (r.row > targetCell.row || (r.row === targetCell.row && r.column >= targetCell.column)) { insertIdx = i; break }
-	}
-	return reflowItems([...remaining.slice(0, insertIdx), moved, ...remaining.slice(insertIdx)], columns)
 }
 
 // ── init() ─────────────────────────────────────────────────────────────────────
@@ -791,15 +745,9 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 
 		function calcLayout(items: ItemRect[], movedId: string, cell: GridCell, cols: number, colspan?: number, rowspan?: number): ItemRect[] {
 			if (ix?.type === 'resize' && colspan != null && rowspan != null) {
-				// Update the resized item in-place before calculating
 				const updated = items.map(i => i.id === movedId ? { ...i, column: cell.column, row: cell.row, width: colspan, height: rowspan } : i)
-				if (algoType === 'reorder') {
-					const ordered = [...updated].sort((a, b) => a.row - b.row || a.column - b.column)
-					return reflowItems(ordered, cols)
-				}
 				return calculatePushLayout(updated, movedId, cell, compact)
 			}
-			if (algoType === 'reorder') return calculateReorderLayout(items, movedId, cell, cols)
 			return calculatePushLayout(items, movedId, cell, compact)
 		}
 
@@ -890,15 +838,6 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 				const items = getItemsWithOriginals(ix.itemId, ix.originals)
 				const layout = calcLayout(items, ix.itemId, detail.cell, ix.columnCount)
 				applyLayout(layout, ix.itemId, true)
-
-				// Reorder: emit drop-preview for placeholder
-				if (algoType === 'reorder') {
-					const landing = layout.find(i => i.id === ix!.itemId)
-					if (landing) {
-						const pd = { cell: { column: landing.column, row: landing.row }, colspan: landing.width, rowspan: landing.height }
-						queueMicrotask(() => element.dispatchEvent(new CustomEvent('egg-drop-preview', { detail: pd, bubbles: true })))
-					}
-				}
 			} else {
 				// Resize move — deduplicate
 				const { cell, colspan, rowspan } = detail
@@ -958,13 +897,6 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 			const items = getItemsWithOriginals(ix.itemId, ix.originals)
 			const layout = calcLayout(items, ix.itemId, cell, ix.columnCount)
 			applyLayout(layout, ix.itemId, true)
-			if (algoType === 'reorder') {
-				const landing = layout.find(i => i.id === ix!.itemId)
-				if (landing) {
-					const pd = { cell: { column: landing.column, row: landing.row }, colspan: landing.width, rowspan: landing.height }
-					queueMicrotask(() => element.dispatchEvent(new CustomEvent('egg-drop-preview', { detail: pd, bubbles: true })))
-				}
-			}
 		}
 
 		const events: Record<string, EventListener> = {
@@ -1161,5 +1093,4 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 
 export { getItemCell, getItemSize, getItemId, layoutToCSS, readItemsFromDOM }
 export { calculatePushLayout, itemsOverlap, pushDown, compactUp }
-export { calculateReorderLayout, reflowItems }
 export type { GridCell, ItemRect, ResizeHandle, EggCore, InitOptions, ResponsiveLayoutModel }

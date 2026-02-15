@@ -87,63 +87,6 @@ function calculatePushLayout(items, movedId, targetCell, compact = true) {
 	if (compact) compactUp(result, movedId);
 	return result;
 }
-function reflowItems(items, columns) {
-	const occupied = /* @__PURE__ */ new Set();
-	const result = [];
-	for (const item of items) {
-		const w = Math.min(item.width, columns);
-		let placed = false;
-		for (let row = 1; !placed; row++) {
-			for (let col = 1; col <= columns; col++) {
-				let fits = col + w - 1 <= columns;
-				if (fits) {
-					for (let r = row; r < row + item.height && fits; r++) for (let c = col; c < col + w && fits; c++) if (occupied.has(`${c},${r}`)) fits = false;
-				}
-				if (fits) {
-					for (let r = row; r < row + item.height; r++) for (let c = col; c < col + w; c++) occupied.add(`${c},${r}`);
-					result.push({
-						...item,
-						column: col,
-						row,
-						width: w
-					});
-					placed = true;
-					break;
-				}
-			}
-			if (row > 100) {
-				result.push({
-					...item,
-					column: 1,
-					row,
-					width: w
-				});
-				placed = true;
-			}
-		}
-	}
-	return result;
-}
-function calculateReorderLayout(items, movedId, targetCell, columns) {
-	const ordered = [...items.map((i) => ({ ...i }))].sort((a, b) => a.row - b.row || a.column - b.column);
-	const moved = ordered.find((i) => i.id === movedId);
-	if (!moved) return reflowItems(ordered, columns);
-	const remaining = ordered.filter((i) => i.id !== movedId);
-	const reflowed = reflowItems(remaining, columns);
-	let insertIdx = reflowed.length;
-	for (let i = 0; i < reflowed.length; i++) {
-		const r = reflowed[i];
-		if (r.row > targetCell.row || r.row === targetCell.row && r.column >= targetCell.column) {
-			insertIdx = i;
-			break;
-		}
-	}
-	return reflowItems([
-		...remaining.slice(0, insertIdx),
-		moved,
-		...remaining.slice(insertIdx)
-	], columns);
-}
 function init(element, options = {}) {
 	const cleanups = [];
 	const styleEl = options.styleElement ?? document.createElement("style");
@@ -965,7 +908,7 @@ function init(element, options = {}) {
 		});
 	}
 	if (options.algorithm !== false) {
-		const algoType = options.algorithm ?? "push";
+		options.algorithm;
 		const compact = options.compaction ?? true;
 		const layoutModel = options.responsive?.layoutModel ?? options.layoutModel;
 		function getColumnCount() {
@@ -975,18 +918,13 @@ function init(element, options = {}) {
 		let ix = null;
 		let layoutVersion = 0;
 		function calcLayout(items, movedId, cell, cols, colspan, rowspan) {
-			if (ix?.type === "resize" && colspan != null && rowspan != null) {
-				const updated = items.map((i) => i.id === movedId ? {
-					...i,
-					column: cell.column,
-					row: cell.row,
-					width: colspan,
-					height: rowspan
-				} : i);
-				if (algoType === "reorder") return reflowItems([...updated].sort((a, b) => a.row - b.row || a.column - b.column), cols);
-				return calculatePushLayout(updated, movedId, cell, compact);
-			}
-			if (algoType === "reorder") return calculateReorderLayout(items, movedId, cell, cols);
+			if (ix?.type === "resize" && colspan != null && rowspan != null) return calculatePushLayout(items.map((i) => i.id === movedId ? {
+				...i,
+				column: cell.column,
+				row: cell.row,
+				width: colspan,
+				height: rowspan
+			} : i), movedId, cell, compact);
 			return calculatePushLayout(items, movedId, cell, compact);
 		}
 		function getItemsWithOriginals(excludeId, originals) {
@@ -1095,25 +1033,7 @@ function init(element, options = {}) {
 					return;
 				}
 				ix.pendingCell = null;
-				const layout = calcLayout(getItemsWithOriginals(ix.itemId, ix.originals), ix.itemId, detail.cell, ix.columnCount);
-				applyLayout(layout, ix.itemId, true);
-				if (algoType === "reorder") {
-					const landing = layout.find((i) => i.id === ix.itemId);
-					if (landing) {
-						const pd = {
-							cell: {
-								column: landing.column,
-								row: landing.row
-							},
-							colspan: landing.width,
-							rowspan: landing.height
-						};
-						queueMicrotask(() => element.dispatchEvent(new CustomEvent("egg-drop-preview", {
-							detail: pd,
-							bubbles: true
-						})));
-					}
-				}
+				applyLayout(calcLayout(getItemsWithOriginals(ix.itemId, ix.originals), ix.itemId, detail.cell, ix.columnCount), ix.itemId, true);
 			} else {
 				const { cell, colspan, rowspan } = detail;
 				if (ix.lastResize && ix.lastResize.cell.column === cell.column && ix.lastResize.cell.row === cell.row && ix.lastResize.colspan === colspan && ix.lastResize.rowspan === rowspan) return;
@@ -1160,25 +1080,7 @@ function init(element, options = {}) {
 			}
 			if (!cell) return;
 			ix.pendingCell = null;
-			const layout = calcLayout(getItemsWithOriginals(ix.itemId, ix.originals), ix.itemId, cell, ix.columnCount);
-			applyLayout(layout, ix.itemId, true);
-			if (algoType === "reorder") {
-				const landing = layout.find((i) => i.id === ix.itemId);
-				if (landing) {
-					const pd = {
-						cell: {
-							column: landing.column,
-							row: landing.row
-						},
-						colspan: landing.width,
-						rowspan: landing.height
-					};
-					queueMicrotask(() => element.dispatchEvent(new CustomEvent("egg-drop-preview", {
-						detail: pd,
-						bubbles: true
-					})));
-				}
-			}
+			applyLayout(calcLayout(getItemsWithOriginals(ix.itemId, ix.originals), ix.itemId, cell, ix.columnCount), ix.itemId, true);
 		};
 		const events = {
 			"egg-drag-start": onStart,
@@ -1843,7 +1745,7 @@ var EgGridElement = class extends HTMLElement {
 		const options = {
 			styleElement: this._styleEl,
 			layoutModel: this.layoutModel ?? void 0,
-			algorithm: algorithmAttr === "none" ? false : algorithmAttr === "reorder" ? "reorder" : "push",
+			algorithm: algorithmAttr === "none" ? false : "push",
 			keyboard: this.hasAttribute("no-keyboard") ? false : void 0,
 			accessibility: this.hasAttribute("no-accessibility") ? false : void 0,
 			camera: this.hasAttribute("no-camera") ? false : void 0,
@@ -1904,6 +1806,6 @@ var EgGridElement = class extends HTMLElement {
 	}
 };
 if (!customElements.get("eg-grid")) customElements.define("eg-grid", EgGridElement);
-export { EgGridElement, calculatePushLayout, calculateReorderLayout, compactUp, createLayoutModel, getItemCell, getItemId, getItemSize, init, itemsOverlap, layoutToCSS, pushDown, readItemsFromDOM, reflowItems };
+export { EgGridElement, calculatePushLayout, compactUp, createLayoutModel, getItemCell, getItemId, getItemSize, init, itemsOverlap, layoutToCSS, pushDown, readItemsFromDOM };
 
 //# sourceMappingURL=eg-grid-element.js.map

@@ -61,7 +61,7 @@ printf "Number of items [6]: "
 read -r nitems
 nitems="${nitems:-6}"
 
-printf "Algorithm (push/reorder/none) [push]: "
+printf "Algorithm (push/none) [push]: "
 read -r algo
 algo="${algo:-push}"
 
