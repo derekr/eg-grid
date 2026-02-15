@@ -726,89 +726,95 @@ core.destroy()      // Clean up all listeners</pre>
   <!-- Syntax highlighting via CSS Highlights API (Alabaster-inspired) -->
   <script>
   if (CSS.highlights) {
-    const ranges = { string: [], comment: [], constant: [], definition: [], tag: [], attr: [], punctuation: [] };
-
-    // Single-pass regex tokenizer — ordered by priority
-    const TOKEN_RE = /\/\/[^\n]*|\/\*[\s\S]*?\*\/|'[^'\n]*'|"[^"\n]*"|<\/?[\w][\w-]*|[\w-]+(?=\s*=\s*["'])|(?<=[:;]\s*)\S[^;{}]*(?=[;}])|(?<=^\s*[\w-]+\s*:\s*)\S[^;{}]*(?=;)|\b(?:const|let|var|import|from|function|export)\b|\b(?:true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b|[{}()[\];=<>\/.,:|]+/gm;
+    const allRanges = { string: [], comment: [], constant: [], definition: [], tag: [], attr: [], punctuation: [] };
 
     for (const pre of document.querySelectorAll('.docs pre')) {
       const text = pre.textContent;
 
-      // Map global offsets → (textNode, localOffset)
+      // Build text node offset map
       const textNodes = [];
       const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
-      let node;
-      while (node = walker.nextNode()) textNodes.push(node);
-
-      // Build offset map
-      const nodeOffsets = [];
-      let cumulative = 0;
+      let n; while (n = walker.nextNode()) textNodes.push(n);
+      const nodeMap = [];
+      let cum = 0;
       for (const tn of textNodes) {
-        nodeOffsets.push({ node: tn, start: cumulative, end: cumulative + tn.length });
-        cumulative += tn.length;
+        nodeMap.push({ node: tn, start: cum, end: cum + tn.length });
+        cum += tn.length;
       }
 
-      function makeRange(start, end) {
-        const range = new Range();
-        let startSet = false;
-        for (const no of nodeOffsets) {
-          if (!startSet && start < no.end) {
-            range.setStart(no.node, start - no.start);
-            startSet = true;
-          }
-          if (startSet && end <= no.end) {
-            range.setEnd(no.node, end - no.start);
-            return range;
-          }
+      function makeRange(s, e) {
+        const r = new Range();
+        let set = false;
+        for (const nm of nodeMap) {
+          if (!set && s < nm.end) { r.setStart(nm.node, s - nm.start); set = true; }
+          if (set && e <= nm.end) { r.setEnd(nm.node, e - nm.start); return r; }
         }
         return null;
       }
 
-      // Track which regions are already claimed (comments/strings take priority)
-      const claimed = [];
-      function overlaps(s, e) {
-        return claimed.some(([cs, ce]) => s < ce && e > cs);
+      function add(type, s, e) {
+        const r = makeRange(s, e);
+        if (r) allRanges[type].push(r);
       }
 
-      // Tokenize
-      TOKEN_RE.lastIndex = 0;
+      // Claimed regions (comments/strings) — other tokens skip these
+      const claimed = [];
+      function isClaimed(s, e) { return claimed.some(([a, b]) => s < b && e > a); }
+
+      // Pass 1: comments and strings (highest priority, claim regions)
+      const COMMENT_STRING = /\/\/[^\n]*|\/\*[\s\S]*?\*\/|'[^'\n]*'|"[^"\n]*"/g;
       let m;
+      while (m = COMMENT_STRING.exec(text)) {
+        const s = m.index, e = s + m[0].length, tok = m[0];
+        if (tok[0] === '/') {
+          add('comment', s, e);
+        } else {
+          add('string', s, e);
+        }
+        claimed.push([s, e]);
+      }
+
+      // Pass 2: HTML tags and their attributes (context-aware)
+      const TAG_RE = /<\/?[\w][\w-]*/g;
+      while (m = TAG_RE.exec(text)) {
+        const s = m.index, e = s + m[0].length;
+        if (isClaimed(s, e)) continue;
+        add('tag', s, e);
+
+        // Scan for attributes after this tag name until > or end
+        const afterTag = text.slice(e);
+        const ATTR_RE = /([\w-]+)\s*=/g;
+        let am;
+        while (am = ATTR_RE.exec(afterTag)) {
+          const absS = e + am.index;
+          const absE = absS + am[1].length;
+          // Stop if we hit > or another tag
+          const between = afterTag.slice(0, am.index);
+          if (between.includes('>')) break;
+          if (!isClaimed(absS, absE)) add('attr', absS, absE);
+        }
+      }
+
+      // Pass 3: definition keywords, constants, numbers, punctuation
+      const TOKEN_RE = /\b(?:const|let|var|import|from|function|export)\b|\b(?:true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b|[{}()[\];=<>\/.,:|]+/g;
       while (m = TOKEN_RE.exec(text)) {
         const s = m.index, e = s + m[0].length, tok = m[0];
-        let type = null;
-
-        if (tok.startsWith('//') || tok.startsWith('/*')) {
-          type = 'comment';
-        } else if ((tok.startsWith("'") && tok.endsWith("'")) || (tok.startsWith('"') && tok.endsWith('"'))) {
-          type = 'string';
-        } else if (overlaps(s, e)) {
-          continue; // inside a comment or string
-        } else if (tok.startsWith('<') || tok.startsWith('</')) {
-          type = 'tag';
-        } else if (/^[\w-]+$/.test(tok) && text.slice(e).match(/^\s*=\s*["']/)) {
-          type = 'attr';
-        } else if (/^(?:const|let|var|import|from|function|export)$/.test(tok)) {
-          type = 'definition';
+        if (isClaimed(s, e)) continue;
+        if (/^(?:const|let|var|import|from|function|export)$/.test(tok)
+            && (s === 0 || /[^-\w]/.test(text[s - 1]))
+            && (e >= text.length || /[^-\w(]/.test(text[e]))) {
+          add('definition', s, e);
         } else if (/^(?:true|false|null|undefined)$/.test(tok)) {
-          type = 'constant';
-        } else if (/^\d+(?:\.\d+)?$/.test(tok)) {
-          type = 'constant';
-        } else if (/^[{}()[\];=<>\/.,:|]+$/.test(tok)) {
-          type = 'punctuation';
-        }
-
-        if (type) {
-          const range = makeRange(s, e);
-          if (range) {
-            ranges[type].push(range);
-            if (type === 'comment' || type === 'string') claimed.push([s, e]);
-          }
+          add('constant', s, e);
+        } else if (/^\d/.test(tok)) {
+          add('constant', s, e);
+        } else {
+          add('punctuation', s, e);
         }
       }
     }
 
-    // Register highlights
-    for (const [type, rng] of Object.entries(ranges)) {
+    for (const [type, rng] of Object.entries(allRanges)) {
       if (rng.length) CSS.highlights.set('hl-' + type, new Highlight(...rng));
     }
   }
