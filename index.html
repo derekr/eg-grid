@@ -88,7 +88,7 @@
       z-index: 100;
     }
     .item[data-egg-dropping] { z-index: 100; }
-    .item[data-egg-selected] { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    .item[data-egg-selected] { outline: 2px solid #fbbf24; outline-offset: 2px; z-index: 10; }
     .item[data-egg-resizing] { z-index: 100; outline: 2px solid rgba(251, 191, 36, 0.5); outline-offset: 2px; }
 
     /* Resize handle indicators */
@@ -717,7 +717,7 @@ core.destroy()      // Clean up all listeners</pre>
     <p>Items are styled via CSS attribute selectors. The library sets data attributes automatically:</p>
     <pre>[data-egg-dragging]  { cursor: grabbing; z-index: 100; }
 [data-egg-dropping]  { z-index: 100; }
-[data-egg-selected]  { outline: 2px solid #fbbf24; }
+[data-egg-selected]  { outline: 2px solid #fbbf24; z-index: 10; }
 [data-egg-resizing]  { z-index: 100; }
 [data-egg-handle-hover="se"]::after { /* show SE handle */ }
 [data-egg-keyboard-mode] { outline: 2px solid gold; }</pre>
