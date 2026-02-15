@@ -525,9 +525,18 @@
     <!-- Quick start -->
     <h2>Quick Start</h2>
 
-    <h3>Copy the file (recommended)</h3>
-    <pre>cp src/eg-grid.ts your-project/lib/eg-grid.ts</pre>
+    <h3>Download a bundle</h3>
+    <pre>// Core library (8.8 KB gzip)
+curl -fsSL https://raw.githubusercontent.com/derekr/eg-grid/main/dist/eg-grid.js -o lib/eg-grid.js
 
+// Web component (10.9 KB gzip)
+curl -fsSL https://raw.githubusercontent.com/derekr/eg-grid/main/dist/eg-grid-element.js -o lib/eg-grid-element.js</pre>
+
+    <h3>Interactive setup</h3>
+    <p>Or run the vendor script — picks a bundle, configures your grid, outputs starter HTML and CSS:</p>
+    <pre>curl -fsSL https://raw.githubusercontent.com/derekr/eg-grid/main/vendor.sh | bash</pre>
+
+    <h3>Core library</h3>
     <pre>&lt;div class="grid" id="grid"&gt;
   &lt;div data-egg-item="a" data-egg-colspan="2"&gt;A&lt;/div&gt;
   &lt;div data-egg-item="b"&gt;B&lt;/div&gt;
@@ -546,7 +555,7 @@
 &lt;/script&gt;</pre>
 
     <h3>Web Component</h3>
-    <pre>&lt;script type="module" src="eg-grid-element.js"&gt;&lt;/script&gt;
+    <pre>&lt;script type="module" src="lib/eg-grid-element.js"&gt;&lt;/script&gt;
 
 &lt;eg-grid columns="4" gap="8" algorithm="push" resize-handles="all"&gt;
   &lt;div data-egg-item="a" data-egg-colspan="2"&gt;A&lt;/div&gt;
