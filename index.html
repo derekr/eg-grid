@@ -154,7 +154,7 @@
     .demo-hint {
       text-align: center;
       font-size: 0.7rem;
-      color: #444;
+      color: #888;
       padding: 8px 32px 0;
     }
 
@@ -275,7 +275,7 @@
     }
 
     .docs .yes { color: #43e97b; }
-    .docs .no { color: #555; }
+    .docs .no { color: #888; }
 
     /* Code blocks */
     .docs pre {
@@ -322,7 +322,7 @@
 
     .perf-chart .perf-note {
       font-size: 0.65rem;
-      color: #555;
+      color: #888;
       margin-top: 8px;
       text-align: right;
     }
@@ -351,7 +351,7 @@
 
     .feature-grid .feature span {
       font-size: 0.7rem;
-      color: #666;
+      color: #888;
       line-height: 1.4;
     }
 
@@ -442,18 +442,18 @@
       <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
         <!-- 16ms budget line -->
         <line x1="80" y1="24" x2="580" y2="24" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4 3"/>
-        <text x="76" y="28" text-anchor="end" fill="#444" font-size="9" font-family="system-ui">16ms</text>
-        <text x="584" y="28" fill="#444" font-size="8" font-family="system-ui">60fps budget</text>
+        <text x="76" y="28" text-anchor="end" fill="#888" font-size="9" font-family="system-ui">16ms</text>
+        <text x="584" y="28" fill="#888" font-size="8" font-family="system-ui">60fps budget</text>
 
         <!-- Grid lines -->
         <line x1="80" y1="63" x2="580" y2="63" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
-        <text x="76" y="67" text-anchor="end" fill="#333" font-size="9" font-family="system-ui">12ms</text>
+        <text x="76" y="67" text-anchor="end" fill="#666" font-size="9" font-family="system-ui">12ms</text>
         <line x1="80" y1="102" x2="580" y2="102" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
-        <text x="76" y="106" text-anchor="end" fill="#333" font-size="9" font-family="system-ui">8ms</text>
+        <text x="76" y="106" text-anchor="end" fill="#666" font-size="9" font-family="system-ui">8ms</text>
         <line x1="80" y1="141" x2="580" y2="141" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
-        <text x="76" y="145" text-anchor="end" fill="#333" font-size="9" font-family="system-ui">4ms</text>
+        <text x="76" y="145" text-anchor="end" fill="#666" font-size="9" font-family="system-ui">4ms</text>
         <line x1="80" y1="180" x2="580" y2="180" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-        <text x="76" y="184" text-anchor="end" fill="#333" font-size="9" font-family="system-ui">0ms</text>
+        <text x="76" y="184" text-anchor="end" fill="#666" font-size="9" font-family="system-ui">0ms</text>
 
         <!-- Drag: avg 8.1ms, p95 9.2ms, 30 frames -->
         <g>
@@ -461,11 +461,11 @@
           <!-- avg bar -->
           <rect x="140" y="89" width="50" height="91" rx="3" fill="url(#grad-drag)" opacity="0.9"/>
           <text x="165" y="84" text-anchor="middle" fill="#a0a0a0" font-size="9" font-family="SF Mono, Consolas, monospace">8.1ms</text>
-          <text x="165" y="196" text-anchor="middle" fill="#666" font-size="8" font-family="system-ui" dy="12">avg</text>
+          <text x="165" y="196" text-anchor="middle" fill="#888" font-size="8" font-family="system-ui" dy="12">avg</text>
           <!-- p95 bar -->
           <rect x="200" y="77" width="50" height="103" rx="3" fill="url(#grad-drag)" opacity="0.5"/>
-          <text x="225" y="72" text-anchor="middle" fill="#707070" font-size="9" font-family="SF Mono, Consolas, monospace">9.2ms</text>
-          <text x="225" y="196" text-anchor="middle" fill="#666" font-size="8" font-family="system-ui" dy="12">p95</text>
+          <text x="225" y="72" text-anchor="middle" fill="#8a8a8a" font-size="9" font-family="SF Mono, Consolas, monospace">9.2ms</text>
+          <text x="225" y="196" text-anchor="middle" fill="#888" font-size="8" font-family="system-ui" dy="12">p95</text>
         </g>
 
         <!-- Keyboard: avg 7.3ms, p95 8.9ms, 8 moves -->
@@ -474,11 +474,11 @@
           <!-- avg bar -->
           <rect x="290" y="98" width="50" height="82" rx="3" fill="url(#grad-kb)" opacity="0.9"/>
           <text x="315" y="93" text-anchor="middle" fill="#a0a0a0" font-size="9" font-family="SF Mono, Consolas, monospace">7.3ms</text>
-          <text x="315" y="196" text-anchor="middle" fill="#666" font-size="8" font-family="system-ui" dy="12">avg</text>
+          <text x="315" y="196" text-anchor="middle" fill="#888" font-size="8" font-family="system-ui" dy="12">avg</text>
           <!-- p95 bar -->
           <rect x="350" y="80" width="50" height="100" rx="3" fill="url(#grad-kb)" opacity="0.5"/>
-          <text x="375" y="75" text-anchor="middle" fill="#707070" font-size="9" font-family="SF Mono, Consolas, monospace">8.9ms</text>
-          <text x="375" y="196" text-anchor="middle" fill="#666" font-size="8" font-family="system-ui" dy="12">p95</text>
+          <text x="375" y="75" text-anchor="middle" fill="#8a8a8a" font-size="9" font-family="SF Mono, Consolas, monospace">8.9ms</text>
+          <text x="375" y="196" text-anchor="middle" fill="#888" font-size="8" font-family="system-ui" dy="12">p95</text>
         </g>
 
         <!-- Resize: avg 8.1ms, p95 9.2ms, 20 frames -->
@@ -487,11 +487,11 @@
           <!-- avg bar -->
           <rect x="440" y="89" width="50" height="91" rx="3" fill="url(#grad-resize)" opacity="0.9"/>
           <text x="465" y="84" text-anchor="middle" fill="#a0a0a0" font-size="9" font-family="SF Mono, Consolas, monospace">8.1ms</text>
-          <text x="465" y="196" text-anchor="middle" fill="#666" font-size="8" font-family="system-ui" dy="12">avg</text>
+          <text x="465" y="196" text-anchor="middle" fill="#888" font-size="8" font-family="system-ui" dy="12">avg</text>
           <!-- p95 bar -->
           <rect x="500" y="77" width="50" height="103" rx="3" fill="url(#grad-resize)" opacity="0.5"/>
-          <text x="525" y="72" text-anchor="middle" fill="#707070" font-size="9" font-family="SF Mono, Consolas, monospace">9.2ms</text>
-          <text x="525" y="196" text-anchor="middle" fill="#666" font-size="8" font-family="system-ui" dy="12">p95</text>
+          <text x="525" y="72" text-anchor="middle" fill="#8a8a8a" font-size="9" font-family="SF Mono, Consolas, monospace">9.2ms</text>
+          <text x="525" y="196" text-anchor="middle" fill="#888" font-size="8" font-family="system-ui" dy="12">p95</text>
         </g>
 
         <!-- Gradients -->
