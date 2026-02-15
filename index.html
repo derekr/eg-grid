@@ -355,6 +355,15 @@
       line-height: 1.4;
     }
 
+    /* ─── Syntax highlighting (CSS Highlights API, Alabaster-inspired) ─── */
+    ::highlight(hl-string) { color: #98c379; }
+    ::highlight(hl-comment) { color: #7a8a7a; font-style: italic; }
+    ::highlight(hl-constant) { color: #c678dd; }
+    ::highlight(hl-definition) { color: #61afef; }
+    ::highlight(hl-tag) { color: #61afef; }
+    ::highlight(hl-attr) { color: #d19a66; }
+    ::highlight(hl-punctuation) { color: #636363; }
+
     @media (max-width: 600px) {
       .feature-grid { grid-template-columns: 1fr; }
       .hero h1 { font-size: 1.6rem; }
@@ -713,5 +722,96 @@ core.destroy()      // Clean up all listeners</pre>
   </div>
 
   <script type="module" src="src/bundles/element.ts"></script>
+
+  <!-- Syntax highlighting via CSS Highlights API (Alabaster-inspired) -->
+  <script>
+  if (CSS.highlights) {
+    const ranges = { string: [], comment: [], constant: [], definition: [], tag: [], attr: [], punctuation: [] };
+
+    // Single-pass regex tokenizer — ordered by priority
+    const TOKEN_RE = /\/\/[^\n]*|\/\*[\s\S]*?\*\/|'[^'\n]*'|"[^"\n]*"|<\/?[\w][\w-]*|[\w-]+(?=\s*=\s*["'])|(?<=[:;]\s*)\S[^;{}]*(?=[;}])|(?<=^\s*[\w-]+\s*:\s*)\S[^;{}]*(?=;)|\b(?:const|let|var|import|from|function|export)\b|\b(?:true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b|[{}()[\];=<>\/.,:|]+/gm;
+
+    for (const pre of document.querySelectorAll('.docs pre')) {
+      const text = pre.textContent;
+
+      // Map global offsets → (textNode, localOffset)
+      const textNodes = [];
+      const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+      let node;
+      while (node = walker.nextNode()) textNodes.push(node);
+
+      // Build offset map
+      const nodeOffsets = [];
+      let cumulative = 0;
+      for (const tn of textNodes) {
+        nodeOffsets.push({ node: tn, start: cumulative, end: cumulative + tn.length });
+        cumulative += tn.length;
+      }
+
+      function makeRange(start, end) {
+        const range = new Range();
+        let startSet = false;
+        for (const no of nodeOffsets) {
+          if (!startSet && start < no.end) {
+            range.setStart(no.node, start - no.start);
+            startSet = true;
+          }
+          if (startSet && end <= no.end) {
+            range.setEnd(no.node, end - no.start);
+            return range;
+          }
+        }
+        return null;
+      }
+
+      // Track which regions are already claimed (comments/strings take priority)
+      const claimed = [];
+      function overlaps(s, e) {
+        return claimed.some(([cs, ce]) => s < ce && e > cs);
+      }
+
+      // Tokenize
+      TOKEN_RE.lastIndex = 0;
+      let m;
+      while (m = TOKEN_RE.exec(text)) {
+        const s = m.index, e = s + m[0].length, tok = m[0];
+        let type = null;
+
+        if (tok.startsWith('//') || tok.startsWith('/*')) {
+          type = 'comment';
+        } else if ((tok.startsWith("'") && tok.endsWith("'")) || (tok.startsWith('"') && tok.endsWith('"'))) {
+          type = 'string';
+        } else if (overlaps(s, e)) {
+          continue; // inside a comment or string
+        } else if (tok.startsWith('<') || tok.startsWith('</')) {
+          type = 'tag';
+        } else if (/^[\w-]+$/.test(tok) && text.slice(e).match(/^\s*=\s*["']/)) {
+          type = 'attr';
+        } else if (/^(?:const|let|var|import|from|function|export)$/.test(tok)) {
+          type = 'definition';
+        } else if (/^(?:true|false|null|undefined)$/.test(tok)) {
+          type = 'constant';
+        } else if (/^\d+(?:\.\d+)?$/.test(tok)) {
+          type = 'constant';
+        } else if (/^[{}()[\];=<>\/.,:|]+$/.test(tok)) {
+          type = 'punctuation';
+        }
+
+        if (type) {
+          const range = makeRange(s, e);
+          if (range) {
+            ranges[type].push(range);
+            if (type === 'comment' || type === 'string') claimed.push([s, e]);
+          }
+        }
+      }
+    }
+
+    // Register highlights
+    for (const [type, rng] of Object.entries(ranges)) {
+      if (rng.length) CSS.highlights.set('hl-' + type, new Highlight(...rng));
+    }
+  }
+  </script>
 </body>
 </html>
