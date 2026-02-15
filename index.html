@@ -279,6 +279,7 @@
 
     /* Code blocks */
     .docs pre {
+      position: relative;
       background: rgba(0,0,0,0.3);
       border-radius: 8px;
       padding: 14px 16px;
@@ -289,6 +290,35 @@
       overflow-x: auto;
       white-space: pre;
       margin-bottom: 16px;
+    }
+
+    .docs pre .copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      color: #888;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 0.6rem;
+      padding: 3px 8px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s, background 0.15s, color 0.15s;
+    }
+
+    .docs pre:hover .copy-btn { opacity: 1; }
+
+    .docs pre .copy-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: #ccc;
+    }
+
+    .docs pre .copy-btn.copied {
+      opacity: 1;
+      color: #43e97b;
+      border-color: rgba(67, 233, 123, 0.2);
     }
 
     /* Vendor callout */
@@ -731,6 +761,24 @@ core.destroy()      // Clean up all listeners</pre>
   </div>
 
   <script type="module" src="src/bundles/element.ts"></script>
+
+  <!-- Copy-to-clipboard buttons -->
+  <script>
+  for (const pre of document.querySelectorAll('.docs pre')) {
+    const text = pre.textContent;
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+      });
+    });
+    pre.appendChild(btn);
+  }
+  </script>
 
   <!-- Syntax highlighting via CSS Highlights API (Alabaster-inspired) -->
   <script>
