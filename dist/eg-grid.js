@@ -974,7 +974,7 @@ function init(element, options = {}) {
 				onApplied?.();
 			};
 			if (useVT && "startViewTransition" in document) {
-				if (ix?.type === "drag" && ix.element) ix.element.style.viewTransitionName = "dragging";
+				if (ix?.type === "drag" && ix.element && ix.source === "pointer") ix.element.style.viewTransitionName = "dragging";
 				document.startViewTransition(doApply);
 			} else doApply();
 		}
@@ -1013,10 +1013,11 @@ function init(element, options = {}) {
 				layout: null,
 				version: 0
 			};
+			const isKeyboard = detail.source === "keyboard";
 			const els = element.querySelectorAll("[data-egg-item]");
 			for (const el of els) {
 				const e = el;
-				if (e !== detail.item) {
+				if (e !== detail.item || isKeyboard) {
 					e.style.gridColumn = "";
 					e.style.gridRow = "";
 				}
@@ -1033,7 +1034,7 @@ function init(element, options = {}) {
 					return;
 				}
 				ix.pendingCell = null;
-				applyLayout(calcLayout(getItemsWithOriginals(ix.itemId, ix.originals), ix.itemId, detail.cell, ix.columnCount), ix.itemId, true);
+				applyLayout(calcLayout(getItemsWithOriginals(ix.itemId, ix.originals), ix.itemId, detail.cell, ix.columnCount), ix.source === "keyboard" ? null : ix.itemId, true);
 			} else {
 				const { cell, colspan, rowspan } = detail;
 				if (ix.lastResize && ix.lastResize.cell.column === cell.column && ix.lastResize.cell.row === cell.row && ix.lastResize.colspan === colspan && ix.lastResize.rowspan === rowspan) return;
@@ -1080,7 +1081,7 @@ function init(element, options = {}) {
 			}
 			if (!cell) return;
 			ix.pendingCell = null;
-			applyLayout(calcLayout(getItemsWithOriginals(ix.itemId, ix.originals), ix.itemId, cell, ix.columnCount), ix.itemId, true);
+			applyLayout(calcLayout(getItemsWithOriginals(ix.itemId, ix.originals), ix.itemId, cell, ix.columnCount), ix.source === "keyboard" ? null : ix.itemId, true);
 		};
 		const events = {
 			"egg-drag-start": onStart,

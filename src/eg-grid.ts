@@ -788,7 +788,7 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 			}
 
 			if (useVT && 'startViewTransition' in document) {
-				if (ix?.type === 'drag' && ix.element) ix.element.style.viewTransitionName = 'dragging'
+				if (ix?.type === 'drag' && ix.element && ix.source === 'pointer') ix.element.style.viewTransitionName = 'dragging'
 				;(document as any).startViewTransition(doApply)
 			} else doApply()
 		}
@@ -819,10 +819,11 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 			}
 
 			// Clear inline styles so CSS injection takes effect
+			const isKeyboard = detail.source === 'keyboard'
 			const els = element.querySelectorAll('[data-egg-item]')
 			for (const el of els) {
 				const e = el as HTMLElement
-				if (e !== detail.item) { e.style.gridColumn = ''; e.style.gridRow = '' }
+				if (e !== detail.item || isKeyboard) { e.style.gridColumn = ''; e.style.gridRow = '' }
 			}
 			core.previewCSS = layoutToCSS(items, { maxColumns: ix.columnCount })
 			core.commitStyles()
@@ -837,7 +838,8 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 				ix.pendingCell = null
 				const items = getItemsWithOriginals(ix.itemId, ix.originals)
 				const layout = calcLayout(items, ix.itemId, detail.cell, ix.columnCount)
-				applyLayout(layout, ix.itemId, true)
+				const excludeId = ix.source === 'keyboard' ? null : ix.itemId
+				applyLayout(layout, excludeId, true)
 			} else {
 				// Resize move — deduplicate
 				const { cell, colspan, rowspan } = detail
@@ -896,7 +898,8 @@ export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
 			ix.pendingCell = null
 			const items = getItemsWithOriginals(ix.itemId, ix.originals)
 			const layout = calcLayout(items, ix.itemId, cell, ix.columnCount)
-			applyLayout(layout, ix.itemId, true)
+			const excludeId = ix.source === 'keyboard' ? null : ix.itemId
+			applyLayout(layout, excludeId, true)
 		}
 
 		const events: Record<string, EventListener> = {
