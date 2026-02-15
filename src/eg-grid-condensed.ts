@@ -1,0 +1,1165 @@
+// EG Grid — condensed single-file version
+// Zero-dependency CSS Grid drag-and-drop. Copy this file into your project and tweak as needed.
+// Optionally import { createLayoutModel } from './layout-model' for responsive breakpoint support.
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+type GridCell = { column: number; row: number }
+type ItemRect = { id: string; column: number; row: number; width: number; height: number }
+type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w'
+
+interface EggCore {
+	element: HTMLElement
+	phase: 'idle' | 'selected' | 'interacting'
+	interaction: { type: 'drag' | 'resize'; mode: 'pointer' | 'keyboard'; itemId: string; element: HTMLElement; columnCount: number } | null
+	selectedItem: HTMLElement | null
+	cameraScrolling: boolean
+	select(item: HTMLElement | null): void
+	deselect(): void
+	getCellFromPoint(x: number, y: number): GridCell | null
+	getGridInfo(): { rect: DOMRect; columns: number[]; rows: number[]; gap: number; cellWidth: number; cellHeight: number }
+	emit(event: string, detail: any): void
+	commitStyles(): void
+	baseCSS: string
+	previewCSS: string
+	destroy(): void
+}
+
+interface InitOptions {
+	algorithm?: 'push' | 'reorder' | false
+	compaction?: boolean
+	resize?: { handles?: 'corners' | 'edges' | 'all'; handleSize?: number; minSize?: { colspan: number; rowspan: number }; maxSize?: { colspan: number; rowspan: number }; showSizeLabel?: boolean } | false
+	camera?: { edgeSize?: number; scrollSpeed?: number; scrollMargin?: number; settleDelay?: number } | false
+	placeholder?: { className?: string } | false
+	accessibility?: false
+	pointer?: false
+	keyboard?: false
+	responsive?: { layoutModel: ResponsiveLayoutModel; cellSize?: number; gap?: number }
+	layoutModel?: ResponsiveLayoutModel
+	styleElement?: HTMLStyleElement
+}
+
+// The responsive layout model interface — see layout-model.ts for implementation
+interface ResponsiveLayoutModel {
+	readonly maxColumns: number
+	readonly currentColumnCount: number
+	getLayoutForColumns(columnCount: number): Map<string, { column: number; row: number }>
+	saveLayout(columnCount: number, positions: Map<string, { column: number; row: number }>): void
+	updateItemSize(itemId: string, size: { width: number; height: number }): void
+	setCurrentColumnCount(columnCount: number): void
+	generateAllBreakpointCSS(options: { cellSize: number; gap: number; gridSelector?: string }): string
+	subscribe(callback: () => void): () => void
+}
+
+// ── Grid Measurement ───────────────────────────────────────────────────────────
+
+function parseGridTemplate(template: string): number[] {
+	return template.split(' ').filter(Boolean).map(v => parseFloat(v) || 0)
+}
+
+function getGridIndex(pos: number, tracks: number[], gap: number): number {
+	let acc = 0
+	const halfGap = gap / 2
+	for (let i = 0; i < tracks.length; i++) {
+		if (pos <= acc + tracks[i]! + halfGap) return i + 1
+		acc += tracks[i]! + gap
+	}
+	return tracks.length || 1
+}
+
+function getItemCell(item: HTMLElement): GridCell {
+	const s = getComputedStyle(item)
+	return { column: parseInt(s.gridColumnStart, 10) || 1, row: parseInt(s.gridRowStart, 10) || 1 }
+}
+
+function getItemSize(item: HTMLElement): { colspan: number; rowspan: number } {
+	return {
+		colspan: parseInt(item.getAttribute('data-egg-colspan') || '1', 10) || 1,
+		rowspan: parseInt(item.getAttribute('data-egg-rowspan') || '1', 10) || 1,
+	}
+}
+
+function getItemId(el: HTMLElement): string {
+	return el.dataset.eggItem || el.dataset.id || el.id || ''
+}
+
+// ── Layout Algorithms ──────────────────────────────────────────────────────────
+
+// Shared
+
+function layoutToCSS(items: ItemRect[], opts: { selectorPrefix?: string; selectorSuffix?: string; excludeId?: string; maxColumns?: number } = {}): string {
+	const { selectorPrefix = '[data-egg-item="', selectorSuffix = '"]', excludeId, maxColumns } = opts
+	const rules: string[] = []
+	for (const item of items) {
+		if (item.id === excludeId) continue
+		const w = maxColumns ? Math.min(item.width, maxColumns) : item.width
+		const c = maxColumns ? Math.max(1, Math.min(item.column, maxColumns - w + 1)) : item.column
+		rules.push(`${selectorPrefix}${item.id}${selectorSuffix} { grid-column: ${c} / span ${w}; grid-row: ${item.row} / span ${item.height}; }`)
+	}
+	return rules.join('\n')
+}
+
+function readItemsFromDOM(container: HTMLElement): ItemRect[] {
+	return Array.from(container.querySelectorAll('[data-egg-item]')).map(el => {
+		const element = el as HTMLElement
+		const style = getComputedStyle(element)
+		return {
+			id: getItemId(element),
+			column: parseInt(style.gridColumnStart, 10) || 1,
+			row: parseInt(style.gridRowStart, 10) || 1,
+			width: parseInt(element.getAttribute('data-egg-colspan') || '1', 10) || 1,
+			height: parseInt(element.getAttribute('data-egg-rowspan') || '1', 10) || 1,
+		}
+	})
+}
+
+// Push algorithm
+
+function itemsOverlap(a: ItemRect, b: ItemRect): boolean {
+	return !(a.column + a.width <= b.column || b.column + b.width <= a.column || a.row + a.height <= b.row || b.row + b.height <= a.row)
+}
+
+function pushDown(items: ItemRect[], moved: ItemRect, movedId: string, depth = 0): void {
+	if (depth > 50) return
+	const colliders = items
+		.filter(it => it.id !== movedId && it.id !== moved.id && itemsOverlap(moved, it))
+		.sort((a, b) => b.row - a.row || a.column - b.column)
+	for (const c of colliders) {
+		const newRow = moved.row + moved.height
+		if (c.row < newRow) {
+			c.row = newRow
+			pushDown(items, c, movedId, depth + 1)
+		}
+	}
+}
+
+function compactUp(items: ItemRect[], excludeId: string): void {
+	const sorted = [...items].filter(it => it.id !== excludeId).sort((a, b) => a.row - b.row || a.column - b.column)
+	for (const item of sorted) {
+		let iter = 0
+		while (item.row > 1 && iter++ < 100) {
+			item.row -= 1
+			if (items.some(o => o.id !== item.id && itemsOverlap(item, o))) { item.row += 1; break }
+		}
+	}
+}
+
+function calculatePushLayout(items: ItemRect[], movedId: string, targetCell: GridCell, compact = true): ItemRect[] {
+	const result = items.map(i => ({ ...i }))
+	const moved = result.find(i => i.id === movedId)
+	if (!moved) return result
+	moved.column = targetCell.column
+	moved.row = targetCell.row
+	pushDown(result, moved, movedId)
+	if (compact) compactUp(result, movedId)
+	return result
+}
+
+// Reorder algorithm
+
+function reflowItems(items: ItemRect[], columns: number): ItemRect[] {
+	const occupied = new Set<string>()
+	const result: ItemRect[] = []
+	for (const item of items) {
+		const w = Math.min(item.width, columns)
+		let placed = false
+		for (let row = 1; !placed; row++) {
+			for (let col = 1; col <= columns; col++) {
+				let fits = col + w - 1 <= columns
+				if (fits) {
+					for (let r = row; r < row + item.height && fits; r++)
+						for (let c = col; c < col + w && fits; c++)
+							if (occupied.has(`${c},${r}`)) fits = false
+				}
+				if (fits) {
+					for (let r = row; r < row + item.height; r++)
+						for (let c = col; c < col + w; c++)
+							occupied.add(`${c},${r}`)
+					result.push({ ...item, column: col, row, width: w })
+					placed = true
+					break
+				}
+			}
+			if (row > 100) { result.push({ ...item, column: 1, row, width: w }); placed = true }
+		}
+	}
+	return result
+}
+
+function calculateReorderLayout(items: ItemRect[], movedId: string, targetCell: GridCell, columns: number): ItemRect[] {
+	const all = items.map(i => ({ ...i }))
+	const ordered = [...all].sort((a, b) => a.row - b.row || a.column - b.column)
+	const moved = ordered.find(i => i.id === movedId)
+	if (!moved) return reflowItems(ordered, columns)
+	const remaining = ordered.filter(i => i.id !== movedId)
+	const reflowed = reflowItems(remaining, columns)
+	let insertIdx = reflowed.length
+	for (let i = 0; i < reflowed.length; i++) {
+		const r = reflowed[i]
+		if (r.row > targetCell.row || (r.row === targetCell.row && r.column >= targetCell.column)) { insertIdx = i; break }
+	}
+	return reflowItems([...remaining.slice(0, insertIdx), moved, ...remaining.slice(insertIdx)], columns)
+}
+
+// ── init() ─────────────────────────────────────────────────────────────────────
+
+export function init(element: HTMLElement, options: InitOptions = {}): EggCore {
+	const cleanups: (() => void)[] = []
+	const styleEl = options.styleElement ?? document.createElement('style')
+	if (!options.styleElement) { document.head.appendChild(styleEl); cleanups.push(() => styleEl.remove()) }
+
+	const existingCSS = styleEl.textContent?.trim() || ''
+	let selectedElement: HTMLElement | null = null
+
+	const core: EggCore = {
+		element,
+		phase: 'idle',
+		interaction: null,
+		cameraScrolling: false,
+		baseCSS: existingCSS,
+		previewCSS: '',
+
+		get selectedItem() { return selectedElement },
+		set selectedItem(item) { this.select(item) },
+
+		select(item) {
+			if (item === selectedElement) return
+			const prev = selectedElement
+			if (prev) prev.removeAttribute('data-egg-selected')
+			if (item) {
+				this.phase = this.phase === 'idle' ? 'selected' : this.phase
+				selectedElement = item
+				item.setAttribute('data-egg-selected', '')
+				this.emit('select', { item })
+			} else {
+				if (this.phase === 'selected') this.phase = 'idle'
+				selectedElement = null
+				if (prev) this.emit('deselect', { item: prev })
+			}
+		},
+
+		deselect() { this.select(null) },
+
+		getCellFromPoint(x, y) {
+			const rect = element.getBoundingClientRect()
+			if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null
+			const s = getComputedStyle(element)
+			const cols = parseGridTemplate(s.gridTemplateColumns)
+			const rows = parseGridTemplate(s.gridTemplateRows)
+			const cGap = parseFloat(s.columnGap) || 0
+			const rGap = parseFloat(s.rowGap) || 0
+			return {
+				column: getGridIndex(x - rect.left + element.scrollLeft, cols, cGap),
+				row: getGridIndex(y - rect.top + element.scrollTop, rows, rGap),
+			}
+		},
+
+		getGridInfo() {
+			const rect = element.getBoundingClientRect()
+			const s = getComputedStyle(element)
+			const columns = parseGridTemplate(s.gridTemplateColumns)
+			const rows = parseGridTemplate(s.gridTemplateRows)
+			const gap = parseFloat(s.columnGap) || 0
+			return { rect, columns, rows, gap, cellWidth: columns[0] || 0, cellHeight: rows[0] || 0 }
+		},
+
+		emit(event, detail) {
+			element.dispatchEvent(new CustomEvent(`egg-${event}`, { bubbles: true, detail }))
+		},
+
+		commitStyles() {
+			styleEl.textContent = [this.baseCSS, this.previewCSS].filter(Boolean).join('\n\n')
+		},
+
+		destroy() { cleanups.forEach(fn => fn()) },
+	}
+
+	// ── Pointer ────────────────────────────────────────────────────────────────
+
+	if (options.pointer !== false) {
+		const DRAG_THRESHOLD = 5
+		const PREDICTION_THRESHOLD = 30
+		const PREDICTION_LEAD = 0.5
+		const HYSTERESIS = 0.4
+		const TARGET_DEBOUNCE = 40
+
+		let pending: { item: HTMLElement; pointerId: number; startX: number; startY: number; rect: DOMRect; startCell: GridCell; colspan: number; rowspan: number } | null = null
+		let drag: { item: HTMLElement; pointerId: number; offsetX: number; offsetY: number; initialRect: DOMRect; startCell: GridCell; lastCell: GridCell; lastChangeTime: number; colspan: number; rowspan: number; dragStartX: number; dragStartY: number } | null = null
+
+		function startDrag(p: NonNullable<typeof pending>, e: PointerEvent) {
+			const { item, pointerId, rect, startCell, colspan, rowspan } = p
+			drag = {
+				item, pointerId, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
+				initialRect: rect, startCell, lastCell: startCell, lastChangeTime: 0, colspan, rowspan,
+				dragStartX: e.clientX, dragStartY: e.clientY,
+			}
+			item.setAttribute('data-egg-dragging', '')
+			document.body.classList.add('is-dragging')
+			const itemId = getItemId(item)
+			core.phase = 'interacting'
+			core.interaction = { type: 'drag', mode: 'pointer', itemId, element: item, columnCount: core.getGridInfo().columns.length }
+			core.emit('drag-start', { item, cell: startCell, colspan, rowspan, source: 'pointer' })
+			item.style.position = 'fixed'
+			item.style.left = `${rect.left}px`
+			item.style.top = `${rect.top}px`
+			item.style.width = `${rect.width}px`
+			item.style.height = `${rect.height}px`
+			item.style.zIndex = '100'
+			pending = null
+		}
+
+		const onPointerMove = (e: PointerEvent) => {
+			if (pending && !drag) {
+				const dx = e.clientX - pending.startX, dy = e.clientY - pending.startY
+				if (Math.sqrt(dx * dx + dy * dy) >= DRAG_THRESHOLD) startDrag(pending, e)
+				else return
+			}
+			if (!drag) return
+			const { item, offsetX, offsetY, initialRect, colspan, rowspan } = drag
+			const newLeft = e.clientX - offsetX, newTop = e.clientY - offsetY
+			item.style.left = `${newLeft}px`
+			item.style.top = `${newTop}px`
+
+			let cx = newLeft + initialRect.width / 2, cy = newTop + initialRect.height / 2
+			const gi = core.getGridInfo()
+			const cdx = e.clientX - drag.dragStartX, cdy = e.clientY - drag.dragStartY
+			if (Math.abs(cdx) > PREDICTION_THRESHOLD) cx += Math.sign(cdx) * PREDICTION_LEAD * (gi.cellWidth + gi.gap)
+			if (Math.abs(cdy) > PREDICTION_THRESHOLD) cy += Math.sign(cdy) * PREDICTION_LEAD * (gi.cellHeight + gi.gap)
+
+			const rawCell = core.getCellFromPoint(cx, cy)
+			if (!rawCell) return
+			const maxCol = Math.max(1, gi.columns.length - colspan + 1)
+			const maxRow = Math.max(1, gi.rows.length - rowspan + 1)
+			const cell = { column: Math.max(1, Math.min(maxCol, rawCell.column)), row: Math.max(1, Math.min(maxRow, rawCell.row)) }
+
+			const now = performance.now()
+			if (now - drag.lastChangeTime < TARGET_DEBOUNCE) return
+			if (cell.column === drag.lastCell.column && cell.row === drag.lastCell.row) return
+
+			// Hysteresis
+			const cellW = gi.cellWidth + gi.gap, cellH = gi.cellHeight + gi.gap
+			const ccx = gi.rect.left + (drag.lastCell.column - 1) * cellW + gi.cellWidth / 2
+			const ccy = gi.rect.top + (drag.lastCell.row - 1) * cellH + gi.cellHeight / 2
+			const offX = (cx - ccx) / cellW, offY = (cy - ccy) / cellH
+			const alignedX = (cell.column > drag.lastCell.column) === (offX > 0)
+			const alignedY = (cell.row > drag.lastCell.row) === (offY > 0)
+			if (Math.abs(offX) < (alignedX ? 0.5 : 0.5 + HYSTERESIS) && Math.abs(offY) < (alignedY ? 0.5 : 0.5 + HYSTERESIS)) return
+
+			drag.lastCell = cell
+			drag.lastChangeTime = now
+			core.emit('drag-move', { item, cell, x: e.clientX, y: e.clientY, colspan, rowspan, source: 'pointer' })
+		}
+
+		const cleanupDrag = () => {
+			if (drag) {
+				const { item, pointerId } = drag
+				item.removeAttribute('data-egg-dragging')
+				document.body.classList.remove('is-dragging')
+				item.style.position = ''; item.style.left = ''; item.style.top = ''
+				item.style.width = ''; item.style.height = ''; item.style.zIndex = ''
+				item.releasePointerCapture(pointerId)
+				item.removeEventListener('pointermove', onPointerMove)
+				item.removeEventListener('pointerup', onPointerUp)
+				item.removeEventListener('pointercancel', onPointerCancel)
+				drag = null
+			}
+			if (pending) {
+				pending.item.releasePointerCapture(pending.pointerId)
+				pending.item.removeEventListener('pointermove', onPointerMove)
+				pending.item.removeEventListener('pointerup', onPointerUp)
+				pending.item.removeEventListener('pointercancel', onPointerCancel)
+				pending = null
+			}
+		}
+
+		const onPointerUp = (e: PointerEvent) => {
+			if (pending && !drag) { cleanupDrag(); return }
+			if (!drag) return
+
+			const { item, initialRect, colspan, rowspan, lastCell, offsetX, offsetY, dragStartX, dragStartY } = drag
+			const gi = core.getGridInfo()
+			const cdx = e.clientX - dragStartX, cdy = e.clientY - dragStartY
+			const nL = e.clientX - offsetX, nT = e.clientY - offsetY
+			let ecx = nL + initialRect.width / 2, ecy = nT + initialRect.height / 2
+			if (Math.abs(cdx) > PREDICTION_THRESHOLD) ecx += Math.sign(cdx) * PREDICTION_LEAD * (gi.cellWidth + gi.gap)
+			if (Math.abs(cdy) > PREDICTION_THRESHOLD) ecy += Math.sign(cdy) * PREDICTION_LEAD * (gi.cellHeight + gi.gap)
+
+			const rawCell = core.getCellFromPoint(ecx, ecy)
+			const firstRect = item.getBoundingClientRect()
+
+			let dropCell = lastCell
+			if (rawCell) {
+				const maxCol = Math.max(1, gi.columns.length - colspan + 1)
+				const maxRow = Math.max(1, gi.rows.length - rowspan + 1)
+				dropCell = { column: Math.max(1, Math.min(maxCol, rawCell.column)), row: Math.max(1, Math.min(maxRow, rawCell.row)) }
+			}
+
+			core.emit('drag-end', { item, cell: dropCell, colspan, rowspan, source: 'pointer' })
+			cleanupDrag()
+			core.phase = 'selected'
+			core.interaction = null
+
+			// Inline FLIP animation
+			requestAnimationFrame(() => {
+				const lastRect = item.getBoundingClientRect()
+				const dx = firstRect.left - lastRect.left, dy = firstRect.top - lastRect.top
+				if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+					item.style.viewTransitionName = 'none'
+					item.setAttribute('data-egg-dropping', '')
+					const anim = item.animate(
+						[{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+						{ duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+					)
+					anim.onfinish = () => {
+						item.removeAttribute('data-egg-dropping')
+						const id = getItemId(item)
+						item.style.viewTransitionName = id || ''
+					}
+				}
+			})
+		}
+
+		const onPointerCancel = () => {
+			if (drag) {
+				core.emit('drag-cancel', { item: drag.item, source: 'pointer' })
+				core.phase = 'selected'
+				core.interaction = null
+			}
+			cleanupDrag()
+		}
+
+		const onPointerDown = (e: PointerEvent) => {
+			const item = (e.target as HTMLElement).closest('[data-egg-item]') as HTMLElement | null
+			if (!item) return
+			core.select(item)
+			e.preventDefault()
+			const rect = item.getBoundingClientRect()
+			pending = { item, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, rect, startCell: getItemCell(item), ...getItemSize(item) }
+			item.setPointerCapture(e.pointerId)
+			item.addEventListener('pointermove', onPointerMove)
+			item.addEventListener('pointerup', onPointerUp)
+			item.addEventListener('pointercancel', onPointerCancel)
+		}
+
+		const onDocPointerDown = (e: PointerEvent) => {
+			if (element.contains(e.target as Node) || drag) return
+			core.deselect()
+		}
+
+		element.addEventListener('pointerdown', onPointerDown)
+		document.addEventListener('pointerdown', onDocPointerDown)
+		cleanups.push(() => { element.removeEventListener('pointerdown', onPointerDown); document.removeEventListener('pointerdown', onDocPointerDown); cleanupDrag() })
+	}
+
+	// ── Resize ─────────────────────────────────────────────────────────────────
+
+	if (options.resize !== false) {
+		const resizeOpts = typeof options.resize === 'object' ? options.resize : {}
+		const handles = resizeOpts.handles ?? 'corners'
+		const handleSize = resizeOpts.handleSize ?? 12
+		const minSize = resizeOpts.minSize ?? { colspan: 1, rowspan: 1 }
+		const maxSize = resizeOpts.maxSize ?? { colspan: 6, rowspan: 6 }
+		const showSizeLabel = resizeOpts.showSizeLabel ?? true
+
+		const CURSOR: Record<string, string> = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }
+
+		let active: {
+			item: HTMLElement; pointerId: number; handle: ResizeHandle; startCell: GridCell
+			origSize: { colspan: number; rowspan: number }; curCell: GridCell; curSize: { colspan: number; rowspan: number }
+			sizeLabel: HTMLElement | null; initRect: DOMRect; startX: number; startY: number
+		} | null = null
+		let hoveredItem: HTMLElement | null = null
+		let hoveredHandle: ResizeHandle | null = null
+
+		function detectHandle(e: PointerEvent, item: HTMLElement): ResizeHandle | null {
+			const r = item.getBoundingClientRect()
+			const x = e.clientX - r.left, y = e.clientY - r.top
+			const nL = x < handleSize, nR = x > r.width - handleSize, nT = y < handleSize, nB = y > r.height - handleSize
+			if (handles === 'corners' || handles === 'all') {
+				if (nT && nL) return 'nw'; if (nT && nR) return 'ne'; if (nB && nL) return 'sw'; if (nB && nR) return 'se'
+			}
+			if (handles === 'edges' || handles === 'all') {
+				if (nT) return 'n'; if (nB) return 's'; if (nL) return 'w'; if (nR) return 'e'
+			}
+			return null
+		}
+
+		function resetResizeItem(item: HTMLElement, pointerId: number, label: HTMLElement | null) {
+			item.releasePointerCapture(pointerId)
+			item.removeEventListener('pointermove', onResizePointerMove)
+			item.removeEventListener('pointerup', onResizePointerUp)
+			item.removeEventListener('pointercancel', onResizePointerCancel)
+			if (label) label.remove()
+			item.style.position = ''; item.style.left = ''; item.style.top = ''
+			item.style.width = ''; item.style.height = ''; item.style.zIndex = ''
+			const id = getItemId(item)
+			item.style.viewTransitionName = id || ''
+			item.removeAttribute('data-egg-resizing')
+			item.removeAttribute('data-egg-handle-active')
+		}
+
+		const onResizePointerMove = (e: PointerEvent) => {
+			if (!active || e.pointerId !== active.pointerId) return
+			const { item, handle, startCell, origSize, initRect, startX, startY, sizeLabel } = active
+			const gi = core.getGridInfo()
+			const dx = e.clientX - startX, dy = e.clientY - startY
+
+			let nW = initRect.width, nH = initRect.height, nL = initRect.left, nT = initRect.top
+			const minW = gi.cellWidth, minH = gi.cellHeight
+			const maxW = Math.min(maxSize.colspan * gi.cellWidth + (maxSize.colspan - 1) * gi.gap, gi.rect.right - initRect.left)
+			const maxH = Math.min(maxSize.rowspan * gi.cellHeight + (maxSize.rowspan - 1) * gi.gap, gi.rect.bottom - initRect.top)
+
+			if (handle === 'e' || handle === 'se' || handle === 'ne') nW = Math.max(minW, Math.min(maxW, initRect.width + dx))
+			if (handle === 'w' || handle === 'sw' || handle === 'nw') {
+				const maxLS = initRect.left - gi.rect.left
+				const maxWL = Math.min(maxSize.colspan * gi.cellWidth + (maxSize.colspan - 1) * gi.gap, initRect.width + maxLS)
+				const wc = Math.max(-initRect.width + minW, Math.min(maxWL - initRect.width, -dx))
+				nW = initRect.width + wc; nL = initRect.left - wc
+			}
+			if (handle === 's' || handle === 'se' || handle === 'sw') nH = Math.max(minH, Math.min(maxH, initRect.height + dy))
+			if (handle === 'n' || handle === 'ne' || handle === 'nw') {
+				const maxTS = initRect.top - gi.rect.top
+				const maxHL = Math.min(maxSize.rowspan * gi.cellHeight + (maxSize.rowspan - 1) * gi.gap, initRect.height + maxTS)
+				const hc = Math.max(-initRect.height + minH, Math.min(maxHL - initRect.height, -dy))
+				nH = initRect.height + hc; nT = initRect.top - hc
+			}
+			item.style.left = `${nL}px`; item.style.top = `${nT}px`
+			item.style.width = `${nW}px`; item.style.height = `${nH}px`
+
+			const cpg = gi.cellWidth + gi.gap, rpg = gi.cellHeight + gi.gap
+			const SNAP = 0.3
+			let pCS = Math.max(minSize.colspan, Math.min(maxSize.colspan, Math.floor((nW + gi.gap) / cpg + (1 - SNAP))))
+			let pRS = Math.max(minSize.rowspan, Math.min(maxSize.rowspan, Math.floor((nH + gi.gap) / rpg + (1 - SNAP))))
+			let pCol = startCell.column, pRow = startCell.row
+			if (handle === 'w' || handle === 'sw' || handle === 'nw') pCol = startCell.column + origSize.colspan - pCS
+			if (handle === 'n' || handle === 'ne' || handle === 'nw') pRow = startCell.row + origSize.rowspan - pRS
+
+			active.curSize = { colspan: pCS, rowspan: pRS }
+			active.curCell = { column: pCol, row: pRow }
+			if (sizeLabel) sizeLabel.textContent = `${pCS}\u00d7${pRS}`
+
+			let anchorCell: GridCell
+			if (handle === 'se' || handle === 's' || handle === 'e') anchorCell = { column: startCell.column, row: startCell.row }
+			else if (handle === 'nw' || handle === 'n' || handle === 'w') anchorCell = { column: startCell.column + origSize.colspan - 1, row: startCell.row + origSize.rowspan - 1 }
+			else if (handle === 'ne') anchorCell = { column: startCell.column, row: startCell.row + origSize.rowspan - 1 }
+			else anchorCell = { column: startCell.column + origSize.colspan - 1, row: startCell.row }
+
+			core.emit('resize-move', { item, cell: { column: pCol, row: pRow }, anchorCell, startCell, colspan: pCS, rowspan: pRS, handle, source: 'pointer' })
+		}
+
+		const onResizePointerUp = (e: PointerEvent) => {
+			if (!active || e.pointerId !== active.pointerId) return
+			const { item, pointerId, curSize, curCell, sizeLabel } = active
+			item.setAttribute('data-egg-colspan', String(curSize.colspan))
+			item.setAttribute('data-egg-rowspan', String(curSize.rowspan))
+			core.emit('resize-end', { item, cell: curCell, colspan: curSize.colspan, rowspan: curSize.rowspan, source: 'pointer' })
+			resetResizeItem(item, pointerId, sizeLabel)
+			active = null
+			core.phase = 'selected'
+			core.interaction = null
+		}
+
+		const onResizePointerCancel = (e: PointerEvent) => {
+			if (!active || e.pointerId !== active.pointerId) return
+			core.emit('resize-cancel', { item: active.item, source: 'pointer' })
+			resetResizeItem(active.item, active.pointerId, active.sizeLabel)
+			active = null
+			core.phase = 'selected'
+			core.interaction = null
+		}
+
+		const onResizeDown = (e: PointerEvent) => {
+			const item = (e.target as HTMLElement).closest('[data-egg-item]') as HTMLElement | null
+			if (!item) return
+			const handle = detectHandle(e, item)
+			if (!handle) return
+			e.stopPropagation(); e.preventDefault()
+			core.select(item)
+			const { colspan, rowspan } = getItemSize(item)
+			const s = getComputedStyle(item)
+			const startCell = { column: parseInt(s.gridColumnStart, 10) || 1, row: parseInt(s.gridRowStart, 10) || 1 }
+			const initRect = item.getBoundingClientRect()
+			let sizeLabel: HTMLElement | null = null
+			if (showSizeLabel) {
+				sizeLabel = document.createElement('div')
+				sizeLabel.className = 'egg-resize-label'
+				sizeLabel.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.8);color:white;padding:4px 8px;border-radius:4px;font-size:14px;font-weight:600;font-family:system-ui,sans-serif;pointer-events:none;z-index:1000;white-space:nowrap'
+				sizeLabel.textContent = `${colspan}\u00d7${rowspan}`
+				item.appendChild(sizeLabel)
+			}
+			active = { item, pointerId: e.pointerId, handle, startCell, origSize: { colspan, rowspan }, curCell: { ...startCell }, curSize: { colspan, rowspan }, sizeLabel, initRect, startX: e.clientX, startY: e.clientY }
+			item.setAttribute('data-egg-resizing', ''); item.setAttribute('data-egg-handle-active', handle); item.removeAttribute('data-egg-handle-hover')
+			item.setPointerCapture(e.pointerId)
+			item.addEventListener('pointermove', onResizePointerMove)
+			item.addEventListener('pointerup', onResizePointerUp)
+			item.addEventListener('pointercancel', onResizePointerCancel)
+			core.phase = 'interacting'
+			core.interaction = { type: 'resize', mode: 'pointer', itemId: getItemId(item), element: item, columnCount: core.getGridInfo().columns.length }
+			core.emit('resize-start', { item, cell: startCell, colspan, rowspan, handle, source: 'pointer' })
+			item.style.position = 'fixed'; item.style.left = `${initRect.left}px`; item.style.top = `${initRect.top}px`
+			item.style.width = `${initRect.width}px`; item.style.height = `${initRect.height}px`; item.style.zIndex = '100'
+			item.style.viewTransitionName = 'resizing'
+		}
+
+		const onResizeHover = (e: PointerEvent) => {
+			if (active) return
+			const item = (e.target as HTMLElement).closest('[data-egg-item]') as HTMLElement | null
+			if (item) {
+				const h = detectHandle(e, item)
+				if (h !== hoveredHandle || item !== hoveredItem) {
+					if (hoveredItem && hoveredItem !== item) { hoveredItem.style.cursor = ''; hoveredItem.removeAttribute('data-egg-handle-hover') }
+					if (hoveredItem === item && hoveredHandle && !h) item.removeAttribute('data-egg-handle-hover')
+					hoveredItem = item; hoveredHandle = h
+					item.style.cursor = (h ? CURSOR[h] : '') || ''
+					if (h) item.setAttribute('data-egg-handle-hover', h); else item.removeAttribute('data-egg-handle-hover')
+				}
+			} else if (hoveredItem) { hoveredItem.style.cursor = ''; hoveredItem.removeAttribute('data-egg-handle-hover'); hoveredItem = null; hoveredHandle = null }
+		}
+
+		const onResizeEsc = (e: KeyboardEvent) => { if (e.key === 'Escape' && active) { onResizePointerCancel(new PointerEvent('pointercancel', { pointerId: active.pointerId })) } }
+
+		element.addEventListener('pointerdown', onResizeDown, { capture: true })
+		element.addEventListener('pointermove', onResizeHover)
+		document.addEventListener('keydown', onResizeEsc)
+		cleanups.push(() => { element.removeEventListener('pointerdown', onResizeDown, { capture: true }); element.removeEventListener('pointermove', onResizeHover); document.removeEventListener('keydown', onResizeEsc) })
+	}
+
+	// ── Keyboard ───────────────────────────────────────────────────────────────
+
+	if (options.keyboard !== false) {
+		let kbMode = false
+		let kbTargetCell: GridCell | null = null
+		let pendingVtnRestore: { item: HTMLElement; tid: number } | null = null
+
+		const KEY_DIR: Record<string, 'up' | 'down' | 'left' | 'right'> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', k: 'up', K: 'up', j: 'down', J: 'down', h: 'left', H: 'left', l: 'right', L: 'right' }
+		const CODE_DIR: Record<string, 'up' | 'down' | 'left' | 'right'> = { KeyK: 'up', KeyJ: 'down', KeyH: 'left', KeyL: 'right' }
+		const getDir = (key: string, code: string) => KEY_DIR[key] ?? CODE_DIR[code] ?? null
+
+		const isHolding = () => core.phase === 'interacting' && core.interaction?.type === 'drag' && core.interaction.mode === 'keyboard'
+		const getHeldItem = () => isHolding() ? core.interaction!.element : null
+
+		const getAdjacentCell = (cell: GridCell, dir: string, amt = 1): GridCell => {
+			if (dir === 'up') return { ...cell, row: Math.max(1, cell.row - amt) }
+			if (dir === 'down') return { ...cell, row: cell.row + amt }
+			if (dir === 'left') return { ...cell, column: Math.max(1, cell.column - amt) }
+			return { ...cell, column: cell.column + amt }
+		}
+
+		const findItemInDir = (from: GridCell, dir: string, exclude: HTMLElement): HTMLElement | null => {
+			const items = Array.from(element.querySelectorAll('[data-egg-item]')) as HTMLElement[]
+			let best: HTMLElement | null = null, bestDist = Infinity
+			for (const item of items) {
+				if (item === exclude) continue
+				const c = getItemCell(item)
+				let inDir = false, dist = 0
+				if (dir === 'up') { inDir = c.row < from.row; dist = from.row - c.row + Math.abs(c.column - from.column) * 0.1 }
+				else if (dir === 'down') { inDir = c.row > from.row; dist = c.row - from.row + Math.abs(c.column - from.column) * 0.1 }
+				else if (dir === 'left') { inDir = c.column < from.column; dist = from.column - c.column + Math.abs(c.row - from.row) * 0.1 }
+				else { inDir = c.column > from.column; dist = c.column - from.column + Math.abs(c.row - from.row) * 0.1 }
+				if (inDir && dist < bestDist) { bestDist = dist; best = item }
+			}
+			return best
+		}
+
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'G' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+				e.preventDefault()
+				kbMode = !kbMode
+				if (kbMode) {
+					element.setAttribute('data-egg-keyboard-mode', '')
+					if (!core.selectedItem) { const f = element.querySelector('[data-egg-item]') as HTMLElement | null; if (f) core.select(f) }
+				} else element.removeAttribute('data-egg-keyboard-mode')
+				return
+			}
+
+			const focused = document.activeElement as HTMLElement | null
+			if (!kbMode && !(focused && element.contains(focused)) && !core.selectedItem) return
+			const sel = core.selectedItem
+			const dir = getDir(e.key, e.code)
+
+			if (e.key === 'Escape') {
+				e.preventDefault()
+				const held = getHeldItem()
+				if (held) { held.removeAttribute('data-egg-dragging'); core.emit('drag-cancel', { item: held, source: 'keyboard' }); core.phase = 'selected'; core.interaction = null; kbTargetCell = null }
+				else if (sel) core.deselect()
+				if (kbMode) { kbMode = false; element.removeAttribute('data-egg-keyboard-mode') }
+				return
+			}
+
+			if (e.key === 'Enter' || e.key === ' ') {
+				if (!sel) return; e.preventDefault()
+				const held = getHeldItem()
+				if (held) {
+					const tc = kbTargetCell ?? getItemCell(held), sz = getItemSize(held)
+					held.removeAttribute('data-egg-dragging')
+					core.emit('drag-end', { item: held, cell: tc, colspan: sz.colspan, rowspan: sz.rowspan, source: 'keyboard' })
+					core.phase = 'selected'; core.interaction = null; kbTargetCell = null
+				} else {
+					const itemId = getItemId(sel), sz = getItemSize(sel), sc = getItemCell(sel)
+					core.phase = 'interacting'
+					core.interaction = { type: 'drag', mode: 'keyboard', itemId, element: sel, columnCount: core.getGridInfo().columns.length }
+					kbTargetCell = sc
+					sel.setAttribute('data-egg-dragging', '')
+					core.emit('drag-start', { item: sel, cell: sc, colspan: sz.colspan, rowspan: sz.rowspan, source: 'keyboard' })
+				}
+				return
+			}
+
+			if (!dir) return
+			e.preventDefault()
+
+			if (e.altKey && !e.ctrlKey && !e.shiftKey && sel) {
+				const adj = findItemInDir(getItemCell(sel), dir, sel)
+				if (adj) core.select(adj)
+				return
+			}
+			if (!sel) return
+
+			const cc = getItemCell(sel), sz = getItemSize(sel), gi = core.getGridInfo()
+
+			// Shift+nav: resize
+			if (e.shiftKey && !e.ctrlKey && !e.altKey) {
+				let nCS = sz.colspan, nRS = sz.rowspan
+				if (dir === 'right') nCS = Math.min(sz.colspan + 1, gi.columns.length - cc.column + 1)
+				else if (dir === 'left') nCS = Math.max(1, sz.colspan - 1)
+				else if (dir === 'down') nRS = sz.rowspan + 1
+				else nRS = Math.max(1, sz.rowspan - 1)
+				if (nCS === sz.colspan && nRS === sz.rowspan) return
+
+				if (pendingVtnRestore) { clearTimeout(pendingVtnRestore.tid); pendingVtnRestore.item.style.removeProperty('view-transition-name'); pendingVtnRestore = null }
+				const handle = dir === 'right' || dir === 'down' ? 'se' : dir === 'left' ? 'w' : 'n'
+				core.phase = 'interacting'
+				core.interaction = { type: 'resize', mode: 'keyboard', itemId: getItemId(sel), element: sel, columnCount: gi.columns.length }
+				;(sel.style as any).viewTransitionName = 'resizing'
+				core.emit('resize-start', { item: sel, cell: cc, colspan: sz.colspan, rowspan: sz.rowspan, handle })
+				sel.setAttribute('data-egg-colspan', String(nCS))
+				sel.setAttribute('data-egg-rowspan', String(nRS))
+				core.emit('resize-end', { item: sel, cell: cc, colspan: nCS, rowspan: nRS })
+				core.phase = 'selected'; core.interaction = null
+				const itemToRestore = sel
+				const tid = window.setTimeout(() => { itemToRestore.style.removeProperty('view-transition-name'); if (pendingVtnRestore?.item === itemToRestore) pendingVtnRestore = null }, 250)
+				pendingVtnRestore = { item: itemToRestore, tid }
+				return
+			}
+
+			let amt = 1
+			if (e.ctrlKey || e.metaKey) amt = (dir === 'up' || dir === 'down') ? sz.rowspan : sz.colspan
+			const rawCell = getAdjacentCell(cc, dir, amt)
+			const maxCol = Math.max(1, gi.columns.length - sz.colspan + 1)
+			const maxRow = Math.max(1, gi.rows.length - sz.rowspan + 1)
+			const tc = { column: Math.max(1, Math.min(maxCol, rawCell.column)), row: Math.max(1, Math.min(maxRow, rawCell.row)) }
+			if (tc.column === cc.column && tc.row === cc.row) return
+
+			const held = getHeldItem()
+			if (held) {
+				kbTargetCell = tc
+				core.emit('drag-move', { item: held, cell: tc, x: 0, y: 0, colspan: sz.colspan, rowspan: sz.rowspan, source: 'keyboard' })
+			} else {
+				core.emit('drag-start', { item: sel, cell: cc, colspan: sz.colspan, rowspan: sz.rowspan, source: 'keyboard' })
+				core.emit('drag-end', { item: sel, cell: tc, colspan: sz.colspan, rowspan: sz.rowspan, source: 'keyboard' })
+			}
+		}
+
+		document.addEventListener('keydown', onKeyDown)
+		cleanups.push(() => { document.removeEventListener('keydown', onKeyDown); element.removeAttribute('data-egg-keyboard-mode') })
+	}
+
+	// ── Algorithm Harness (unified drag + resize) ──────────────────────────────
+
+	if (options.algorithm !== false) {
+		const algoType = options.algorithm ?? 'push'
+		const compact = options.compaction ?? true
+		const layoutModel = options.responsive?.layoutModel ?? options.layoutModel
+
+		function getColumnCount(): number {
+			const s = getComputedStyle(element)
+			return Math.max(1, s.gridTemplateColumns.split(' ').filter(Boolean).length)
+		}
+
+		// Unified interaction state
+		let ix: {
+			type: 'drag' | 'resize'
+			itemId: string; element: HTMLElement; source: string
+			columnCount: number
+			originals: Map<string, ItemRect>
+			pendingCell: GridCell | null
+			lastResize: { cell: GridCell; colspan: number; rowspan: number } | null
+			layout: ItemRect[] | null
+			version: number
+		} | null = null
+		let layoutVersion = 0
+
+		function calcLayout(items: ItemRect[], movedId: string, cell: GridCell, cols: number, colspan?: number, rowspan?: number): ItemRect[] {
+			if (ix?.type === 'resize' && colspan != null && rowspan != null) {
+				// Update the resized item in-place before calculating
+				const updated = items.map(i => i.id === movedId ? { ...i, column: cell.column, row: cell.row, width: colspan, height: rowspan } : i)
+				if (algoType === 'reorder') {
+					const ordered = [...updated].sort((a, b) => a.row - b.row || a.column - b.column)
+					return reflowItems(ordered, cols)
+				}
+				return calculatePushLayout(updated, movedId, cell, compact)
+			}
+			if (algoType === 'reorder') return calculateReorderLayout(items, movedId, cell, cols)
+			return calculatePushLayout(items, movedId, cell, compact)
+		}
+
+		function getItemsWithOriginals(excludeId: string | null, originals: Map<string, ItemRect>): ItemRect[] {
+			return readItemsFromDOM(element).map(item => {
+				const orig = originals.get(item.id)
+				if (orig && item.id !== excludeId) return { ...item, column: orig.column, row: orig.row }
+				return item
+			})
+		}
+
+		function getResizeItems(originals: Map<string, ItemRect>, resizedId: string, cell: GridCell, colspan: number, rowspan: number): ItemRect[] {
+			const items: ItemRect[] = []
+			for (const [id, o] of originals) {
+				if (id === resizedId) items.push({ id, column: cell.column, row: cell.row, width: colspan, height: rowspan })
+				else items.push({ ...o })
+			}
+			return items
+		}
+
+		function applyLayout(layout: ItemRect[], excludeId: string | null, useVT: boolean, onApplied?: () => void) {
+			const v = ++layoutVersion
+			if (ix) { ix.layout = layout; ix.version = v }
+
+			const doApply = () => {
+				if (v !== layoutVersion) return
+				core.previewCSS = layoutToCSS(layout, { excludeId: excludeId ?? undefined, maxColumns: ix?.columnCount })
+				core.commitStyles()
+				const els = element.querySelectorAll('[data-egg-item]')
+				for (const el of els) {
+					const e = el as HTMLElement
+					const id = getItemId(e)
+					if (id !== excludeId && e.style.viewTransitionName !== 'none') {
+						e.style.gridColumn = ''; e.style.gridRow = ''
+					}
+				}
+				onApplied?.()
+			}
+
+			if (useVT && 'startViewTransition' in document) {
+				if (ix?.type === 'drag' && ix.element) ix.element.style.viewTransitionName = 'dragging'
+				;(document as any).startViewTransition(doApply)
+			} else doApply()
+		}
+
+		function saveAndClear(layout: ItemRect[], cols: number, afterSave?: () => void) {
+			if (!layoutModel || !cols) return
+			const positions = new Map<string, { column: number; row: number }>()
+			for (const item of layout) positions.set(item.id, { column: item.column, row: item.row })
+			layoutModel.saveLayout(cols, positions)
+			afterSave?.()
+			core.previewCSS = ''
+			core.commitStyles()
+			core.emit('layout-change', { items: layout, columnCount: cols })
+		}
+
+		// Event handlers
+		const onStart = (e: Event) => {
+			const detail = (e as CustomEvent).detail
+			const isDrag = e.type === 'egg-drag-start'
+			const itemId = getItemId(detail.item)
+			const items = readItemsFromDOM(element)
+			const originals = new Map<string, ItemRect>()
+			for (const i of items) originals.set(i.id, { ...i })
+
+			ix = {
+				type: isDrag ? 'drag' : 'resize', itemId, element: detail.item, source: detail.source,
+				columnCount: getColumnCount(), originals, pendingCell: null, lastResize: null, layout: null, version: 0,
+			}
+
+			// Clear inline styles so CSS injection takes effect
+			const els = element.querySelectorAll('[data-egg-item]')
+			for (const el of els) {
+				const e = el as HTMLElement
+				if (e !== detail.item) { e.style.gridColumn = ''; e.style.gridRow = '' }
+			}
+			core.previewCSS = layoutToCSS(items, { maxColumns: ix.columnCount })
+			core.commitStyles()
+		}
+
+		const onMove = (e: Event) => {
+			if (!ix) return
+			const detail = (e as CustomEvent).detail
+
+			if (ix.type === 'drag') {
+				if (core.cameraScrolling) { ix.pendingCell = detail.cell; return }
+				ix.pendingCell = null
+				const items = getItemsWithOriginals(ix.itemId, ix.originals)
+				const layout = calcLayout(items, ix.itemId, detail.cell, ix.columnCount)
+				applyLayout(layout, ix.itemId, true)
+
+				// Reorder: emit drop-preview for placeholder
+				if (algoType === 'reorder') {
+					const landing = layout.find(i => i.id === ix!.itemId)
+					if (landing) {
+						const pd = { cell: { column: landing.column, row: landing.row }, colspan: landing.width, rowspan: landing.height }
+						queueMicrotask(() => element.dispatchEvent(new CustomEvent('egg-drop-preview', { detail: pd, bubbles: true })))
+					}
+				}
+			} else {
+				// Resize move — deduplicate
+				const { cell, colspan, rowspan } = detail
+				if (ix.lastResize && ix.lastResize.cell.column === cell.column && ix.lastResize.cell.row === cell.row && ix.lastResize.colspan === colspan && ix.lastResize.rowspan === rowspan) return
+				ix.lastResize = { cell: { ...cell }, colspan, rowspan }
+				const items = getResizeItems(ix.originals, ix.itemId, cell, colspan, rowspan)
+				const layout = calcLayout(items, ix.itemId, cell, ix.columnCount, colspan, rowspan)
+				applyLayout(layout, ix.itemId, true)
+			}
+		}
+
+		const onEnd = (e: Event) => {
+			if (!ix) return
+			const detail = (e as CustomEvent).detail
+			const savedIx = ix
+
+			if (savedIx.element.style.viewTransitionName === 'dragging') savedIx.element.style.viewTransitionName = ''
+			const useVT = savedIx.source !== 'pointer'
+
+			let finalLayout: ItemRect[]
+			if (savedIx.type === 'drag') {
+				const items = getItemsWithOriginals(savedIx.itemId, savedIx.originals)
+				finalLayout = calcLayout(items, savedIx.itemId, detail.cell, savedIx.columnCount)
+			} else {
+				const items = getResizeItems(savedIx.originals, savedIx.itemId, detail.cell, detail.colspan, detail.rowspan)
+				finalLayout = calcLayout(items, savedIx.itemId, detail.cell, savedIx.columnCount, detail.colspan, detail.rowspan)
+			}
+
+			const savedCols = savedIx.columnCount
+			const isResize = savedIx.type === 'resize'
+			const savedItemId = savedIx.itemId
+
+			applyLayout(finalLayout, null, useVT, () =>
+				saveAndClear(finalLayout, savedCols, isResize ? () => layoutModel?.updateItemSize(savedItemId, { width: detail.colspan, height: detail.rowspan }) : undefined),
+			)
+			ix = null
+		}
+
+		const onCancel = () => {
+			if (!ix) return
+			const restoreLayout = Array.from(ix.originals.values())
+			const restore = () => applyLayout(restoreLayout, null, false)
+			if ('startViewTransition' in document) (document as any).startViewTransition(restore)
+			else restore()
+			ix = null
+		}
+
+		const onCameraSettled = () => {
+			if (!ix || ix.type !== 'drag') return
+			let cell = ix.pendingCell
+			if (!cell && ix.element) {
+				const r = ix.element.getBoundingClientRect()
+				cell = core.getCellFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+			}
+			if (!cell) return
+			ix.pendingCell = null
+			const items = getItemsWithOriginals(ix.itemId, ix.originals)
+			const layout = calcLayout(items, ix.itemId, cell, ix.columnCount)
+			applyLayout(layout, ix.itemId, true)
+			if (algoType === 'reorder') {
+				const landing = layout.find(i => i.id === ix!.itemId)
+				if (landing) {
+					const pd = { cell: { column: landing.column, row: landing.row }, colspan: landing.width, rowspan: landing.height }
+					queueMicrotask(() => element.dispatchEvent(new CustomEvent('egg-drop-preview', { detail: pd, bubbles: true })))
+				}
+			}
+		}
+
+		const events: Record<string, EventListener> = {
+			'egg-drag-start': onStart, 'egg-drag-move': onMove, 'egg-drag-end': onEnd, 'egg-drag-cancel': onCancel,
+			'egg-resize-start': onStart, 'egg-resize-move': onMove, 'egg-resize-end': onEnd, 'egg-resize-cancel': onCancel,
+			'egg-camera-settled': onCameraSettled,
+		}
+		for (const [name, handler] of Object.entries(events)) element.addEventListener(name, handler)
+		cleanups.push(() => { for (const [name, handler] of Object.entries(events)) element.removeEventListener(name, handler) })
+	}
+
+	// ── Camera ─────────────────────────────────────────────────────────────────
+
+	if (options.camera !== false) {
+		const camOpts = typeof options.camera === 'object' ? options.camera : {}
+		const edgeSize = camOpts.edgeSize ?? 60
+		const scrollSpeed = camOpts.scrollSpeed ?? 15
+		const settleDelay = camOpts.settleDelay ?? 150
+
+		let scrollContainer: HTMLElement | Window = window
+		let p = element.parentElement
+		while (p) {
+			const s = getComputedStyle(p)
+			if (s.overflowY === 'auto' || s.overflowY === 'scroll' || s.overflowX === 'auto' || s.overflowX === 'scroll') { scrollContainer = p; break }
+			p = p.parentElement
+		}
+
+		let isDragging = false, dragSrc: string | null = null
+		let lastPX = 0, lastPY = 0
+		let rafId: number | null = null, settleId: ReturnType<typeof setTimeout> | null = null
+		let wasScrolling = false
+
+		function setScrolling(active: boolean) {
+			if (active) {
+				core.cameraScrolling = true
+				if (settleId) { clearTimeout(settleId); settleId = null }
+			} else {
+				if (settleId) clearTimeout(settleId)
+				settleId = setTimeout(() => {
+					core.cameraScrolling = false; settleId = null
+					element.dispatchEvent(new CustomEvent('egg-camera-settled', { bubbles: true }))
+				}, settleDelay)
+			}
+		}
+
+		function scrollLoop() {
+			if (!isDragging) { rafId = null; if (wasScrolling) { setScrolling(false); wasScrolling = false }; return }
+			const vp = scrollContainer === window
+				? { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight }
+				: (() => { const r = (scrollContainer as HTMLElement).getBoundingClientRect(); return { top: r.top, left: r.left, width: r.width, height: r.height } })()
+			const rx = lastPX - vp.left, ry = lastPY - vp.top
+			let vx = 0, vy = 0
+			if (rx < edgeSize) vx = -scrollSpeed * (1 - rx / edgeSize)
+			else if (rx > vp.width - edgeSize) vx = scrollSpeed * (1 - (vp.width - rx) / edgeSize)
+			if (ry < edgeSize) vy = -scrollSpeed * (1 - ry / edgeSize)
+			else if (ry > vp.height - edgeSize) vy = scrollSpeed * (1 - (vp.height - ry) / edgeSize)
+
+			if (vx || vy) {
+				if (!wasScrolling) setScrolling(true)
+				wasScrolling = true
+				if (scrollContainer === window) window.scrollBy(vx, vy)
+				else { (scrollContainer as HTMLElement).scrollLeft += vx; (scrollContainer as HTMLElement).scrollTop += vy }
+			} else if (wasScrolling) { setScrolling(false); wasScrolling = false }
+			rafId = requestAnimationFrame(scrollLoop)
+		}
+
+		const onCamPtrMove = (e: PointerEvent) => { if (!isDragging) return; lastPX = e.clientX; lastPY = e.clientY; if (rafId === null) rafId = requestAnimationFrame(scrollLoop) }
+		const stopLoop = () => { if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }; setScrolling(false) }
+
+		const camEvents: Record<string, EventListener> = {
+			'egg-drag-start': ((e: CustomEvent) => { isDragging = true; dragSrc = e.detail.source; if (dragSrc === 'pointer') window.addEventListener('pointermove', onCamPtrMove) }) as EventListener,
+			'egg-drag-move': ((e: CustomEvent) => { if (e.detail.source === 'pointer') { lastPX = e.detail.x; lastPY = e.detail.y } else requestAnimationFrame(() => e.detail.item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })) }) as EventListener,
+			'egg-drag-end': ((e: CustomEvent) => { const wp = dragSrc === 'pointer'; isDragging = false; dragSrc = null; stopLoop(); if (wp) window.removeEventListener('pointermove', onCamPtrMove); if (!wp) setTimeout(() => requestAnimationFrame(() => e.detail.item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })), 100) }) as EventListener,
+			'egg-drag-cancel': (() => { const wp = dragSrc === 'pointer'; isDragging = false; dragSrc = null; stopLoop(); if (wp) window.removeEventListener('pointermove', onCamPtrMove) }) as EventListener,
+			'egg-select': ((e: CustomEvent) => { if (!isDragging) e.detail.item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }) }) as EventListener,
+		}
+		for (const [name, handler] of Object.entries(camEvents)) element.addEventListener(name, handler)
+		cleanups.push(() => { stopLoop(); for (const [name, handler] of Object.entries(camEvents)) element.removeEventListener(name, handler) })
+	}
+
+	// ── Placeholder ────────────────────────────────────────────────────────────
+
+	if (options.placeholder !== false) {
+		const phOpts = typeof options.placeholder === 'object' ? options.placeholder : {}
+		const className = phOpts.className ?? 'egg-placeholder'
+		let ph: HTMLElement | null = null
+
+		function createPH() { if (ph) return; ph = document.createElement('div'); ph.className = className; ph.style.pointerEvents = 'none'; ph.style.viewTransitionName = 'none'; element.appendChild(ph) }
+		function updatePH(c: number, r: number, cs: number, rs: number) { if (!ph) return; ph.style.gridColumn = `${c} / span ${cs}`; ph.style.gridRow = `${r} / span ${rs}` }
+		function removePH() { if (ph) { ph.remove(); ph = null } }
+
+		const phEvents: Record<string, EventListener> = {
+			'egg-drag-start': ((e: CustomEvent) => { createPH(); updatePH(e.detail.cell.column, e.detail.cell.row, e.detail.colspan, e.detail.rowspan) }) as EventListener,
+			'egg-drag-move': ((e: CustomEvent) => { updatePH(e.detail.cell.column, e.detail.cell.row, e.detail.colspan, e.detail.rowspan) }) as EventListener,
+			'egg-drop-preview': ((e: CustomEvent) => { updatePH(e.detail.cell.column, e.detail.cell.row, e.detail.colspan, e.detail.rowspan) }) as EventListener,
+			'egg-drag-end': (() => removePH()) as EventListener,
+			'egg-drag-cancel': (() => removePH()) as EventListener,
+			'egg-resize-start': ((e: CustomEvent) => { createPH(); updatePH(e.detail.cell.column, e.detail.cell.row, e.detail.colspan, e.detail.rowspan) }) as EventListener,
+			'egg-resize-move': ((e: CustomEvent) => { updatePH(e.detail.cell.column, e.detail.cell.row, e.detail.colspan, e.detail.rowspan) }) as EventListener,
+			'egg-resize-end': (() => removePH()) as EventListener,
+			'egg-resize-cancel': (() => removePH()) as EventListener,
+		}
+		for (const [name, handler] of Object.entries(phEvents)) element.addEventListener(name, handler)
+		document.addEventListener('pointerup', () => requestAnimationFrame(() => { if (ph && !document.querySelector('[data-egg-dragging]') && !document.querySelector('[data-egg-resizing]')) removePH() }))
+		cleanups.push(() => { removePH(); for (const [name, handler] of Object.entries(phEvents)) element.removeEventListener(name, handler) })
+	}
+
+	// ── Accessibility ──────────────────────────────────────────────────────────
+
+	if (options.accessibility !== false) {
+		const live = document.createElement('div')
+		live.setAttribute('aria-live', 'assertive'); live.setAttribute('aria-atomic', 'true')
+		Object.assign(live.style, { position: 'absolute', width: '1px', height: '1px', padding: '0', margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: '0' })
+		element.appendChild(live)
+		let lastA11yCell: GridCell | null = null, lastA11ySize: { colspan: number; rowspan: number } | null = null
+
+		function announce(msg: string) { live.textContent = ''; requestAnimationFrame(() => { live.textContent = msg }) }
+		function label(item: HTMLElement) { return item.getAttribute('data-egg-label') || item.getAttribute('aria-label') || item.id || 'Item' }
+		function pos(cell: GridCell) { return `row ${cell.row}, column ${cell.column}` }
+		function tpl(item: HTMLElement, event: string, vars: Record<string, string>, fallback: string): string {
+			const t = item.getAttribute(`data-egg-announce-${event}`) || element.getAttribute(`data-egg-announce-${event}`)
+			return t ? t.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '') : fallback
+		}
+
+		const a11yEvents: Record<string, EventListener> = {
+			'egg-drag-start': ((e: CustomEvent) => { lastA11yCell = e.detail.cell; const l = label(e.detail.item), p = pos(e.detail.cell); announce(tpl(e.detail.item, 'grab', { label: l, row: String(e.detail.cell.row), column: String(e.detail.cell.column) }, `${l} grabbed. Position ${p}. Use arrow keys to move, Enter to drop, Escape to cancel.`)) }) as EventListener,
+			'egg-drag-move': ((e: CustomEvent) => { const c = e.detail.cell; if (lastA11yCell && c.row === lastA11yCell.row && c.column === lastA11yCell.column) return; lastA11yCell = c; announce(tpl(e.detail.item, 'move', { label: label(e.detail.item), row: String(c.row), column: String(c.column) }, `Moved to ${pos(c)}.`)) }) as EventListener,
+			'egg-drag-end': ((e: CustomEvent) => { lastA11yCell = null; const l = label(e.detail.item), p = pos(e.detail.cell); announce(tpl(e.detail.item, 'drop', { label: l, row: String(e.detail.cell.row), column: String(e.detail.cell.column) }, `${l} dropped at ${p}.`)) }) as EventListener,
+			'egg-drag-cancel': ((e: CustomEvent) => { lastA11yCell = null; announce(tpl(e.detail.item, 'cancel', { label: label(e.detail.item) }, `${label(e.detail.item)} drag cancelled.`)) }) as EventListener,
+			'egg-resize-start': ((e: CustomEvent) => { lastA11ySize = { colspan: e.detail.colspan, rowspan: e.detail.rowspan }; const sz = `${e.detail.colspan} columns by ${e.detail.rowspan} rows`; announce(tpl(e.detail.item, 'resize-start', { label: label(e.detail.item), colspan: String(e.detail.colspan), rowspan: String(e.detail.rowspan) }, `${label(e.detail.item)} resize started. Size ${sz}.`)) }) as EventListener,
+			'egg-resize-move': ((e: CustomEvent) => { if (lastA11ySize && e.detail.colspan === lastA11ySize.colspan && e.detail.rowspan === lastA11ySize.rowspan) return; lastA11ySize = { colspan: e.detail.colspan, rowspan: e.detail.rowspan }; announce(tpl(e.detail.item, 'resize-move', { label: label(e.detail.item), colspan: String(e.detail.colspan), rowspan: String(e.detail.rowspan) }, `Resized to ${e.detail.colspan} columns by ${e.detail.rowspan} rows.`)) }) as EventListener,
+			'egg-resize-end': ((e: CustomEvent) => { lastA11ySize = null; const sz = `${e.detail.colspan} columns by ${e.detail.rowspan} rows`; announce(tpl(e.detail.item, 'resize-end', { label: label(e.detail.item), colspan: String(e.detail.colspan), rowspan: String(e.detail.rowspan), row: String(e.detail.cell.row), column: String(e.detail.cell.column) }, `${label(e.detail.item)} resized to ${sz} at ${pos(e.detail.cell)}.`)) }) as EventListener,
+			'egg-resize-cancel': ((e: CustomEvent) => { lastA11ySize = null; announce(tpl(e.detail.item, 'resize-cancel', { label: label(e.detail.item) }, `${label(e.detail.item)} resize cancelled.`)) }) as EventListener,
+		}
+		for (const [name, handler] of Object.entries(a11yEvents)) element.addEventListener(name, handler)
+		cleanups.push(() => { live.remove(); for (const [name, handler] of Object.entries(a11yEvents)) element.removeEventListener(name, handler) })
+	}
+
+	// ── Responsive ─────────────────────────────────────────────────────────────
+
+	if (options.responsive) {
+		const { layoutModel } = options.responsive
+		let cellSize = options.responsive.cellSize
+		let gap = options.responsive.gap
+
+		function inferMetrics() {
+			if (cellSize !== undefined && gap !== undefined) return
+			const s = getComputedStyle(element)
+			if (gap === undefined) gap = parseFloat(s.columnGap) || parseFloat(s.gap) || 16
+			if (cellSize === undefined) { const ar = parseFloat(s.gridAutoRows); cellSize = ar > 0 ? ar : parseFloat(s.gridTemplateColumns.split(' ')[0] ?? '184') || 184 }
+		}
+
+		function injectCSS() {
+			inferMetrics()
+			const gridSelector = element.id ? `#${element.id}` : element.className ? `.${element.className.split(' ')[0]}` : '.grid'
+			core.baseCSS = layoutModel.generateAllBreakpointCSS({ cellSize: cellSize!, gap: gap!, gridSelector })
+			core.commitStyles()
+		}
+
+		if (!core.baseCSS.trim()) injectCSS()
+		const unsub = layoutModel.subscribe(() => injectCSS())
+
+		let lastColCount = layoutModel.currentColumnCount
+		const ro = new ResizeObserver(() => {
+			const s = getComputedStyle(element)
+			const newCount = Math.max(1, s.gridTemplateColumns.split(' ').filter(Boolean).length)
+			if (newCount !== lastColCount) {
+				const prev = lastColCount; lastColCount = newCount
+				layoutModel.setCurrentColumnCount(newCount)
+				element.dispatchEvent(new CustomEvent('egg-column-count-change', { bubbles: true, detail: { previousCount: prev, currentCount: newCount } }))
+			}
+		})
+		ro.observe(element)
+		cleanups.push(() => { ro.disconnect(); unsub() })
+	}
+
+	// Snapshot initial layout from inline styles → CSS, then clear inline styles
+	// so CSS injection controls layout from here on. Skip if responsive plugin
+	// already injected CSS (it writes to baseCSS).
+	if (!options.responsive && !core.baseCSS) {
+		const items = readItemsFromDOM(element)
+		core.baseCSS = layoutToCSS(items)
+		core.commitStyles()
+		element.querySelectorAll('[data-egg-item]').forEach(el => {
+			(el as HTMLElement).style.removeProperty('grid-column');
+			(el as HTMLElement).style.removeProperty('grid-row')
+		})
+	}
+
+	return core
+}
+
+// ── Exports ────────────────────────────────────────────────────────────────────
+
+export { getItemCell, getItemSize, getItemId, layoutToCSS, readItemsFromDOM }
+export { calculatePushLayout, itemsOverlap, pushDown, compactUp }
+export { calculateReorderLayout, reflowItems }
+export type { GridCell, ItemRect, ResizeHandle, EggCore, InitOptions, ResponsiveLayoutModel }

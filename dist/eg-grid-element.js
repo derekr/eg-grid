@@ -2378,6 +2378,29 @@ var EgGridElement = class extends HTMLElement {
 				row: rowStart
 			});
 		}
+		if (canonicalPositions.size > 1) {
+			if (Array.from(canonicalPositions.values()).every((p) => p.column === 1 && p.row === 1)) {
+				const occupied = [];
+				for (let r = 0; r < 100; r++) occupied.push(new Array(maxColumns).fill(null));
+				for (const def of itemDefs) {
+					const w = Math.min(def.width, maxColumns);
+					const h = def.height;
+					let placed = false;
+					for (let row = 0; row < 100 && !placed; row++) for (let col = 0; col <= maxColumns - w && !placed; col++) {
+						let fits = true;
+						for (let dy = 0; dy < h && fits; dy++) for (let dx = 0; dx < w && fits; dx++) if (occupied[row + dy]?.[col + dx] !== null) fits = false;
+						if (fits) {
+							canonicalPositions.set(def.id, {
+								column: col + 1,
+								row: row + 1
+							});
+							for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) if (occupied[row + dy]) occupied[row + dy][col + dx] = def.id;
+							placed = true;
+						}
+					}
+				}
+			}
+		}
 		if (itemDefs.length > 0) this.layoutModel = createLayoutModel({
 			maxColumns,
 			minColumns: 1,
