@@ -3,85 +3,619 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EG Grid</title>
+  <title>EG Grid — Zero-dependency CSS Grid drag-and-drop</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
       font-family: system-ui, -apple-system, sans-serif;
       background: #1a1a2e;
       color: #e0e0e0;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
-    .landing {
+
+    /* ─── Hero ─── */
+    .hero {
+      padding: 48px 32px 40px;
       text-align: center;
-      max-width: 480px;
-      padding: 32px;
     }
-    h1 {
-      font-size: 2rem;
+
+    .hero h1 {
+      font-size: 2.2rem;
       font-weight: 700;
       margin-bottom: 8px;
     }
-    p {
+
+    .hero .tagline {
       color: #888;
-      font-size: 0.9rem;
-      margin-bottom: 32px;
+      font-size: 0.95rem;
       line-height: 1.5;
+      margin-bottom: 6px;
     }
-    .links {
+
+    .hero .size-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      color: #43e97b;
+      background: rgba(67, 233, 123, 0.08);
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-bottom: 24px;
+    }
+
+    /* ─── Grid demo ─── */
+    .demo {
       display: flex;
-      flex-direction: column;
-      gap: 12px;
+      justify-content: center;
+      padding: 0 32px 16px;
     }
-    a {
-      display: block;
-      padding: 14px 20px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
+
+    eg-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      grid-auto-rows: 120px;
+      background: rgba(255,255,255,0.04);
+      padding: 8px;
+      border-radius: 12px;
+      max-width: 560px;
+      width: 100%;
+    }
+
+    .item {
       border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 16px;
+      color: white;
+      cursor: default;
+      user-select: none;
+      -webkit-user-select: none;
+      position: relative;
+      view-transition-name: var(--item-id);
+      transition: filter 0.15s ease;
+    }
+
+    eg-grid[data-pointer-active] .item { cursor: grab; }
+
+    .item[data-egg-dragging] {
+      cursor: grabbing;
+      transform: scale(1.03);
+      filter: drop-shadow(0 16px 32px rgba(0,0,0,0.5));
+      z-index: 100;
+    }
+    .item[data-egg-dropping] { z-index: 100; }
+    .item[data-egg-selected] { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    .item[data-egg-resizing] { z-index: 100; outline: 2px solid rgba(251, 191, 36, 0.5); outline-offset: 2px; }
+
+    /* Resize handle indicators */
+    .item::after {
+      content: '';
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: 3px;
+      background: rgba(59, 130, 246, 0.7);
+    }
+    .item[data-egg-handle-hover="se"]::after { opacity: 1; width: 12px; height: 12px; bottom: 4px; right: 4px; }
+    .item[data-egg-handle-hover="sw"]::after { opacity: 1; width: 12px; height: 12px; bottom: 4px; left: 4px; }
+    .item[data-egg-handle-hover="ne"]::after { opacity: 1; width: 12px; height: 12px; top: 4px; right: 4px; }
+    .item[data-egg-handle-hover="nw"]::after { opacity: 1; width: 12px; height: 12px; top: 4px; left: 4px; }
+    .item[data-egg-handle-hover="n"]::after { opacity: 1; height: 3px; top: 4px; left: 16px; right: 16px; }
+    .item[data-egg-handle-hover="s"]::after { opacity: 1; height: 3px; bottom: 4px; left: 16px; right: 16px; }
+    .item[data-egg-handle-hover="e"]::after { opacity: 1; width: 3px; right: 4px; top: 16px; bottom: 16px; }
+    .item[data-egg-handle-hover="w"]::after { opacity: 1; width: 3px; left: 4px; top: 16px; bottom: 16px; }
+    .item[data-egg-handle-active]::after { opacity: 1; background: rgba(59, 130, 246, 0.95); box-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
+    .item[data-egg-handle-active="se"]::after { width: 12px; height: 12px; bottom: 4px; right: 4px; top: auto; left: auto; }
+    .item[data-egg-handle-active="sw"]::after { width: 12px; height: 12px; bottom: 4px; left: 4px; top: auto; right: auto; }
+    .item[data-egg-handle-active="ne"]::after { width: 12px; height: 12px; top: 4px; right: 4px; bottom: auto; left: auto; }
+    .item[data-egg-handle-active="nw"]::after { width: 12px; height: 12px; top: 4px; left: 4px; bottom: auto; right: auto; }
+    .item[data-egg-handle-active="n"]::after { height: 3px; top: 4px; left: 16px; right: 16px; bottom: auto; width: auto; }
+    .item[data-egg-handle-active="s"]::after { height: 3px; bottom: 4px; left: 16px; right: 16px; top: auto; width: auto; }
+    .item[data-egg-handle-active="e"]::after { width: 3px; right: 4px; top: 16px; bottom: 16px; left: auto; height: auto; }
+    .item[data-egg-handle-active="w"]::after { width: 3px; left: 4px; top: 16px; bottom: 16px; right: auto; height: auto; }
+
+    /* Placeholder */
+    .drop-placeholder {
+      background: rgba(255,255,255,0.06);
+      border: 2px dashed rgba(255,255,255,0.25);
+      border-radius: 8px;
+      pointer-events: none;
+      view-transition-name: none;
+    }
+
+    /* Colors */
+    .item[data-color="1"] { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .item[data-color="2"] { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .item[data-color="3"] { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .item[data-color="4"] { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .item[data-color="5"] { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .item[data-color="6"] { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
+
+    /* View Transitions */
+    ::view-transition-group(*) {
+      animation-duration: 200ms;
+      animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+    ::view-transition-old(*) { animation: none; opacity: 0; }
+    ::view-transition-new(*) { animation: none; }
+    ::view-transition-old(dragging), ::view-transition-new(dragging), ::view-transition-group(dragging) { animation: none; }
+    ::view-transition-old(resizing), ::view-transition-new(resizing), ::view-transition-group(resizing) { animation: none; }
+
+    /* Keyboard mode */
+    eg-grid[data-egg-keyboard-mode] {
+      outline: 2px solid rgba(251, 191, 36, 0.3);
+      outline-offset: 4px;
+    }
+
+    .demo-hint {
+      text-align: center;
+      font-size: 0.7rem;
+      color: #444;
+      padding: 8px 32px 0;
+    }
+
+    /* ─── Examples nav ─── */
+    .examples-nav {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px 32px 0;
+      flex-wrap: wrap;
+    }
+
+    .examples-nav a {
+      font-size: 0.75rem;
       color: #4facfe;
       text-decoration: none;
-      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 6px;
+      background: rgba(79, 172, 254, 0.06);
+      border: 1px solid rgba(79, 172, 254, 0.12);
       transition: background 0.15s, border-color 0.15s;
     }
-    a:hover {
-      background: rgba(255,255,255,0.1);
+    .examples-nav a:hover {
+      background: rgba(79, 172, 254, 0.12);
       border-color: rgba(79, 172, 254, 0.3);
     }
-    a small {
+
+    /* ─── Docs content ─── */
+    .docs {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 48px 32px 64px;
+    }
+
+    .docs h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 48px 0 16px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .docs h2:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .docs h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #ccc;
+      margin: 24px 0 10px;
+    }
+
+    .docs p {
+      font-size: 0.8rem;
+      color: #999;
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+
+    .docs p code,
+    .docs li code,
+    .docs td code {
+      color: #b0b0b0;
+      background: rgba(255,255,255,0.06);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.72rem;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    }
+
+    .docs p strong { color: #ddd; }
+
+    .docs ul, .docs ol {
+      font-size: 0.8rem;
+      color: #999;
+      line-height: 1.7;
+      margin-bottom: 12px;
+      padding-left: 20px;
+    }
+
+    .docs li { margin-bottom: 4px; }
+    .docs li strong { color: #ddd; }
+
+    /* Tables */
+    .docs table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 0.72rem;
+    }
+
+    .docs th {
+      text-align: left;
+      font-weight: 600;
+      color: #aaa;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      white-space: nowrap;
+    }
+
+    .docs td {
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #888;
+      vertical-align: top;
+    }
+
+    .docs tr:last-child td { border-bottom: none; }
+
+    /* Comparison table: highlight eg-grid column */
+    .comparison td:nth-child(2),
+    .comparison th:nth-child(2) {
+      color: #e0e0e0;
+      background: rgba(79, 172, 254, 0.04);
+    }
+
+    .docs .yes { color: #43e97b; }
+    .docs .no { color: #555; }
+
+    /* Code blocks */
+    .docs pre {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.7rem;
+      line-height: 1.6;
+      color: #a0a0a0;
+      overflow-x: auto;
+      white-space: pre;
+      margin-bottom: 16px;
+    }
+
+    /* Vendor callout */
+    .vendor-callout {
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 20px 24px;
+      margin: 24px 0;
+    }
+
+    .vendor-callout p {
+      margin-bottom: 8px;
+    }
+
+    .vendor-callout p:last-child { margin-bottom: 0; }
+
+    .vendor-callout ul {
+      padding-left: 18px;
+    }
+
+    /* Feature grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .feature-grid .feature {
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .feature-grid .feature strong {
       display: block;
-      color: #666;
-      font-weight: 400;
       font-size: 0.75rem;
-      margin-top: 2px;
+      color: #ccc;
+      margin-bottom: 3px;
+    }
+
+    .feature-grid .feature span {
+      font-size: 0.7rem;
+      color: #666;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 600px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.6rem; }
     }
   </style>
 </head>
 <body>
-  <div class="landing">
+  <!-- ─── Hero ─── -->
+  <div class="hero">
     <h1>EG Grid</h1>
-    <p>Zero-dependency CSS Grid drag-and-drop library.</p>
-    <div class="links">
-      <a href="examples/index.html">
-        Architecture Explorer
-        <small>Full setup with X-ray debug panel</small>
-      </a>
-<a href="examples/web-component.html">
-        Web Component
-        <small>&lt;eg-grid&gt; — zero JS setup</small>
-      </a>
-      <a href="examples/frameworks.html">
-        Frameworks
-        <small>React, Vue, Solid — web component interop</small>
-      </a>
-      <a href="https://eg-grid-cdn.derekr.workers.dev/morph" target="_blank" rel="noopener">
-        Datastar + Workers
-        <small>Server-driven layout with Cloudflare Durable Objects</small>
-      </a>
-    </div>
+    <p class="tagline">Zero-dependency CSS Grid drag-and-drop. One file.</p>
+    <div class="size-badge">29 KB min &middot; 8.8 KB gzip &middot; 0 deps</div>
   </div>
+
+  <!-- ─── Live demo ─── -->
+  <style>
+    [data-egg-item="item-a"] { grid-column: 1 / span 2; grid-row: 1; }
+    [data-egg-item="item-b"] { grid-column: 3; grid-row: 1; }
+    [data-egg-item="item-c"] { grid-column: 4; grid-row: 1; }
+    [data-egg-item="item-d"] { grid-column: 1; grid-row: 2 / span 2; }
+    [data-egg-item="item-e"] { grid-column: 2 / span 2; grid-row: 2; }
+    [data-egg-item="item-f"] { grid-column: 4; grid-row: 2; }
+    [data-egg-item="item-g"] { grid-column: 2; grid-row: 3; }
+    [data-egg-item="item-h"] { grid-column: 3 / span 2; grid-row: 3; }
+  </style>
+
+  <div class="demo">
+    <eg-grid columns="4" cell-size="120" gap="8" algorithm="push" resize-handles="all" placeholder-class="drop-placeholder">
+      <div class="item" data-egg-item="item-a" data-color="1">A (2&times;1)</div>
+      <div class="item" data-egg-item="item-b" data-color="2">B</div>
+      <div class="item" data-egg-item="item-c" data-color="3">C</div>
+      <div class="item" data-egg-item="item-d" data-color="4">D (1&times;2)</div>
+      <div class="item" data-egg-item="item-e" data-color="5">E (2&times;1)</div>
+      <div class="item" data-egg-item="item-f" data-color="6">F</div>
+      <div class="item" data-egg-item="item-g" data-color="1">G</div>
+      <div class="item" data-egg-item="item-h" data-color="2">H (2&times;1)</div>
+    </eg-grid>
+  </div>
+  <p class="demo-hint">Drag to rearrange. Resize from corners and edges. Arrow keys to navigate.</p>
+
+  <!-- ─── Examples nav ─── -->
+  <div class="examples-nav">
+    <a href="examples/index.html">Architecture Explorer</a>
+    <a href="examples/web-component.html">Web Component</a>
+    <a href="examples/frameworks.html">Frameworks</a>
+    <a href="https://eg-grid-cdn.derekr.workers.dev/morph" target="_blank" rel="noopener">Datastar + Workers</a>
+  </div>
+
+  <!-- ─── Docs ─── -->
+  <div class="docs">
+
+    <!-- Comparison -->
+    <h2>Comparison</h2>
+    <table class="comparison">
+      <thead>
+        <tr>
+          <th></th>
+          <th>EG Grid</th>
+          <th>Packery</th>
+          <th>gridster.js</th>
+          <th>react-grid-layout</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Minified</strong></td><td>29 KB</td><td>~38 KB</td><td>~32 KB</td><td>~43 KB</td></tr>
+        <tr><td><strong>Gzipped</strong></td><td>8.8 KB</td><td>~12 KB</td><td>~10 KB</td><td>~13 KB</td></tr>
+        <tr><td><strong>Dependencies</strong></td><td>0</td><td>0 (bundled)</td><td>jQuery (~30 KB)</td><td>React (~42 KB)</td></tr>
+        <tr><td><strong>Total w/ deps</strong></td><td>29 KB</td><td>~48 KB</td><td>~62 KB</td><td>~85 KB+</td></tr>
+        <tr><td><strong>Framework</strong></td><td>none</td><td>none</td><td>jQuery</td><td>React only</td></tr>
+        <tr><td><strong>Layout engine</strong></td><td>CSS Grid</td><td>abs positioning</td><td>abs positioning</td><td>CSS transforms</td></tr>
+        <tr><td><strong>Drag</strong></td><td class="yes">yes</td><td>yes (addon)</td><td class="yes">yes</td><td class="yes">yes</td></tr>
+        <tr><td><strong>Resize (8-way)</strong></td><td class="yes">yes</td><td class="no">no</td><td>SE only</td><td>SE only</td></tr>
+        <tr><td><strong>Keyboard</strong></td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+        <tr><td><strong>Accessibility</strong></td><td class="yes">yes (ARIA)</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+        <tr><td><strong>View Transitions</strong></td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td><td class="no">no</td></tr>
+        <tr><td><strong>Vendorable</strong></td><td class="yes">1 file</td><td>npm/CDN</td><td>npm/CDN</td><td>npm only</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Quick start -->
+    <h2>Quick Start</h2>
+
+    <h3>Copy the file (recommended)</h3>
+    <pre>cp src/eg-grid.ts your-project/lib/eg-grid.ts</pre>
+
+    <pre>&lt;div class="grid" id="grid"&gt;
+  &lt;div data-egg-item="a" data-egg-colspan="2"&gt;A&lt;/div&gt;
+  &lt;div data-egg-item="b"&gt;B&lt;/div&gt;
+  &lt;div data-egg-item="c"&gt;C&lt;/div&gt;
+&lt;/div&gt;
+&lt;style id="egg-styles"&gt;&lt;/style&gt;
+
+&lt;script type="module"&gt;
+  import { init } from './lib/eg-grid.js';
+
+  const core = init(document.getElementById('grid'), {
+    algorithm: 'push',
+    styleElement: document.getElementById('egg-styles'),
+    resize: { handles: 'all' },
+  });
+&lt;/script&gt;</pre>
+
+    <h3>Web Component</h3>
+    <pre>&lt;script type="module" src="eg-grid-element.js"&gt;&lt;/script&gt;
+
+&lt;eg-grid columns="4" gap="8" algorithm="push" resize-handles="all"&gt;
+  &lt;div data-egg-item="a" data-egg-colspan="2"&gt;A&lt;/div&gt;
+  &lt;div data-egg-item="b"&gt;B&lt;/div&gt;
+  &lt;div data-egg-item="c"&gt;C&lt;/div&gt;
+&lt;/eg-grid&gt;</pre>
+
+    <!-- How it works -->
+    <h2>How It Works</h2>
+    <p>
+      CSS Grid does the layout. JavaScript only sets <code>grid-column</code> and <code>grid-row</code>
+      via <code>&lt;style&gt;</code> injection. The browser computes all pixel positions, handles animations
+      via View Transitions, and manages responsive behavior through container queries.
+    </p>
+    <p>
+      During drag, the item leaves grid flow (<code>position: fixed</code>) so the grid can reflow around it.
+      On drop, it rejoins the grid at its new position.
+    </p>
+    <p>
+      <strong>State machine:</strong> <code>idle</code> &rarr; <code>selected</code> &rarr; <code>interacting</code> &rarr; <code>idle</code>.
+      Three phases, tracked on <code>core.phase</code>.
+    </p>
+
+    <!-- Features -->
+    <h2>Features</h2>
+    <p>Everything is in one file. No plugins to configure &mdash; just <code>init()</code> options.</p>
+
+    <div class="feature-grid">
+      <div class="feature"><strong>Drag &amp; drop</strong><span>Pointer and touch. Push or reorder algorithms.</span></div>
+      <div class="feature"><strong>Resize (8-way)</strong><span>Corners and edges. Min/max size constraints.</span></div>
+      <div class="feature"><strong>Keyboard</strong><span>Arrow keys, hjkl, Enter/Space grab, Shift+G mode.</span></div>
+      <div class="feature"><strong>Accessibility</strong><span>ARIA live region announces all interactions.</span></div>
+      <div class="feature"><strong>View Transitions</strong><span>Animated layout changes when the browser supports it.</span></div>
+      <div class="feature"><strong>Responsive</strong><span>Container query breakpoints. Auto-reflow on resize.</span></div>
+      <div class="feature"><strong>Camera scroll</strong><span>Auto-scroll viewport when dragging near edges.</span></div>
+      <div class="feature"><strong>Placeholder</strong><span>Visual drop target indicator. Styled via CSS class.</span></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>algorithm</code></td><td><code>false</code></td><td><code>'push'</code> (dashboard), <code>'reorder'</code> (list), or <code>false</code></td></tr>
+        <tr><td><code>resize</code></td><td>enabled</td><td><code>{ handles: 'corners' | 'edges' | 'all' }</code> or <code>false</code></td></tr>
+        <tr><td><code>camera</code></td><td>enabled</td><td>Auto-scroll during drag. <code>false</code> to disable</td></tr>
+        <tr><td><code>placeholder</code></td><td>enabled</td><td>Drop target indicator. <code>{ className }</code> or <code>false</code></td></tr>
+        <tr><td><code>keyboard</code></td><td>enabled</td><td>Arrow key navigation. <code>false</code> to disable</td></tr>
+        <tr><td><code>accessibility</code></td><td>enabled</td><td>ARIA announcements. <code>false</code> to disable</td></tr>
+        <tr><td><code>pointer</code></td><td>enabled</td><td>Mouse/touch drag. <code>false</code> to disable</td></tr>
+        <tr><td><code>responsive</code></td><td>disabled</td><td><code>{ layoutModel, cellSize, gap }</code></td></tr>
+        <tr><td><code>styleElement</code></td><td>auto-created</td><td><code>&lt;style&gt;</code> element for CSS injection</td></tr>
+      </tbody>
+    </table>
+
+    <!-- API -->
+    <h2>API</h2>
+    <pre>const core = init(element, options);
+
+core.phase          // 'idle' | 'selected' | 'interacting'
+core.interaction    // { type, mode, itemId, element, columnCount } | null
+core.selectedItem   // HTMLElement | null
+core.select(item)   // Programmatic select
+core.deselect()     // Programmatic deselect
+core.baseCSS        // Get/set base layout CSS
+core.previewCSS     // Get/set preview CSS (during drag/resize)
+core.commitStyles() // Flush CSS to &lt;style&gt; element
+core.destroy()      // Clean up all listeners</pre>
+
+    <h3>Events</h3>
+    <p>All events bubble from the grid element. <code>source</code> is <code>'pointer'</code> or <code>'keyboard'</code>.</p>
+    <table>
+      <thead>
+        <tr><th>Event</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>egg-drag-start</code></td><td><code>{ item, cell, colspan, rowspan, source }</code></td></tr>
+        <tr><td><code>egg-drag-move</code></td><td><code>{ item, cell, colspan, rowspan, source }</code></td></tr>
+        <tr><td><code>egg-drag-end</code></td><td><code>{ item, cell, colspan, rowspan, source }</code></td></tr>
+        <tr><td><code>egg-drag-cancel</code></td><td><code>{ item, source }</code></td></tr>
+        <tr><td><code>egg-resize-start</code></td><td><code>{ item, handle, colspan, rowspan, source }</code></td></tr>
+        <tr><td><code>egg-resize-move</code></td><td><code>{ item, handle, colspan, rowspan, source }</code></td></tr>
+        <tr><td><code>egg-resize-end</code></td><td><code>{ item, handle, colspan, rowspan, source }</code></td></tr>
+        <tr><td><code>egg-resize-cancel</code></td><td><code>{ item, source }</code></td></tr>
+        <tr><td><code>egg-select</code></td><td><code>{ item }</code></td></tr>
+        <tr><td><code>egg-deselect</code></td><td><code>{ item }</code></td></tr>
+        <tr><td><code>egg-column-count-change</code></td><td><code>{ columnCount }</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- Keyboard -->
+    <h2>Keyboard</h2>
+    <table>
+      <thead>
+        <tr><th>Key</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Arrow keys</strong> / <strong>hjkl</strong></td><td>Nudge item by 1 cell</td></tr>
+        <tr><td><strong>Shift+Arrow</strong></td><td>Resize item</td></tr>
+        <tr><td><strong>Ctrl+Arrow</strong></td><td>Jump by item size</td></tr>
+        <tr><td><strong>Alt+Arrow</strong></td><td>Select adjacent item</td></tr>
+        <tr><td><strong>Enter</strong> / <strong>Space</strong></td><td>Pick up / drop item</td></tr>
+        <tr><td><strong>Escape</strong></td><td>Cancel or deselect</td></tr>
+        <tr><td><strong>Shift+G</strong></td><td>Toggle keyboard mode</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Styling -->
+    <h2>Styling</h2>
+    <p>Items are styled via CSS attribute selectors. The library sets data attributes automatically:</p>
+    <pre>[data-egg-dragging]  { cursor: grabbing; z-index: 100; }
+[data-egg-dropping]  { z-index: 100; }
+[data-egg-selected]  { outline: 2px solid #fbbf24; }
+[data-egg-resizing]  { z-index: 100; }
+[data-egg-handle-hover="se"]::after { /* show SE handle */ }
+[data-egg-keyboard-mode] { outline: 2px solid gold; }</pre>
+
+    <h3>View Transitions</h3>
+    <p>For animated layout changes, give items a <code>view-transition-name</code>:</p>
+    <pre>.item { view-transition-name: var(--item-id); }
+
+::view-transition-group(*) {
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}</pre>
+
+    <h3>Item Attributes</h3>
+    <table>
+      <thead>
+        <tr><th>Attribute</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>data-egg-item</code></td><td>Mark as grid item (value = item ID)</td></tr>
+        <tr><td><code>data-egg-colspan</code></td><td>Column span (default: 1, or derived from CSS)</td></tr>
+        <tr><td><code>data-egg-rowspan</code></td><td>Row span (default: 1, or derived from CSS)</td></tr>
+        <tr><td><code>data-egg-label</code></td><td>Human-readable name for accessibility</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Vendor-first -->
+    <h2>Vendor-First</h2>
+    <div class="vendor-callout">
+      <p><strong>This is not a package you install.</strong> Copy one file into your codebase and own it.</p>
+      <ul>
+        <li><strong>No npm.</strong> No registry. No lock file entry.</li>
+        <li><strong>No versions.</strong> The code you copy is your version.</li>
+        <li><strong>No API stability contract.</strong> Modify the source to fit your needs.</li>
+        <li><strong>LLM-friendly.</strong> One file, ~1,100 lines. Feed it to your AI and ask for changes.</li>
+        <li><strong>One grep away.</strong> Every feature, every edge case, one file.</li>
+      </ul>
+    </div>
+
+    <!-- Source -->
+    <h2>Source</h2>
+    <pre>src/
+  eg-grid.ts            &larr; THE library (1,165 lines, everything in one file)
+  eg-grid-element.ts    &larr; &lt;eg-grid&gt; web component wrapper
+  layout-model.ts       &larr; Responsive layout model (optional)
+  bundles/element.ts    &larr; Web component bundle entry
+  plugins/dev-overlay.ts&larr; Debug panel (Shift+D, optional)</pre>
+
+    <table>
+      <thead>
+        <tr><th>Bundle</th><th>Gzip</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>eg-grid.js</code></td><td>8.8 KB</td><td>Core library</td></tr>
+        <tr><td><code>eg-grid-element.js</code></td><td>10.9 KB</td><td>Web component</td></tr>
+        <tr><td><code>dev-overlay.js</code></td><td>3.1 KB</td><td>Debug panel (Shift+D)</td></tr>
+      </tbody>
+    </table>
+
+  </div>
+
+  <script type="module" src="src/bundles/element.ts"></script>
 </body>
 </html>
