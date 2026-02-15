@@ -192,8 +192,8 @@
     .docs h2 {
       font-size: 1.1rem;
       font-weight: 700;
-      margin: 48px 0 16px;
-      padding-top: 24px;
+      margin: 64px 0 20px;
+      padding-top: 32px;
       border-top: 1px solid rgba(255,255,255,0.06);
     }
 
@@ -207,14 +207,14 @@
       font-size: 0.85rem;
       font-weight: 600;
       color: #ccc;
-      margin: 24px 0 10px;
+      margin: 28px 0 12px;
     }
 
     .docs p {
       font-size: 0.8rem;
       color: #999;
       line-height: 1.7;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
 
     .docs p code,
@@ -342,19 +342,21 @@
 
     /* Perf chart */
     .perf-chart {
-      margin: 16px 0;
+      margin: 24px 0;
+      text-align: center;
     }
 
     .perf-chart svg {
       width: 100%;
-      display: block;
+      max-width: 640px;
+      display: inline-block;
     }
 
     .perf-chart .perf-note {
       font-size: 0.65rem;
       color: #888;
-      margin-top: 8px;
-      text-align: right;
+      margin-top: 12px;
+      text-align: center;
     }
 
     /* Feature grid */
@@ -478,7 +480,7 @@
     <p>Frame times measured on a live 8-item grid. All interactions stay under 16ms (60fps budget).</p>
 
     <div class="perf-chart">
-      <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 660 220" xmlns="http://www.w3.org/2000/svg">
         <!-- 16ms budget line -->
         <line x1="80" y1="24" x2="580" y2="24" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="4 3"/>
         <text x="76" y="28" text-anchor="end" fill="#888" font-size="9" font-family="system-ui">16ms</text>
