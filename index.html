@@ -9,6 +9,7 @@
 
     body {
       font-family: system-ui, -apple-system, sans-serif;
+      font-size: 18px;
       background: #1a1a2e;
       color: #e0e0e0;
       min-height: 100vh;
@@ -586,12 +587,17 @@ curl -fsSL https://raw.githubusercontent.com/derekr/eg-grid/main/dist/eg-grid-el
     <pre>curl -fsSL https://raw.githubusercontent.com/derekr/eg-grid/main/vendor.sh | bash</pre>
 
     <h3>Core library</h3>
-    <pre>&lt;div class="grid" id="grid"&gt;
-  &lt;div data-egg-item="a" data-egg-colspan="2"&gt;A&lt;/div&gt;
+    <pre>&lt;style id="egg-styles"&gt;
+  [data-egg-item="a"] { grid-column: 1 / span 2; grid-row: 1; }
+  [data-egg-item="b"] { grid-column: 3; grid-row: 1; }
+  [data-egg-item="c"] { grid-column: 1; grid-row: 2; }
+&lt;/style&gt;
+
+&lt;div class="grid" id="grid"&gt;
+  &lt;div data-egg-item="a"&gt;A&lt;/div&gt;
   &lt;div data-egg-item="b"&gt;B&lt;/div&gt;
   &lt;div data-egg-item="c"&gt;C&lt;/div&gt;
 &lt;/div&gt;
-&lt;style id="egg-styles"&gt;&lt;/style&gt;
 
 &lt;script type="module"&gt;
   import { init } from './lib/eg-grid.js';
@@ -606,8 +612,14 @@ curl -fsSL https://raw.githubusercontent.com/derekr/eg-grid/main/dist/eg-grid-el
     <h3>Web Component</h3>
     <pre>&lt;script type="module" src="lib/eg-grid-element.js"&gt;&lt;/script&gt;
 
+&lt;style&gt;
+  [data-egg-item="a"] { grid-column: 1 / span 2; grid-row: 1; }
+  [data-egg-item="b"] { grid-column: 3; grid-row: 1; }
+  [data-egg-item="c"] { grid-column: 1; grid-row: 2; }
+&lt;/style&gt;
+
 &lt;eg-grid columns="4" gap="8" algorithm="push" resize-handles="all"&gt;
-  &lt;div data-egg-item="a" data-egg-colspan="2"&gt;A&lt;/div&gt;
+  &lt;div data-egg-item="a"&gt;A&lt;/div&gt;
   &lt;div data-egg-item="b"&gt;B&lt;/div&gt;
   &lt;div data-egg-item="c"&gt;C&lt;/div&gt;
 &lt;/eg-grid&gt;</pre>
